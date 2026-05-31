@@ -32,6 +32,10 @@ export default function EventCard({ event, onClick }) {
             <i className="ti ti-map-pin" aria-hidden="true" />
             {event.location}
           </div>
+          <div className={styles.row}>
+            <i className="ti ti-building-church" aria-hidden="true" />
+            {event.responsible}
+          </div>
         </div>
 
         <p className={styles.desc}>{event.description}</p>

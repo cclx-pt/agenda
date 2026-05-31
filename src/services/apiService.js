@@ -64,6 +64,25 @@ function inferCategory(name) {
   return 'evento'
 }
 
+// ── Community (church) inference from event name ─────────────────
+
+const CHURCH_NAMES = ['Açores', 'Almada', 'Barreiro', 'Caldas Da Rainha', 'Coruche', 'Moita', 'Porto']
+
+function inferCommunity(raw) {
+  // 1. Use responsible_church when available
+  if (raw.responsible_church?.name) {
+    return raw.responsible_church.name === 'Sede' ? 'CCLX' : raw.responsible_church.name
+  }
+  // 2. Infer from event name
+  const name = raw.name || ''
+  for (const church of CHURCH_NAMES) {
+    if (name.toLowerCase().includes(church.toLowerCase())) return church
+  }
+  if (/\bsede\b/i.test(name)) return 'CCLX'
+  // 3. Fallback
+  return 'CCLX'
+}
+
 // ── Map inChurch event → app event ───────────────────────────────
 
 function pad2(n) { return String(n).padStart(2, '0') }
@@ -86,6 +105,7 @@ function mapEvent(raw) {
     id: String(raw.id),
     title: raw.name,
     category: inferCategory(raw.name),
+    community: inferCommunity(raw),
     date,
     timeStart,
     timeEnd,

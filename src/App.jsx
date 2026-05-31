@@ -10,6 +10,7 @@ import DayPopup from './components/DayPopup'
 import EventDetail from './components/EventDetail'
 import ExportModal from './components/ExportModal'
 import SearchBar from './components/SearchBar'
+import CommunityFilter from './components/CommunityFilter'
 import {
   MONTHS_PT, MONTHS_SHORT,
 } from './utils/calendarHelpers'
@@ -31,6 +32,22 @@ export default function App() {
   const [dayPopup,     setDayPopup]     = useState(null)   // { dateKey, events }
   const [detailEvent,  setDetailEvent]  = useState(null)   // event object
   const [exportData,   setExportData]   = useState(null)   // { events, filename }
+  const [community,    setCommunity]    = useState('Todas') // church filter
+
+  // ─── Filtered events by community ────────────────────────────
+  const filteredEvents = useMemo(() => {
+    if (community === 'Todas') return events
+    return events.filter(e => e.community === community)
+  }, [events, community])
+
+  const filteredByDate = useMemo(() => {
+    if (community === 'Todas') return eventsByDate
+    const map = {}
+    for (const e of filteredEvents) {
+      ;(map[e.date] ??= []).push(e)
+    }
+    return map
+  }, [filteredEvents, eventsByDate, community])
 
   // ─── Navigation ──────────────────────────────────────────────────
   const navigate = (dir) => {
@@ -70,24 +87,24 @@ export default function App() {
   const exportCurrentView = () => {
     let filtered = []
     if (view === 'month') {
-      filtered = events.filter(e => {
+      filtered = filteredEvents.filter(e => {
         const d = new Date(e.date)
         return d.getFullYear() === year && d.getMonth() === month
       })
     } else if (view === 'quarter') {
       const months = getMonthRange(3)
-      filtered = events.filter(e => {
+      filtered = filteredEvents.filter(e => {
         const d = new Date(e.date)
         return months.some(m => m.year === d.getFullYear() && m.month === d.getMonth())
       })
     } else if (view === 'semester') {
       const months = getMonthRange(6)
-      filtered = events.filter(e => {
+      filtered = filteredEvents.filter(e => {
         const d = new Date(e.date)
         return months.some(m => m.year === d.getFullYear() && m.month === d.getMonth())
       })
     } else {
-      filtered = events.filter(e => new Date(e.date).getFullYear() === year)
+      filtered = filteredEvents.filter(e => new Date(e.date).getFullYear() === year)
     }
     if (filtered.length === 0) {
       toast.info('Sem eventos para exportar nesta vista')
@@ -124,7 +141,8 @@ export default function App() {
         </div>
 
         <div className={styles.topRight}>
-          <SearchBar events={events} onSelect={(evt) => setDetailEvent(evt)} />
+          <CommunityFilter events={events} value={community} onChange={setCommunity} />
+          <SearchBar events={filteredEvents} onSelect={(evt) => setDetailEvent(evt)} />
           <button className={styles.icsExportBtn} onClick={exportCurrentView}
             title="Exportar vista atual">
             <i className="ti ti-calendar-share" aria-hidden="true" />
@@ -168,7 +186,7 @@ export default function App() {
             {view === 'month' && (
               <MonthView
                 year={year} month={month}
-                eventsByDate={eventsByDate}
+                eventsByDate={filteredByDate}
                 onDayClick={(dateKey, evts) => setDayPopup({ dateKey, events: evts })}
               />
             )}
@@ -177,7 +195,7 @@ export default function App() {
               <div className={styles.multiGrid}>
                 {getMonthRange(3).map(({ year: y, month: m }) => (
                   <MiniMonth key={`${y}-${m}`} year={y} month={m}
-                    eventsByDate={eventsByDate} size="md"
+                    eventsByDate={filteredByDate} size="md"
                     onDayClick={(dateKey, evts) => setDayPopup({ dateKey, events: evts })}
                   />
                 ))}
@@ -188,7 +206,7 @@ export default function App() {
               <div className={styles.multiGrid6}>
                 {getMonthRange(6).map(({ year: y, month: m }) => (
                   <MiniMonth key={`${y}-${m}`} year={y} month={m}
-                    eventsByDate={eventsByDate} size="sm"
+                    eventsByDate={filteredByDate} size="sm"
                     onDayClick={(dateKey, evts) => setDayPopup({ dateKey, events: evts })}
                   />
                 ))}
@@ -199,7 +217,7 @@ export default function App() {
               <div className={styles.yearGrid}>
                 {Array.from({ length: 12 }, (_, i) => (
                   <MiniMonth key={i} year={year} month={i}
-                    eventsByDate={eventsByDate} size="xs"
+                    eventsByDate={filteredByDate} size="xs"
                     onDayClick={(dateKey, evts) => setDayPopup({ dateKey, events: evts })}
                   />
                 ))}

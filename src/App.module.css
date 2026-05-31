@@ -37,6 +37,11 @@
   height: 32px;
   width: auto;
   object-fit: contain;
+  transition: filter 0.3s ease;
+}
+
+:global([data-theme="light"]) .logoImg {
+  filter: invert(1);
 }
 
 .agendaTitle {
