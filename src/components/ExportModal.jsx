@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   downloadEventICS,
@@ -7,6 +6,7 @@ import {
   outlookCalendarUrl,
   yahooCalendarUrl,
 } from '../utils/icsExport'
+import { useModalA11y } from '../hooks/useModalA11y'
 import styles from './ExportModal.module.css'
 
 const TARGETS = [
@@ -58,12 +58,7 @@ const TARGETS = [
 export default function ExportModal({ events, filename, onClose }) {
   const isSingle = events.length === 1
   const event = isSingle ? events[0] : null
-
-  useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  const containerRef = useModalA11y(onClose)
 
   const handlePick = (target) => {
     switch (target) {
@@ -98,6 +93,7 @@ export default function ExportModal({ events, filename, onClose }) {
     >
       <motion.div
         className={styles.modal}
+        ref={containerRef} tabIndex={-1}
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.97 }}

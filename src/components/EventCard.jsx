@@ -1,11 +1,12 @@
-import { CATEGORY_META, formatTimeRange } from '../utils/calendarHelpers'
+import { CATEGORY_META, STATUS_META, formatTimeRange } from '../utils/calendarHelpers'
 import styles from './EventCard.module.css'
 
 export default function EventCard({ event, onClick }) {
   const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
+  const status = STATUS_META[event.status]
 
   return (
-    <div className={styles.card} onClick={() => onClick(event)} role="button" tabIndex={0}
+    <div className={`${styles.card} ${status ? styles.cardDraft : ''}`} onClick={() => onClick(event)} role="button" tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick(event)}>
 
       {event.imageUrl
@@ -16,10 +17,18 @@ export default function EventCard({ event, onClick }) {
       }
 
       <div className={styles.body}>
-        <span className={styles.tag}
-          style={{ background: cat.bgVar, color: cat.colorVar }}>
-          {cat.label}
-        </span>
+        <div className={styles.tags}>
+          <span className={styles.tag}
+            style={{ background: cat.bgVar, color: cat.colorVar }}>
+            {cat.label}
+          </span>
+          {status && (
+            <span className={styles.statusBadge}>
+              <i className={`ti ${status.icon}`} aria-hidden="true" />
+              {status.label}
+            </span>
+          )}
+        </div>
 
         <div className={styles.title}>{event.title}</div>
 

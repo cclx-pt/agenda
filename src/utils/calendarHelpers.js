@@ -44,6 +44,35 @@ export function groupByDate(events) {
   }, {})
 }
 
+/**
+ * Intervalo de datas (YYYY-MM-DD, inclusivo) coberto por uma vista do calendário.
+ * `day` é o dia âncora (1..31) usado pelas vistas diária e semanal.
+ */
+export function rangeForView(view, year, month, day = 1) {
+  if (view === 'day') {
+    const k = toDateKey(year, month, day)
+    return { from: k, to: k }
+  }
+  if (view === 'week') {
+    const dow = mondayFirstDay(new Date(year, month, day)) // 0=Seg … 6=Dom
+    const monday = new Date(year, month, day - dow)
+    const sunday = new Date(year, month, day - dow + 6)
+    return {
+      from: toDateKey(monday.getFullYear(), monday.getMonth(), monday.getDate()),
+      to: toDateKey(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()),
+    }
+  }
+  if (view === 'year') {
+    return { from: toDateKey(year, 0, 1), to: toDateKey(year, 11, 31) }
+  }
+  const span = view === 'quarter' ? 3 : view === 'semester' ? 6 : 1
+  const end = new Date(year, month + span, 0) // último dia do último mês do intervalo
+  return {
+    from: toDateKey(year, month, 1),
+    to: toDateKey(end.getFullYear(), end.getMonth(), end.getDate()),
+  }
+}
+
 /** Format time range "10:30 – 12:00" or just "10:30" */
 export function formatTimeRange(start, end) {
   if (!end || end === start) return start
@@ -57,6 +86,22 @@ export function formatDateLabel(dateKey) {
   const cap = weekday.charAt(0).toUpperCase() + weekday.slice(1)
   const day = d.getDate()
   return `${cap}, ${day} de ${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/** Numeric date "dd/mm/aaaa" from a yyyy-MM-dd key. */
+export function formatDateNumeric(dateKey) {
+  if (!dateKey) return ''
+  const d = parse(dateKey, 'yyyy-MM-dd', new Date())
+  if (Number.isNaN(d.getTime())) return ''
+  return format(d, 'dd/MM/yyyy')
+}
+
+/** Numeric date + time "dd/mm/aaaa HH:mm" from an ISO string or Date. */
+export function formatDateTimeNumeric(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return format(d, 'dd/MM/yyyy HH:mm')
 }
 
 export const CATEGORY_META = {
@@ -80,4 +125,13 @@ export const CATEGORY_META = {
     colorVar: 'var(--evt-jovens-text)',
     bgVar: 'var(--evt-jovens-bg)',
   },
+}
+
+// Estado editorial do evento. Eventos publicados nao mostram selo; rascunhos e
+// pendentes mostram-se so a gestores (admin/aprovador/editor), com indicacao visual.
+// `bg` = fundo vermelho leve usado para assinalar drafts em todas as vistas.
+const DRAFT_BG = 'rgba(226, 87, 76, 0.16)'
+export const STATUS_META = {
+  rascunho: { label: 'Rascunho', icon: 'ti-pencil', bg: DRAFT_BG },
+  pendente: { label: 'Pendente', icon: 'ti-clock-pause', bg: DRAFT_BG },
 }

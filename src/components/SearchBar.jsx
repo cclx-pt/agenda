@@ -11,14 +11,21 @@ const FUSE_OPTIONS = {
 
 export default function SearchBar({ events, onSelect }) {
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
 
+  // debounce the query before running the fuzzy search
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 150)
+    return () => clearTimeout(id)
+  }, [query])
+
   const fuse = useMemo(() => new Fuse(events, FUSE_OPTIONS), [events])
   const results = useMemo(() => {
-    if (query.length < 2) return []
-    return fuse.search(query, { limit: 8 }).map(r => r.item)
-  }, [fuse, query])
+    if (debouncedQuery.length < 2) return []
+    return fuse.search(debouncedQuery, { limit: 8 }).map(r => r.item)
+  }, [fuse, debouncedQuery])
 
   // close on outside click
   useEffect(() => {
@@ -77,7 +84,7 @@ export default function SearchBar({ events, onSelect }) {
         </div>
       )}
 
-      {open && query.length >= 2 && results.length === 0 && (
+      {open && debouncedQuery.length >= 2 && results.length === 0 && (
         <div className={styles.dropdown}>
           <div className={styles.noResults}>
             <i className="ti ti-search-off" aria-hidden="true" />

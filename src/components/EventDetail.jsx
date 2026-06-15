@@ -1,16 +1,12 @@
-import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { CATEGORY_META, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { CATEGORY_META, STATUS_META, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { useModalA11y } from '../hooks/useModalA11y'
 import styles from './EventDetail.module.css'
 
-export default function EventDetail({ event, onClose, onBack, onExport }) {
+export default function EventDetail({ event, onClose, onBack, onExport, onDelete }) {
   const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
-
-  useEffect(() => {
-    const handler = e => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  const status = STATUS_META[event.status]
+  const containerRef = useModalA11y(onClose)
 
   return (
     <motion.div className={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -19,6 +15,7 @@ export default function EventDetail({ event, onClose, onBack, onExport }) {
       transition={{ duration: 0.2 }}>
 
       <motion.div className={styles.modal}
+        ref={containerRef} tabIndex={-1}
         initial={{ opacity: 0, y: 40, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 30, scale: 0.96 }}
@@ -56,11 +53,19 @@ export default function EventDetail({ event, onClose, onBack, onExport }) {
         </div>
 
         {/* Body */}
-        <div className={styles.body}>
-          <span className={styles.tag}
-            style={{ background: cat.bgVar, color: cat.colorVar }}>
-            {cat.label}
-          </span>
+        <div className={`${styles.body} ${status ? styles.bodyDraft : ''}`}>
+          <div className={styles.tags}>
+            <span className={styles.tag}
+              style={{ background: cat.bgVar, color: cat.colorVar }}>
+              {cat.label}
+            </span>
+            {status && (
+              <span className={styles.statusBadge}>
+                <i className={`ti ${status.icon}`} aria-hidden="true" />
+                {status.label}
+              </span>
+            )}
+          </div>
 
           <h2 className={styles.title}>{event.title}</h2>
 
@@ -94,6 +99,15 @@ export default function EventDetail({ event, onClose, onBack, onExport }) {
               <i className="ti ti-calendar-share" aria-hidden="true" />
               Guardar no calendário
             </button>
+            {onDelete && (
+              <button
+                className={styles.deleteBtn}
+                onClick={() => onDelete(event)}
+              >
+                <i className="ti ti-trash" aria-hidden="true" />
+                Eliminar
+              </button>
+            )}
           </div>
         </div>
 

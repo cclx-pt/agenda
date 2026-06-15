@@ -8,6 +8,22 @@
   font-family: 'Barlow', sans-serif;
   font-size: 16px;
   line-height: 1.5;
+
+  /* ─── Cromado navy (barra de topo + sidebar) ──────────────────
+     Constante nos dois temas: o cromado é sempre navy com acento
+     dourado da marca CCLX. O conteúdo (calendário) segue o tema. */
+  --chrome-bg:          #1e2a48;   /* navy principal (topbar) */
+  --chrome-bg2:         #18233d;   /* navy mais escuro (sidebar) */
+  --chrome-elev:        #283656;   /* cartões/hover sobre navy */
+  --chrome-elev-hover:  #31426899; /* hover translúcido */
+  --chrome-text:        #eef2fb;   /* texto quase branco */
+  --chrome-muted:       #9aa6c6;   /* texto secundário azul-acinzentado */
+  --chrome-dim:         #6c7aa0;   /* texto ténue */
+  --chrome-border:      rgba(255,255,255,0.09);
+  --chrome-accent:      #F5A800;   /* dourado CCLX */
+  --chrome-accent-dark: #d89400;
+  --chrome-accent-text: #1a1205;
+  --weekend:            #e2574c;   /* fins de semana a vermelho */
 }
 
 /* ─── DARK THEME (default / night) ─────────────────────────────── */

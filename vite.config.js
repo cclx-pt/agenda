@@ -6,8 +6,36 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.js',
+      css: true,
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'data-vendor': ['@tanstack/react-query', 'zod'],
+            'ui-vendor': ['framer-motion', 'sonner'],
+            'search-vendor': ['fuse.js', 'date-fns'],
+          },
+        },
+      },
+    },
     server: {
       proxy: {
+        // Backend próprio (System of Record): auth, papéis e gestão da agenda.
+        '/auth': {
+          target: env.BACKEND_URL || 'http://localhost:4000',
+          changeOrigin: true,
+        },
+        '/data': {
+          target: env.BACKEND_URL || 'http://localhost:4000',
+          changeOrigin: true,
+        },
+        // API inChurch/inRadar (apenas leitura da agenda).
         '/api': {
           target: 'https://inradar.com.br/public/v1',
           changeOrigin: true,

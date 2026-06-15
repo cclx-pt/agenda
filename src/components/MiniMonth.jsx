@@ -1,6 +1,6 @@
 import {
   MONTHS_PT, WEEKDAYS_SHORT,
-  daysInMonth, mondayFirstDay, toDateKey
+  daysInMonth, mondayFirstDay, toDateKey, STATUS_META
 } from '../utils/calendarHelpers'
 import styles from './MiniMonth.module.css'
 
@@ -22,6 +22,7 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
       day: d, current: true, dateKey,
       isToday: isThisMonth && today.getDate() === d,
       hasEvents: events.length > 0,
+      hasDraft: events.some(e => STATUS_META[e.status]),
       events,
     })
   }
@@ -38,18 +39,19 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
         ))}
         {cells.map((cell, idx) => (
           <div
-            key={idx}
+            key={cell.dateKey || `pad-${idx}`}
             className={[
               styles.day,
               !cell.current  ? styles.other    : '',
               cell.isToday   ? styles.today    : '',
               cell.hasEvents ? styles.hasEvts  : '',
+              cell.hasDraft  ? styles.dayDraft : '',
             ].join(' ')}
             onClick={() => cell.current && cell.hasEvents && onDayClick(cell.dateKey, cell.events)}
             title={cell.current && cell.hasEvents ? `${cell.day}: ${cell.events.length} evento(s)` : undefined}
           >
-            {size !== 'sm' && <span className={styles.num}>{cell.day}</span>}
-            {size === 'md' && cell.hasEvents && (
+            <span className={styles.num}>{cell.day}</span>
+            {(size === 'md' || size === 'sm') && cell.hasEvents && (
               <span className={styles.bar} />
             )}
           </div>

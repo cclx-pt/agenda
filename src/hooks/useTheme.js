@@ -4,8 +4,11 @@ export function useTheme() {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('cclx-theme')
     if (saved) return saved
-    // Default to dark (matches CCLX brand)
-    return 'dark'
+    // Fall back to the OS preference, defaulting to light (novo layout)
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    return 'light'
   })
 
   useEffect(() => {

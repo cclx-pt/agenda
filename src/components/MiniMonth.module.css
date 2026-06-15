@@ -31,8 +31,8 @@
 
 /* ─── SIZE VARIANTS ─── */
 .md .day { min-height: 32px; }
-.sm .day { min-height: 20px; }
-.xs .day { min-height: 13px; }
+.sm .day { min-height: 24px; }
+.xs .day { min-height: 18px; }
 
 .day {
   border: 1px solid var(--border);
@@ -52,6 +52,9 @@
   background: rgba(245,168,0,0.08);
 }
 .day.hasEvts:hover { background: rgba(245,168,0,0.18); }
+
+.day.dayDraft { background: rgba(226, 87, 76, 0.16); }
+.day.dayDraft:hover { background: rgba(226, 87, 76, 0.26); }
 
 .other {
   background: var(--other-day) !important;
@@ -80,5 +83,6 @@
   margin-top: 2px;
 }
 
-/* sm: no numbers, just colored cells */
-.sm .num { display: none; }
+/* sm + xs: smaller font for numbers */
+.sm .num { font-size: 7px; }
+.xs .num { font-size: 6px; }

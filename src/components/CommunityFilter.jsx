@@ -1,14 +1,11 @@
 import { useMemo } from 'react'
+import { compareChurches } from '../utils/churches'
 import styles from './CommunityFilter.module.css'
 
 export default function CommunityFilter({ events, value, onChange }) {
   const communities = useMemo(() => {
-    const set = new Set(events.map(e => e.community))
-    return ['Todas', ...Array.from(set).sort((a, b) => {
-      if (a === 'CCLX') return -1
-      if (b === 'CCLX') return 1
-      return a.localeCompare(b, 'pt')
-    })]
+    const set = new Set(events.map(e => e.community).filter(Boolean))
+    return ['Todas', ...Array.from(set).sort(compareChurches)]
   }, [events])
 
   return (

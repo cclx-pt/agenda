@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchAllEvents } from '../services/apiService'
+import { fetchEvents } from '../services/apiService'
 import { groupByDate } from '../utils/calendarHelpers'
 
-export function useEvents() {
+export function useEvents({ from, to, includePrivate = false, includeDrafts = false } = {}) {
   const { data: events = [], isLoading: loading, error, refetch } = useQuery({
-    queryKey: ['events'],
-    queryFn: ({ signal }) => fetchAllEvents({ signal }),
+    queryKey: ['events', from, to, includePrivate, includeDrafts],
+    queryFn: ({ signal }) => fetchEvents(from, to, { signal, includePrivate, includeDrafts }),
   })
 
   const eventsByDate = useMemo(() => groupByDate(events), [events])
