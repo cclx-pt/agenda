@@ -116,7 +116,7 @@ export default function CalendarSidebar({
       </div>
 
       <div className={styles.section}>
-        <div className={styles.sectionTitle}>Categorias automáticas</div>
+        <div className={styles.sectionTitle}>Categorias</div>
         <ul className={styles.calList}>
           <li>
             <button
