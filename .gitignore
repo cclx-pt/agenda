@@ -5,3 +5,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Artefactos de testes/browser (Playwright MCP)
+.playwright-mcp/
