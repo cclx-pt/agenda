@@ -1,4 +1,4 @@
-import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, CATEGORY_META, STATUS_META } from '../utils/calendarHelpers'
+import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, CATEGORY_META, STATUS_META, API_BADGE } from '../utils/calendarHelpers'
 import styles from './WeekView.module.css'
 
 export default function WeekView({ year, month, day, eventsByDate, onSelectEvent, onDayClick }) {
@@ -47,6 +47,12 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                     <span className={styles.evtStatus}>
                       <i className={`ti ${st.icon}`} aria-hidden="true" />
                       {st.label}
+                    </span>
+                  )}
+                  {evt.isApi && (
+                    <span className={styles.apiTag} title={API_BADGE.title}>
+                      <i className={`ti ${API_BADGE.icon}`} aria-hidden="true" />
+                      {API_BADGE.label}
                     </span>
                   )}
                 </button>

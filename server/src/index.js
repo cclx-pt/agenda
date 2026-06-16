@@ -1,6 +1,9 @@
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { config } from './config.js'
 import { loadUser } from './middleware/auth.js'
 import { authRouter } from './auth/routes.js'
@@ -48,6 +51,36 @@ app.use('/data/privacy-tags', privacyTagsRouter)
 // Imagens carregadas: servidas estaticamente (GET) e endpoint de upload (POST).
 app.use('/data/uploads', express.static(uploadsDir))
 app.use('/data/uploads', uploadsRouter)
+
+// ── Frontend (build do Vite) ─────────────────────────────────────
+// Em produção (Hostinger / VPS) o backend serve também o frontend já
+// compilado, para correr como UMA única app Node.js num só porto. O frontend
+// usa caminhos relativos (/auth, /data, /api), por isso funciona em same-origin
+// sem alterações. O caminho do build pode ser ajustado com CLIENT_DIST; por
+// omissão é a pasta `dist/` na raiz do repositório.
+const here = path.dirname(fileURLToPath(import.meta.url))
+const clientDist = process.env.CLIENT_DIST
+  ? path.resolve(process.env.CLIENT_DIST)
+  : path.resolve(here, '../../dist')
+
+if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist))
+  // Fallback SPA: qualquer rota que não seja da API devolve o index.html.
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/data') ||
+      req.path.startsWith('/auth') ||
+      req.path === '/health'
+    ) {
+      return next()
+    }
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+  console.log(`[server] A servir o frontend de ${clientDist}`)
+} else {
+  console.log('[server] Frontend compilado não encontrado — a correr só como API.')
+}
 
 // Tratamento de erros centralizado.
 // eslint-disable-next-line no-unused-vars

@@ -144,6 +144,7 @@ function mapInchurchEvent(raw) {
     imageUrl: raw.image || raw.app_image || null,
     imageLabel: raw.image ? 'foto do evento' : null,
     status: 'publicado',
+    isApi: true,
   }
 }
 
@@ -164,6 +165,7 @@ function mapSorEvent(e) {
     imageLabel: e.bannerUrl ? 'imagem do evento' : null,
     isPrivate: !!e.isPrivate,
     status: e.status || 'publicado',
+    isApi: false,
   }
 }
 

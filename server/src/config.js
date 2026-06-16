@@ -16,8 +16,12 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
 
   db: {
+    // String de ligação MySQL/MariaDB, ex.:
+    // mysql://utilizador:senha@host:3306/base_de_dados
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : false,
+    // TLS opcional (Hostinger normalmente não exige para ligações locais).
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    poolSize: Number(process.env.DB_POOL_SIZE ?? 10),
   },
 
   jwt: {

@@ -1,5 +1,5 @@
 import {
-  parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META,
+  parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE,
 } from '../utils/calendarHelpers'
 import styles from './CalendarSidebar.module.css'
 
@@ -86,6 +86,9 @@ export default function CalendarSidebar({
                       <span className={styles.evtStatus} title={st.label} aria-label={st.label}>
                         <i className={`ti ${st.icon}`} aria-hidden="true" />
                       </span>
+                    )}
+                    {evt.isApi && (
+                      <span className={styles.apiTag} title={API_BADGE.title}>{API_BADGE.label}</span>
                     )}
                   </button>
                 </li>

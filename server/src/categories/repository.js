@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
 // Mapeia a linha da BD para a forma usada pela aplicação.
@@ -46,13 +47,13 @@ export async function findBySlug(slug) {
 }
 
 export async function insert(data) {
-  const { rows } = await pool.query(
-    `INSERT INTO categories (slug, label, color, sort_order)
-     VALUES ($1, $2, $3, $4)
-     RETURNING ${COLUMNS}`,
-    [data.slug, data.label, data.color ?? null, data.sortOrder ?? 0]
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO categories (id, slug, label, color, sort_order)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [id, data.slug, data.label, data.color ?? null, data.sortOrder ?? 0]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 export async function update(id, fields) {
@@ -62,19 +63,17 @@ export async function update(id, fields) {
     params.push(val)
     sets.push(`${col} = $${params.length}`)
   }
-  const { rows } = await pool.query(
-    `UPDATE categories SET ${sets.join(', ')}
-     WHERE id = $1
-     RETURNING ${COLUMNS}`,
+  await pool.query(
+    `UPDATE categories SET ${sets.join(', ')} WHERE id = $1`,
     params
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 /** Número de eventos que usam esta categoria (bloqueia a eliminação). */
 export async function countEvents(slug) {
   const { rows } = await pool.query(
-    'SELECT COUNT(*)::int AS n FROM events WHERE category = $1',
+    'SELECT COUNT(*) AS n FROM events WHERE category = $1',
     [slug]
   )
   return rows[0].n

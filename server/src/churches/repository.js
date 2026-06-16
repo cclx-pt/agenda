@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
 // Mapeia a linha da BD para a forma usada pela aplicação.
@@ -47,13 +48,13 @@ export async function findByName(name) {
 }
 
 export async function insert(data) {
-  const { rows } = await pool.query(
-    `INSERT INTO churches (name, external_id, address, postal_code)
-     VALUES ($1, $2, $3, $4)
-     RETURNING ${COLUMNS}`,
-    [data.name, data.externalId ?? null, data.address ?? null, data.postalCode ?? null]
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO churches (id, name, external_id, address, postal_code)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [id, data.name, data.externalId ?? null, data.address ?? null, data.postalCode ?? null]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 export async function update(id, fields) {
@@ -63,13 +64,11 @@ export async function update(id, fields) {
     params.push(val)
     sets.push(`${col} = $${params.length}`)
   }
-  const { rows } = await pool.query(
-    `UPDATE churches SET ${sets.join(', ')}
-     WHERE id = $1
-     RETURNING ${COLUMNS}`,
+  await pool.query(
+    `UPDATE churches SET ${sets.join(', ')} WHERE id = $1`,
     params
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 export async function remove(id) {

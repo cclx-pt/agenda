@@ -117,6 +117,18 @@
 
 .evtDraft { outline: 1px dashed currentColor; outline-offset: -2px; }
 .evtDraftIcon { font-size: 9px; margin-left: auto; flex-shrink: 0; opacity: .85; }
+.apiTag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.5;
+  padding: 0 4px;
+  border-radius: 3px;
+  color: #fff;
+  background: #3b82f6;
+}
 
 .more {
   font-size: 9px;

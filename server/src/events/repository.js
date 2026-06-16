@@ -1,4 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
+
+// Converte um valor de data (ISO/Date) para algo que o driver MySQL aceite em
+// colunas DATETIME (guardado em UTC pela configuração do pool).
+const toDb = (v) => (v == null ? null : new Date(v))
 
 // Mapeia a linha da BD para a forma usada pela aplicação (alinhada com apiService).
 function mapRow(row) {
@@ -8,6 +13,7 @@ function mapRow(row) {
   const pad = (n) => String(n).padStart(2, '0')
   const dateKey = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
   const hhmm = (d) => (d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : null)
+  const allDay = !!row.all_day
   return {
     id: row.id,
     title: row.title,
@@ -15,14 +21,14 @@ function mapRow(row) {
     date: dateKey,
     startDatetime: row.start_datetime,
     endDatetime: row.end_datetime,
-    timeStart: row.all_day ? null : hhmm(start),
-    timeEnd: row.all_day ? null : hhmm(end),
-    allDay: row.all_day,
+    timeStart: allDay ? null : hhmm(start),
+    timeEnd: allDay ? null : hhmm(end),
+    allDay,
     location: row.location,
     community: row.community,
     category: row.category,
     status: row.status,
-    isPrivate: row.is_private,
+    isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
     bannerUrl: row.banner_url,
     seriesId: row.series_id ?? null,
@@ -51,8 +57,10 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   const params = []
   if (status) {
     const statuses = Array.isArray(status) ? status : [status]
-    params.push(statuses)
-    where.push(`status = ANY($${params.length})`)
+    if (statuses.length > 0) {
+      params.push(statuses)
+      where.push(`status IN ($${params.length})`)
+    }
   }
   if (createdBy) {
     params.push(createdBy)
@@ -60,15 +68,15 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   }
   if (Array.isArray(communities) && communities.length > 0) {
     params.push(communities)
-    where.push(`community = ANY($${params.length})`)
+    where.push(`community IN ($${params.length})`)
   }
   if (from) {
     params.push(from)
-    where.push(`start_datetime >= $${params.length}::date`)
+    where.push(`start_datetime >= $${params.length}`)
   }
   if (to) {
     params.push(to)
-    where.push(`start_datetime < ($${params.length}::date + interval '1 day')`)
+    where.push(`start_datetime < DATE_ADD($${params.length}, INTERVAL 1 DAY)`)
   }
   if (!includePrivate) {
     where.push('is_private = FALSE')
@@ -77,7 +85,7 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
     // esteja na lista permitida do utilizador.
     params.push(allowedPrivacyTags)
     where.push(
-      `(is_private = FALSE OR privacy_tag IS NULL OR privacy_tag = ANY($${params.length}))`
+      `(is_private = FALSE OR privacy_tag IS NULL OR privacy_tag IN ($${params.length}))`
     )
   }
   const sql = `
@@ -90,17 +98,18 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
 }
 
 export async function insert(data, actorId) {
-  const { rows } = await pool.query(
+  const id = randomUUID()
+  await pool.query(
     `INSERT INTO events
-      (title, description, start_datetime, end_datetime, all_day, location,
+      (id, title, description, start_datetime, end_datetime, all_day, location,
        community, category, is_private, privacy_tag, banner_url, series_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-     RETURNING *`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [
+      id,
       data.title,
       data.description ?? null,
-      data.startDatetime,
-      data.endDatetime ?? null,
+      toDb(data.startDatetime),
+      toDb(data.endDatetime),
       data.allDay ?? false,
       data.location ?? null,
       data.community ?? 'Sede',
@@ -112,11 +121,11 @@ export async function insert(data, actorId) {
       actorId ?? null,
     ]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 export async function update(id, data) {
-  const { rows } = await pool.query(
+  await pool.query(
     `UPDATE events SET
        title = $2,
        description = $3,
@@ -130,14 +139,13 @@ export async function update(id, data) {
        privacy_tag = $11,
        banner_url = $12,
        updated_at = now()
-     WHERE id = $1
-     RETURNING *`,
+     WHERE id = $1`,
     [
       id,
       data.title,
       data.description ?? null,
-      data.startDatetime,
-      data.endDatetime ?? null,
+      toDb(data.startDatetime),
+      toDb(data.endDatetime),
       data.allDay ?? false,
       data.location ?? null,
       data.community ?? 'Sede',
@@ -147,23 +155,22 @@ export async function update(id, data) {
       data.bannerUrl ?? null,
     ]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 // Atualiza apenas o estado (transições do fluxo de aprovação).
 export async function updateStatus(id, { status, rejectionReason = null, touchSubmitted = false, touchPublished = false }) {
-  const { rows } = await pool.query(
+  await pool.query(
     `UPDATE events SET
        status = $2,
        rejection_reason = $3,
        submitted_at = CASE WHEN $4 THEN now() ELSE submitted_at END,
        published_at = CASE WHEN $5 THEN now() ELSE published_at END,
        updated_at = now()
-     WHERE id = $1
-     RETURNING *`,
+     WHERE id = $1`,
     [id, status, rejectionReason, touchSubmitted, touchPublished]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 export async function remove(id) {
@@ -218,9 +225,9 @@ export async function setExternalId(id, externalId) {
 
 export async function addHistory({ eventId, actorId, fromStatus, toStatus, comment = null }) {
   await pool.query(
-    `INSERT INTO event_history (event_id, actor_id, from_status, to_status, comment)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [eventId, actorId ?? null, fromStatus, toStatus, comment]
+    `INSERT INTO event_history (id, event_id, actor_id, from_status, to_status, comment)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [randomUUID(), eventId, actorId ?? null, fromStatus, toStatus, comment]
   )
 }
 

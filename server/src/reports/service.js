@@ -3,13 +3,13 @@ import { pool } from '../db/pool.js'
 // Relatórios agregados da agenda (System of Record). Apenas leitura.
 export async function getSummary() {
   const [byStatus, byCommunity, byCategory, privacy, upcoming, recent] = await Promise.all([
-    pool.query('SELECT status, COUNT(*)::int AS n FROM events GROUP BY status'),
-    pool.query('SELECT community, COUNT(*)::int AS n FROM events GROUP BY community ORDER BY n DESC'),
-    pool.query('SELECT category, COUNT(*)::int AS n FROM events GROUP BY category ORDER BY n DESC'),
+    pool.query('SELECT status, COUNT(*) AS n FROM events GROUP BY status'),
+    pool.query('SELECT community, COUNT(*) AS n FROM events GROUP BY community ORDER BY n DESC'),
+    pool.query('SELECT category, COUNT(*) AS n FROM events GROUP BY category ORDER BY n DESC'),
     pool.query(
       `SELECT
-         COUNT(*) FILTER (WHERE is_private)::int AS private,
-         COUNT(*) FILTER (WHERE NOT is_private)::int AS public
+         CAST(SUM(CASE WHEN is_private THEN 1 ELSE 0 END) AS UNSIGNED) AS private,
+         CAST(SUM(CASE WHEN NOT is_private THEN 1 ELSE 0 END) AS UNSIGNED) AS public
        FROM events`
     ),
     pool.query(

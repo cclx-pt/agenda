@@ -1,4 +1,4 @@
-import { CATEGORY_META, STATUS_META, formatTimeRange } from '../utils/calendarHelpers'
+import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange } from '../utils/calendarHelpers'
 import styles from './EventCard.module.css'
 
 export default function EventCard({ event, onClick }) {
@@ -26,6 +26,12 @@ export default function EventCard({ event, onClick }) {
             <span className={styles.statusBadge}>
               <i className={`ti ${status.icon}`} aria-hidden="true" />
               {status.label}
+            </span>
+          )}
+          {event.isApi && (
+            <span className={styles.apiBadge} title={API_BADGE.title}>
+              <i className={`ti ${API_BADGE.icon}`} aria-hidden="true" />
+              {API_BADGE.label}
             </span>
           )}
         </div>

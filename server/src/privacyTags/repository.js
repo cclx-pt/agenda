@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
 // Mapeia a linha da BD para a forma usada pela aplicação.
@@ -43,19 +44,19 @@ export async function findByName(name) {
 }
 
 export async function insert(data) {
-  const { rows } = await pool.query(
-    `INSERT INTO privacy_tags (name)
-     VALUES ($1)
-     RETURNING ${COLUMNS}`,
-    [data.name]
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO privacy_tags (id, name)
+     VALUES ($1, $2)`,
+    [id, data.name]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 /** Número de eventos que usam esta etiqueta (bloqueia a eliminação). */
 export async function countEvents(name) {
   const { rows } = await pool.query(
-    'SELECT COUNT(*)::int AS n FROM events WHERE privacy_tag = $1',
+    'SELECT COUNT(*) AS n FROM events WHERE privacy_tag = $1',
     [name]
   )
   return rows[0].n
@@ -63,10 +64,19 @@ export async function countEvents(name) {
 
 /** Remove a etiqueta das listas de acesso dos utilizadores (limpeza). */
 export async function removeFromUsers(name) {
-  await pool.query(
-    'UPDATE users SET privacy_tags = array_remove(privacy_tags, $1) WHERE $1 = ANY(privacy_tags)',
-    [name]
+  // privacy_tags é uma coluna JSON: filtra em JS e regrava cada utilizador.
+  const { rows } = await pool.query(
+    'SELECT id, privacy_tags FROM users WHERE privacy_tags IS NOT NULL'
   )
+  for (const row of rows) {
+    const tags = Array.isArray(row.privacy_tags) ? row.privacy_tags : []
+    if (!tags.includes(name)) continue
+    const next = tags.filter((t) => t !== name)
+    await pool.query('UPDATE users SET privacy_tags = $1 WHERE id = $2', [
+      next.length ? JSON.stringify(next) : null,
+      row.id,
+    ])
+  }
 }
 
 export async function remove(id) {

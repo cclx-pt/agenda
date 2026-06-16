@@ -156,6 +156,18 @@
   color: var(--chrome-accent);
 }
 
+.apiTag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #fff;
+  background: #3b82f6;
+}
+
 /* ─── Filtro de igreja ─────────────────────────────────────────── */
 .selectWrap {
   display: flex;

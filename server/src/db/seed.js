@@ -1,20 +1,25 @@
+import { randomUUID } from 'node:crypto'
 import { config } from '../config.js'
 import { pool } from './pool.js'
 
 async function seed() {
   const email = config.seed.adminEmail.toLowerCase().trim()
   const name = config.seed.adminName
+  const id = randomUUID()
 
-  const result = await pool.query(
-    `INSERT INTO users (email, name, role, is_active, can_view_private)
-     VALUES ($1, $2, 'admin', TRUE, TRUE)
-     ON CONFLICT (email) DO UPDATE SET role = 'admin', is_active = TRUE,
-       can_view_private = TRUE, name = EXCLUDED.name
-     RETURNING id, email, role`,
-    [email, name]
+  await pool.query(
+    `INSERT INTO users (id, email, name, role, is_active, can_view_private)
+     VALUES ($1, $2, $3, 'admin', TRUE, TRUE)
+     ON DUPLICATE KEY UPDATE role = 'admin', is_active = TRUE,
+       can_view_private = TRUE, name = VALUES(name)`,
+    [id, email, name]
   )
 
-  const user = result.rows[0]
+  const { rows } = await pool.query(
+    'SELECT id, email, role FROM users WHERE email = $1',
+    [email]
+  )
+  const user = rows[0]
   console.log(`[db] Administrador garantido: ${user.email} (${user.role})`)
 }
 

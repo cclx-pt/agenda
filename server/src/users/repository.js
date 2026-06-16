@@ -1,4 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
+
+// Serializa arrays para colunas JSON (NULL = todas/sem restrição).
+const toJson = (v) => (v != null ? JSON.stringify(v) : null)
 
 // Mapeia a linha da BD para a forma usada pela aplicação.
 function mapRow(row) {
@@ -8,8 +12,8 @@ function mapRow(row) {
     email: row.email,
     name: row.name,
     role: row.role,
-    isActive: row.is_active,
-    canViewPrivate: row.can_view_private,
+    isActive: !!row.is_active,
+    canViewPrivate: !!row.can_view_private,
     churches: row.churches ?? null,
     privacyTags: row.privacy_tags ?? null,
     createdAt: row.created_at,
@@ -45,21 +49,22 @@ export async function findByEmail(email) {
 }
 
 export async function insert(data) {
-  const { rows } = await pool.query(
-    `INSERT INTO users (email, name, role, is_active, can_view_private, churches, privacy_tags)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at`,
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO users (id, email, name, role, is_active, can_view_private, churches, privacy_tags)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
+      id,
       data.email,
       data.name ?? null,
       data.role,
       data.isActive ?? true,
       data.canViewPrivate ?? false,
-      data.churches ?? null,
-      data.privacyTags ?? null,
+      toJson(data.churches),
+      toJson(data.privacyTags),
     ]
   )
-  return mapRow(rows[0])
+  return findById(id)
 }
 
 // Atualiza apenas os campos fornecidos (papel, estado, acesso a privados, nome).
@@ -67,17 +72,14 @@ export async function update(id, fields) {
   const sets = []
   const params = [id]
   for (const [col, val] of Object.entries(fields)) {
-    params.push(val)
+    // churches e privacy_tags são colunas JSON: serializa os arrays.
+    const value = col === 'churches' || col === 'privacy_tags' ? toJson(val) : val
+    params.push(value)
     sets.push(`${col} = $${params.length}`)
   }
   if (sets.length === 0) return findById(id)
-  const { rows } = await pool.query(
-    `UPDATE users SET ${sets.join(', ')}
-     WHERE id = $1
-     RETURNING id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at`,
-    params
-  )
-  return mapRow(rows[0])
+  await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = $1`, params)
+  return findById(id)
 }
 
 export async function remove(id) {
@@ -86,7 +88,7 @@ export async function remove(id) {
 
 export async function countAdmins() {
   const { rows } = await pool.query(
-    "SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND is_active = TRUE"
+    "SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active = TRUE"
   )
   return rows[0].n
 }

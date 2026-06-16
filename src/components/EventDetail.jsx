@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { CATEGORY_META, STATUS_META, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
 import { useModalA11y } from '../hooks/useModalA11y'
 import styles from './EventDetail.module.css'
 
@@ -63,6 +63,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <span className={styles.statusBadge}>
                 <i className={`ti ${status.icon}`} aria-hidden="true" />
                 {status.label}
+              </span>
+            )}
+            {event.isApi && (
+              <span className={styles.apiBadge} title={API_BADGE.title}>
+                <i className={`ti ${API_BADGE.icon}`} aria-hidden="true" />
+                {API_BADGE.label}
               </span>
             )}
           </div>

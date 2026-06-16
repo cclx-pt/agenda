@@ -1,173 +1,152 @@
--- Esquema base da Agenda CCLX (System of Record)
--- Incremento 1 da Fase 3: autenticação OTP por email + papéis.
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Esquema base da Agenda CCLX (System of Record) — MariaDB / MySQL.
+-- Os UUID são gerados na aplicação (crypto.randomUUID) e guardados em CHAR(36).
+-- As datas são guardadas em DATETIME (UTC) e os arrays/objetos em JSON.
 
 CREATE TABLE IF NOT EXISTS users (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email            TEXT UNIQUE NOT NULL,
-  name             TEXT,
-  role             TEXT NOT NULL DEFAULT 'editor'
+  id               CHAR(36) PRIMARY KEY,
+  email            VARCHAR(255) NOT NULL UNIQUE,
+  name             VARCHAR(255),
+  role             VARCHAR(20) NOT NULL DEFAULT 'editor'
                      CHECK (role IN ('admin', 'aprovador', 'editor', 'visitante')),
   is_active        BOOLEAN NOT NULL DEFAULT TRUE,
   can_view_private BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_login_at    TIMESTAMPTZ
+  -- Acesso por igreja: NULL = todas; array JSON = igrejas permitidas.
+  churches         JSON,
+  -- Etiquetas de privacidade visíveis: NULL = todas; array JSON = lista permitida.
+  privacy_tags     JSON,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_login_at    DATETIME
 );
-
--- Migração idempotente para bases já existentes.
-ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_private BOOLEAN NOT NULL DEFAULT FALSE;
-
--- Acesso por igreja: NULL = todas as igrejas (sem restrição); array = igrejas
--- a que o utilizador tem acesso na gestão de eventos do SoR. Só é relevante
--- para utilizadores não-staff (editores).
-ALTER TABLE users ADD COLUMN IF NOT EXISTS churches TEXT[];
 
 CREATE TABLE IF NOT EXISTS otp_codes (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email       TEXT NOT NULL,
-  code_hash   TEXT NOT NULL,
-  expires_at  TIMESTAMPTZ NOT NULL,
-  consumed_at TIMESTAMPTZ,
-  attempts    INTEGER NOT NULL DEFAULT 0,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id          CHAR(36) PRIMARY KEY,
+  email       VARCHAR(255) NOT NULL,
+  code_hash   VARCHAR(128) NOT NULL,
+  expires_at  DATETIME NOT NULL,
+  consumed_at DATETIME,
+  attempts    INT NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_otp_email (email),
+  KEY idx_otp_expires (expires_at)
 );
-
-CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_codes (email);
-CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes (expires_at);
 
 -- ── Eventos (System of Record) ──────────────────────────────────
 -- Fonte da verdade da agenda. external_id mantém a referência ao
 -- evento equivalente na inChurch (RG-16). status segue o fluxo de
--- aprovação (RA-01..RA-06).
+-- aprovação (RA-01..RA-06). A categoria é validada na camada de serviço.
 CREATE TABLE IF NOT EXISTS events (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title            TEXT NOT NULL,
+  id               CHAR(36) PRIMARY KEY,
+  title            VARCHAR(255) NOT NULL,
   description      TEXT,
-  start_datetime   TIMESTAMPTZ NOT NULL,
-  end_datetime     TIMESTAMPTZ,
+  start_datetime   DATETIME NOT NULL,
+  end_datetime     DATETIME,
   all_day          BOOLEAN NOT NULL DEFAULT FALSE,
-  location         TEXT,
-  community        TEXT NOT NULL DEFAULT 'Sede',
-  category         TEXT NOT NULL DEFAULT 'evento'
-                     CHECK (category IN ('culto', 'jovens', 'formacao', 'evento')),
-  status           TEXT NOT NULL DEFAULT 'rascunho'
+  location         VARCHAR(255),
+  community        VARCHAR(120) NOT NULL DEFAULT 'Sede',
+  category         VARCHAR(50) NOT NULL DEFAULT 'evento',
+  status           VARCHAR(20) NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'pendente', 'publicado', 'rejeitado')),
   is_private       BOOLEAN NOT NULL DEFAULT FALSE,
-  banner_url       TEXT,
-  external_id      TEXT,
+  -- Etiqueta de privacidade (obrigatória só quando is_private, validada na app).
+  privacy_tag      VARCHAR(120),
+  banner_url       VARCHAR(512),
+  external_id      VARCHAR(120),
   rejection_reason TEXT,
-  created_by       UUID REFERENCES users (id) ON DELETE SET NULL,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  submitted_at     TIMESTAMPTZ,
-  published_at     TIMESTAMPTZ,
-  CONSTRAINT chk_event_dates CHECK (end_datetime IS NULL OR end_datetime >= start_datetime)
+  created_by       CHAR(36),
+  -- Recorrência: ocorrências materializadas partilham o mesmo series_id.
+  series_id        CHAR(36),
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  submitted_at     DATETIME,
+  published_at     DATETIME,
+  CONSTRAINT chk_event_dates CHECK (end_datetime IS NULL OR end_datetime >= start_datetime),
+  KEY idx_events_status (status),
+  KEY idx_events_start (start_datetime),
+  KEY idx_events_created_by (created_by),
+  KEY idx_events_series (series_id),
+  CONSTRAINT fk_events_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_events_status ON events (status);
-CREATE INDEX IF NOT EXISTS idx_events_start ON events (start_datetime);
-CREATE INDEX IF NOT EXISTS idx_events_created_by ON events (created_by);
-
--- Migração idempotente: igreja responsável por omissão passa a ser a Sede.
-ALTER TABLE events ALTER COLUMN community SET DEFAULT 'Sede';
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id    UUID NOT NULL REFERENCES events (id) ON DELETE CASCADE,
-  actor_id    UUID REFERENCES users (id) ON DELETE SET NULL,
-  from_status TEXT,
-  to_status   TEXT NOT NULL,
+  id          CHAR(36) PRIMARY KEY,
+  event_id    CHAR(36) NOT NULL,
+  actor_id    CHAR(36),
+  from_status VARCHAR(20),
+  to_status   VARCHAR(20) NOT NULL,
   comment     TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_event_history_event (event_id),
+  CONSTRAINT fk_history_event FOREIGN KEY (event_id)
+    REFERENCES events (id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_actor FOREIGN KEY (actor_id)
+    REFERENCES users (id) ON DELETE SET NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_event_history_event ON event_history (event_id);
 
 -- ── Definições da aplicação (key/value) ─────────────────────────
 -- Configurações geríveis em runtime (ex.: integração de saída com a inChurch:
 -- ativar sincronização, permitir PUT, permitir DELETE).
 CREATE TABLE IF NOT EXISTS app_settings (
-  key        TEXT PRIMARY KEY,
-  value      JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_by UUID REFERENCES users (id) ON DELETE SET NULL
+  `key`      VARCHAR(120) PRIMARY KEY,
+  value      JSON NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by CHAR(36),
+  CONSTRAINT fk_settings_updated_by FOREIGN KEY (updated_by)
+    REFERENCES users (id) ON DELETE SET NULL
 );
 
 -- ── Igrejas / organizações ──────────────────────────────────────
--- Fonte única da verdade das igrejas geridas no backoffice. Substitui a lista
--- fixa que existia no código. `external_id` é o ID da inChurch
--- (responsible_church.id) usado para ligar os eventos importados à igreja.
+-- Fonte única da verdade das igrejas geridas no backoffice. `external_id` é o
+-- ID da inChurch (responsible_church.id) usado para ligar os eventos importados.
 CREATE TABLE IF NOT EXISTS churches (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        TEXT NOT NULL UNIQUE,
-  external_id INTEGER,
-  address     TEXT,
-  postal_code TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id          CHAR(36) PRIMARY KEY,
+  name        VARCHAR(255) NOT NULL UNIQUE,
+  external_id INT,
+  address     VARCHAR(255),
+  postal_code VARCHAR(40),
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Semeia as 8 igrejas atuais (idempotente) com o respetivo ID da inChurch.
-INSERT INTO churches (name, external_id) VALUES
-  ('Sede', 33023),
-  ('Açores', 34878),
-  ('Almada', 33072),
-  ('Barreiro', 33079),
-  ('Caldas Da Rainha', 33077),
-  ('Coruche', 33080),
-  ('Moita', 33078),
-  ('Porto', 33075)
-ON CONFLICT (name) DO NOTHING;
+INSERT IGNORE INTO churches (id, name, external_id) VALUES
+  (UUID(), 'Sede', 33023),
+  (UUID(), 'Açores', 34878),
+  (UUID(), 'Almada', 33072),
+  (UUID(), 'Barreiro', 33079),
+  (UUID(), 'Caldas Da Rainha', 33077),
+  (UUID(), 'Coruche', 33080),
+  (UUID(), 'Moita', 33078),
+  (UUID(), 'Porto', 33075);
 
 -- ── Categorias de eventos ───────────────────────────────────────
--- Fonte única da verdade das categorias geríveis no backoffice. Substitui a
--- lista fixa que existia no CHECK da tabela `events`. `slug` é o identificador
--- estável guardado em events.category; `color` é a cor de apresentação.
+-- Fonte única da verdade das categorias geríveis no backoffice. `slug` é o
+-- identificador estável guardado em events.category; `color` é a cor.
 CREATE TABLE IF NOT EXISTS categories (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug       TEXT NOT NULL UNIQUE,
-  label      TEXT NOT NULL,
-  color      TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id         CHAR(36) PRIMARY KEY,
+  slug       VARCHAR(120) NOT NULL UNIQUE,
+  label      VARCHAR(120) NOT NULL,
+  color      VARCHAR(20),
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Semeia as 4 categorias atuais (idempotente) com as cores em uso.
-INSERT INTO categories (slug, label, color, sort_order) VALUES
-  ('culto', 'Celebração', '#F5A800', 1),
-  ('jovens', 'Jovens', '#6FA8FF', 2),
-  ('formacao', 'Formação', '#5DB87A', 3),
-  ('evento', 'Evento', '#B8C0D8', 4)
-ON CONFLICT (slug) DO NOTHING;
-
--- As categorias passam a ser geríveis (tabela `categories`): remove o CHECK
--- fixo de events.category. A validação passa a ser feita na camada de serviço.
-ALTER TABLE events DROP CONSTRAINT IF EXISTS events_category_check;
+INSERT IGNORE INTO categories (id, slug, label, color, sort_order) VALUES
+  (UUID(), 'culto', 'Celebração', '#F5A800', 1),
+  (UUID(), 'jovens', 'Jovens', '#6FA8FF', 2),
+  (UUID(), 'formacao', 'Formação', '#5DB87A', 3),
+  (UUID(), 'evento', 'Evento', '#B8C0D8', 4);
 
 -- ── Etiquetas de privacidade ────────────────────────────────────
 -- Lista gerível no backoffice. Uma etiqueta agrupa eventos privados; cada
--- utilizador vê todos os eventos privados (privacy_tags = NULL) ou apenas os
--- das etiquetas que lhe foram atribuídas.
+-- utilizador vê todos os privados (privacy_tags = NULL) ou apenas os das
+-- etiquetas que lhe foram atribuídas.
 CREATE TABLE IF NOT EXISTS privacy_tags (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id         CHAR(36) PRIMARY KEY,
+  name       VARCHAR(120) NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Etiqueta de privacidade do evento (obrigatória só quando is_private, validada
--- na camada de aplicação/formulário). NULL = sem etiqueta (visível a todos os
--- que veem privados).
-ALTER TABLE events ADD COLUMN IF NOT EXISTS privacy_tag TEXT;
-
--- Etiquetas de privacidade que o utilizador pode ver: NULL = todas; array =
--- apenas eventos privados com uma destas etiquetas.
-ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_tags TEXT[];
-
--- Recorrência: as ocorrências materializadas de uma série partilham o mesmo
--- series_id. NULL = evento único.
-ALTER TABLE events ADD COLUMN IF NOT EXISTS series_id UUID;
-CREATE INDEX IF NOT EXISTS idx_events_series ON events (series_id);

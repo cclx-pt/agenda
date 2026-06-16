@@ -135,3 +135,6 @@ export const STATUS_META = {
   rascunho: { label: 'Rascunho', icon: 'ti-pencil', bg: DRAFT_BG },
   pendente: { label: 'Pendente', icon: 'ti-clock-pause', bg: DRAFT_BG },
 }
+
+// Selo para eventos importados da API externa (inChurch / inRadar).
+export const API_BADGE = { label: 'API', icon: 'ti-cloud-download', title: 'Evento importado da inChurch (API)' }

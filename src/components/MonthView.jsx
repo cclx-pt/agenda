@@ -1,6 +1,6 @@
 import {
   WEEKDAYS_SHORT, MONTHS_PT,
-  daysInMonth, mondayFirstDay, toDateKey, CATEGORY_META, STATUS_META
+  daysInMonth, mondayFirstDay, toDateKey, CATEGORY_META, STATUS_META, API_BADGE
 } from '../utils/calendarHelpers'
 import styles from './MonthView.module.css'
 
@@ -86,6 +86,7 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                     <span className={styles.evtDot} style={{ background: cat.colorVar }} />
                     <span className={styles.evtTitle}>{evt.title}</span>
                     {st && <i className={`ti ${st.icon} ${styles.evtDraftIcon}`} aria-hidden="true" />}
+                    {evt.isApi && <span className={styles.apiTag} title={API_BADGE.title}>{API_BADGE.label}</span>}
                   </div>
                 )
               })}

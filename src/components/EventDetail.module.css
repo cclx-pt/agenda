@@ -159,6 +159,20 @@
   border: 1px dashed rgba(245, 168, 0, 0.6);
 }
 
+.apiBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 3px 8px;
+  color: #fff;
+  background: #3b82f6;
+}
+
 .title {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 22px;
