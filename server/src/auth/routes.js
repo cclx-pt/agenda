@@ -47,7 +47,14 @@ authRouter.post('/request-code', requestLimiter, async (req, res, next) => {
     const user = await findActiveUser(email)
     if (user) {
       const code = await issueCode(email)
-      await sendOtpEmail(email, code)
+      try {
+        await sendOtpEmail(email, code)
+      } catch (mailErr) {
+        // O código já foi gravado na BD; uma falha de SMTP não deve bloquear o
+        // login nem revelar estado interno ao cliente (resposta genérica abaixo).
+        // Regista-se para diagnóstico no servidor.
+        console.error('[auth] Falha ao enviar email OTP:', mailErr?.message ?? mailErr)
+      }
     }
 
     res.json({ ok: true, message: 'Se o email estiver autorizado, enviámos um código.' })

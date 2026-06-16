@@ -39,9 +39,9 @@ export async function issueCode(email) {
   )
 
   await pool.query(
-    `INSERT INTO otp_codes (email, code_hash, expires_at)
-     VALUES ($1, $2, $3)`,
-    [email, codeHash, expiresAt]
+    `INSERT INTO otp_codes (id, email, code_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [crypto.randomUUID(), email, codeHash, expiresAt]
   )
 
   return code

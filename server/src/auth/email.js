@@ -16,6 +16,10 @@ function getTransporter() {
     port: config.smtp.port,
     secure: config.smtp.secure,
     auth: config.smtp.user ? { user: config.smtp.user, pass: config.smtp.pass } : undefined,
+    // Falha depressa se o servidor SMTP estiver inacessível, em vez de pendurar o pedido.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   })
   return transporter
 }

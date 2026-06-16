@@ -7,7 +7,7 @@ import * as eventsService from '../services/eventsService'
 import { useChurches, invalidateChurches } from '../hooks/useChurches'
 import { useCategories, invalidateCategories } from '../hooks/useCategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
-import { CATEGORY_META, formatDateNumeric, formatDateTimeNumeric } from '../utils/calendarHelpers'
+import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import styles from './ManagePanel.module.css'
 
@@ -1504,7 +1504,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                           <div className={styles.itemText}>
                             <strong className={styles.itemTitle}>{e.title}</strong>
                             <span className={styles.itemMeta}>
-                              {formatDateTimeNumeric(e.startDatetime)}{' '}
+                              {formatDateNumericValue(e.startDatetime)}{' '}
                               · {CATEGORY_META[e.category]?.label ?? e.category} · {e.community}
                             </span>
                           </div>
@@ -1526,7 +1526,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                               {r.fromStatus ? `${r.fromStatus} → ` : ''}
                               {r.toStatus}
                               {r.actor ? ` · ${r.actor}` : ''} ·{' '}
-                              {formatDateTimeNumeric(r.createdAt)}
+                              {formatDateNumericValue(r.createdAt)}
                             </span>
                           </div>
                         </li>

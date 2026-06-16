@@ -104,6 +104,14 @@ export function formatDateTimeNumeric(value) {
   return format(d, 'dd/MM/yyyy HH:mm')
 }
 
+/** Numeric date "dd/mm/aaaa" (sem hora) a partir de um ISO string ou Date. */
+export function formatDateNumericValue(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return format(d, 'dd/MM/yyyy')
+}
+
 export const CATEGORY_META = {
   culto: {
     label: 'Celebração',
@@ -137,4 +145,4 @@ export const STATUS_META = {
 }
 
 // Selo para eventos importados da API externa (inChurch / inRadar).
-export const API_BADGE = { label: 'API', icon: 'ti-cloud-download', title: 'Evento importado da inChurch (API)' }
+export const API_BADGE = { label: 'APP', icon: 'ti-cloud-download', title: 'Evento importado da inChurch (APP)' }
