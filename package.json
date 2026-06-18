@@ -12,6 +12,8 @@
     "build:server": "npm install --omit=dev --prefix server",
     "build:all": "npm run build && npm run build:server",
     "start": "node server/src/index.js",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "db:seed": "npm --prefix server run db:seed",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
