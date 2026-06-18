@@ -6,5 +6,8 @@ dist/
 .env.*
 !.env.example
 
+# Ficheiro de variáveis para a Hostinger (contém segredos — nunca versionar)
+hostinger-env.txt
+
 # Artefactos de testes/browser (Playwright MCP)
 .playwright-mcp/
