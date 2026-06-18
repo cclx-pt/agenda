@@ -18,10 +18,18 @@ export default function EventCard({ event, onClick }) {
 
       <div className={styles.body}>
         <div className={styles.tags}>
-          <span className={styles.tag}
-            style={{ background: cat.bgVar, color: cat.colorVar }}>
-            {cat.label}
-          </span>
+          {!event.isApi && (
+            <span className={styles.tag}
+              style={{ background: cat.bgVar, color: cat.colorVar }}>
+              {cat.label}
+            </span>
+          )}
+          {!event.isApi && event.privacyTag && (
+            <span className={styles.privacyTag} title={`Privacidade: ${event.privacyTag}`}>
+              <i className="ti ti-lock" aria-hidden="true" />
+              {event.privacyTag}
+            </span>
+          )}
           {status && (
             <span className={styles.statusBadge}>
               <i className={`ti ${status.icon}`} aria-hidden="true" />

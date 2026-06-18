@@ -164,6 +164,7 @@ function mapSorEvent(e) {
     imageUrl: e.bannerUrl || null,
     imageLabel: e.bannerUrl ? 'imagem do evento' : null,
     isPrivate: !!e.isPrivate,
+    privacyTag: e.privacyTag ?? null,
     status: e.status || 'publicado',
     isApi: false,
   }
