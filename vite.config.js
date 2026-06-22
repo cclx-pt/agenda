@@ -35,7 +35,11 @@ export default defineConfig(({ mode }) => {
           target: env.BACKEND_URL || 'http://localhost:4000',
           changeOrigin: true,
         },
-        // API inChurch/inRadar (apenas leitura da agenda).
+        // Estado dos serviços (lights + página /logs).
+        '/health': {
+          target: env.BACKEND_URL || 'http://localhost:4000',
+          changeOrigin: true,
+        },
         '/api': {
           target: 'https://inradar.com.br/public/v1',
           changeOrigin: true,

@@ -6,6 +6,7 @@ import { useAuth } from './hooks/useAuth'
 import { Toaster, toast } from 'sonner'
 import { AnimatePresence } from 'framer-motion'
 import ThemeToggle from './components/ThemeToggle'
+import StatusLights from './components/StatusLights'
 import MonthView from './components/MonthView'
 import MiniMonth from './components/MiniMonth'
 import DayView from './components/DayView'
@@ -251,6 +252,7 @@ export default function App() {
               <span>Entrar</span>
             </button>
           )}
+          <StatusLights />
           <ThemeToggle isDark={isDark} onToggle={toggle} />
         </div>
       </header>

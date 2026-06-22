@@ -17,6 +17,8 @@ import { churchesRouter } from './churches/routes.js'
 import { categoriesRouter } from './categories/routes.js'
 import { privacyTagsRouter } from './privacyTags/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
+import { healthRouter } from './health/routes.js'
+import { recordRestart } from './health/repository.js'
 
 const app = express()
 
@@ -36,7 +38,9 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(loadUser)
 
-app.get('/health', (_req, res) => res.json({ ok: true }))
+// Estado dos serviços: /health (liveness), /health/full (componentes) e
+// /health/logs (registo de reinícios — usado pela página pública /logs).
+app.use('/health', healthRouter)
 
 app.use('/api', inradarRouter)
 app.use('/auth', authRouter)
@@ -71,7 +75,7 @@ if (fs.existsSync(path.join(clientDist, 'index.html'))) {
       req.path.startsWith('/api') ||
       req.path.startsWith('/data') ||
       req.path.startsWith('/auth') ||
-      req.path === '/health'
+      req.path.startsWith('/health')
     ) {
       return next()
     }
@@ -89,6 +93,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Erro interno do servidor.' })
 })
 
-app.listen(config.port, () => {
-  console.log(`[server] Agenda CCLX backend a correr em http://localhost:${config.port}`)
+const server = app.listen(config.port, () => {
+  console.log(`[server] Agenda CCLX backend a correr na porta ${config.port}`)
+  // Regista o arranque (best-effort) para aparecer em /logs.
+  recordRestart({ event: 'start', status: 'ok' })
 })
+
+// Encerramento gracioso: regista a paragem antes de sair.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, async () => {
+    console.log(`[server] Recebido ${signal} — a encerrar…`)
+    await recordRestart({ event: 'stop', status: 'ok', detail: signal })
+    server.close(() => process.exit(0))
+    // Força a saída se as ligações não fecharem a tempo.
+    setTimeout(() => process.exit(0), 5000).unref()
+  })
+}

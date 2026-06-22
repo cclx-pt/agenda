@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './hooks/useAuth'
 import App from './App.jsx'
+import LogsPage from './components/LogsPage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -16,12 +17,19 @@ const queryClient = new QueryClient({
   },
 })
 
+// Rota simples sem react-router: /logs mostra a página de estado/registos.
+const isLogsRoute = window.location.pathname.replace(/\/+$/, '') === '/logs'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      {isLogsRoute ? (
+        <LogsPage />
+      ) : (
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      )}
     </QueryClientProvider>
   </React.StrictMode>,
 )

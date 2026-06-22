@@ -147,3 +147,21 @@ CREATE TABLE IF NOT EXISTS privacy_tags (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ── Registo de reinícios do servidor (observabilidade) ──────────
+-- Cada arranque/paragem com sucesso grava uma linha; a página pública /logs
+-- mostra as mais recentes. Não contém dados sensíveis. A app também cria esta
+-- tabela em runtime (ver server/src/health/repository.js), por isso funciona
+-- mesmo sem correr esta migração manualmente.
+CREATE TABLE IF NOT EXISTS server_restarts (
+  id         BIGSERIAL PRIMARY KEY,
+  event      TEXT NOT NULL DEFAULT 'start',
+  status     TEXT NOT NULL DEFAULT 'ok',
+  node_env   TEXT,
+  version    TEXT,
+  pid        INTEGER,
+  detail     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_server_restarts_created
+  ON server_restarts (created_at DESC);
