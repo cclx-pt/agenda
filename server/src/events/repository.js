@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
-// Converte um valor de data (ISO/Date) para algo que o driver MySQL aceite em
-// colunas DATETIME (guardado em UTC pela configuração do pool).
+// Converte um valor de data (ISO/Date) num objeto Date que o node-postgres
+// grava em colunas TIMESTAMPTZ (instante normalizado em UTC).
 const toDb = (v) => (v == null ? null : new Date(v))
 
 // Mapeia a linha da BD para a forma usada pela aplicação (alinhada com apiService).
@@ -59,7 +59,7 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
     const statuses = Array.isArray(status) ? status : [status]
     if (statuses.length > 0) {
       params.push(statuses)
-      where.push(`status IN ($${params.length})`)
+      where.push(`status = ANY($${params.length})`)
     }
   }
   if (createdBy) {
@@ -68,15 +68,15 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   }
   if (Array.isArray(communities) && communities.length > 0) {
     params.push(communities)
-    where.push(`community IN ($${params.length})`)
+    where.push(`community = ANY($${params.length})`)
   }
   if (from) {
     params.push(from)
-    where.push(`start_datetime >= $${params.length}`)
+    where.push(`start_datetime >= $${params.length}::date`)
   }
   if (to) {
     params.push(to)
-    where.push(`start_datetime < DATE_ADD($${params.length}, INTERVAL 1 DAY)`)
+    where.push(`start_datetime < ($${params.length}::date + INTERVAL '1 day')`)
   }
   if (!includePrivate) {
     where.push('is_private = FALSE')
@@ -85,7 +85,7 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
     // esteja na lista permitida do utilizador.
     params.push(allowedPrivacyTags)
     where.push(
-      `(is_private = FALSE OR privacy_tag IS NULL OR privacy_tag IN ($${params.length}))`
+      `(is_private = FALSE OR privacy_tag IS NULL OR privacy_tag = ANY($${params.length}))`
     )
   }
   const sql = `

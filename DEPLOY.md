@@ -4,7 +4,7 @@ Guia de instalação em produção num **VPS Hostinger** (Ubuntu) com:
 
 - **Nginx** — serve o front-end estático e faz proxy para o backend.
 - **Node.js (PM2)** — backend Express (auth, papéis, gestão e proxy da API inRadar).
-- **PostgreSQL** — base de dados (System of Record).
+- **Supabase** — Postgres gerido (System of Record) + Storage (imagens de eventos).
 
 A arquitetura:
 
@@ -15,7 +15,7 @@ Internet ──HTTPS──> Nginx (443)
    ├── /auth/*      -> Node :4000  (OTP + sessão JWT)
    └── /data/*      -> Node :4000  (eventos / gestão)
 
-Node/Express (PM2) ──> PostgreSQL (localhost:5432)
+Node/Express (PM2) ──TLS──> Supabase (Postgres pooler :5432 + Storage)
 ```
 
 ---
@@ -27,24 +27,26 @@ Node/Express (PM2) ──> PostgreSQL (localhost:5432)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# PostgreSQL + Nginx + utilitários
-sudo apt-get install -y postgresql nginx git
+# Nginx + utilitários (a base de dados é o Supabase, gerido — não é local)
+sudo apt-get install -y nginx git
 
 # PM2 global
 sudo npm install -g pm2
 ```
 
-## 2. PostgreSQL
+## 2. Supabase (base de dados + Storage)
 
-```bash
-sudo -u postgres psql <<'SQL'
-CREATE USER cclx WITH PASSWORD 'troca-esta-password';
-CREATE DATABASE cclx_agenda OWNER cclx;
-SQL
-```
+A base de dados é o **Supabase** (Postgres gerido) — não se instala Postgres no
+VPS. No painel do projeto Supabase:
 
-A `DATABASE_URL` ficará:
-`postgres://cclx:troca-esta-password@localhost:5432/cclx_agenda`
+1. **Database → Connection string → "Session pooler"**: copia a string do
+   Supavisor (porta `5432`, compatível com IPv4 e prepared statements). É esta
+   que vai para `DATABASE_URL`:
+   `postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:5432/postgres`
+2. **Storage → New bucket**: cria um bucket **público** para as imagens dos
+   eventos (ex.: `event-images`) — o nome vai para `SUPABASE_STORAGE_BUCKET`.
+3. **Project Settings → API**: copia o **Project URL** (`SUPABASE_URL`) e a
+   chave **`service_role`** (`SUPABASE_SERVICE_ROLE_KEY`, usada só no backend).
 
 ## 3. Obter o código
 
@@ -70,7 +72,11 @@ Valores **obrigatórios** no `server/.env` em produção:
 |----------|-------|
 | `NODE_ENV` | `production` |
 | `CORS_ORIGIN` | `https://agenda.cclx.pt` (domínio real) |
-| `DATABASE_URL` | string do passo 2 |
+| `DATABASE_URL` | string do Supavisor (passo 2) |
+| `DB_SSL` | `true` (TLS obrigatório no Supabase) |
+| `SUPABASE_URL` | Project URL do Supabase (passo 2) |
+| `SUPABASE_SERVICE_ROLE_KEY` | chave `service_role` (passo 2) — segredo, só backend |
+| `SUPABASE_STORAGE_BUCKET` | nome do bucket público (ex.: `event-images`) |
 | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `OTP_PEPPER` | outra string longa e aleatória |
 | `SMTP_*` / `MAIL_FROM` | credenciais de email para envio dos códigos OTP |
@@ -148,7 +154,8 @@ O `dist/` é servido diretamente pelo Nginx; basta reconstruir.
 
 - **Firewall:** abrir apenas 80/443 (e 22 para SSH). A porta 4000 fica só em
   `localhost` — nunca exposta diretamente.
-- **PostgreSQL** escuta em `localhost`; não abrir 5432 ao exterior.
+- **Base de dados:** o Supabase é gerido e acedido por TLS (saída para o pooler
+  na porta `5432`); não há Postgres local nem porta de BD a expor.
 - **Logs do backend:** `pm2 logs cclx-agenda-api`.
 - **Cookies de sessão** são `secure` em produção (só viajam por HTTPS) — por isso
   o TLS do passo 8 é obrigatório para o login funcionar.

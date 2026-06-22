@@ -64,7 +64,8 @@ export async function countEvents(name) {
 
 /** Remove a etiqueta das listas de acesso dos utilizadores (limpeza). */
 export async function removeFromUsers(name) {
-  // privacy_tags é uma coluna JSON: filtra em JS e regrava cada utilizador.
+  // privacy_tags é uma coluna TEXT[]: filtra em JS e regrava cada utilizador
+  // (array ou null), preservando a semântica "lista vazia → NULL = todas".
   const { rows } = await pool.query(
     'SELECT id, privacy_tags FROM users WHERE privacy_tags IS NOT NULL'
   )
@@ -73,7 +74,7 @@ export async function removeFromUsers(name) {
     if (!tags.includes(name)) continue
     const next = tags.filter((t) => t !== name)
     await pool.query('UPDATE users SET privacy_tags = $1 WHERE id = $2', [
-      next.length ? JSON.stringify(next) : null,
+      next.length ? next : null,
       row.id,
     ])
   }

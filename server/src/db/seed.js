@@ -10,8 +10,9 @@ async function seed() {
   await pool.query(
     `INSERT INTO users (id, email, name, role, is_active, can_view_private)
      VALUES ($1, $2, $3, 'admin', TRUE, TRUE)
-     ON DUPLICATE KEY UPDATE role = 'admin', is_active = TRUE,
-       can_view_private = TRUE, name = VALUES(name)`,
+     ON CONFLICT (email) DO UPDATE SET
+       role = 'admin', is_active = TRUE, can_view_private = TRUE,
+       name = EXCLUDED.name`,
     [id, email, name]
   )
 

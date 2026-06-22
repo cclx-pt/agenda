@@ -16,12 +16,21 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
 
   db: {
-    // String de ligação MySQL/MariaDB, ex.:
-    // mysql://utilizador:senha@host:3306/base_de_dados
+    // String de ligação PostgreSQL (Supabase Supavisor, modo sessão, porta 5432):
+    //   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
     connectionString: process.env.DATABASE_URL,
-    // TLS opcional (Hostinger normalmente não exige para ligações locais).
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    // O Supabase exige TLS. Ligado por omissão; usa DB_SSL=false apenas para
+    // um PostgreSQL local sem TLS.
+    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
     poolSize: Number(process.env.DB_POOL_SIZE ?? 10),
+  },
+
+  // Supabase Storage — imagens de eventos. A service role key é usada só no
+  // backend (NUNCA enviada para o browser).
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'event-images',
   },
 
   jwt: {

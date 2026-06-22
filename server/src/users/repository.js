@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
-// Serializa arrays para colunas JSON (NULL = todas/sem restrição).
-const toJson = (v) => (v != null ? JSON.stringify(v) : null)
-
 // Mapeia a linha da BD para a forma usada pela aplicação.
 function mapRow(row) {
   if (!row) return null
@@ -60,8 +57,8 @@ export async function insert(data) {
       data.role,
       data.isActive ?? true,
       data.canViewPrivate ?? false,
-      toJson(data.churches),
-      toJson(data.privacyTags),
+      data.churches ?? null,
+      data.privacyTags ?? null,
     ]
   )
   return findById(id)
@@ -72,9 +69,9 @@ export async function update(id, fields) {
   const sets = []
   const params = [id]
   for (const [col, val] of Object.entries(fields)) {
-    // churches e privacy_tags são colunas JSON: serializa os arrays.
-    const value = col === 'churches' || col === 'privacy_tags' ? toJson(val) : val
-    params.push(value)
+    // churches e privacy_tags são colunas TEXT[]: o node-postgres serializa o
+    // array (ou null) diretamente, sem JSON.
+    params.push(val)
     sets.push(`${col} = $${params.length}`)
   }
   if (sets.length === 0) return findById(id)

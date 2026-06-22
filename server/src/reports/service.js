@@ -8,8 +8,8 @@ export async function getSummary() {
     pool.query('SELECT category, COUNT(*) AS n FROM events GROUP BY category ORDER BY n DESC'),
     pool.query(
       `SELECT
-         CAST(SUM(CASE WHEN is_private THEN 1 ELSE 0 END) AS UNSIGNED) AS private,
-         CAST(SUM(CASE WHEN NOT is_private THEN 1 ELSE 0 END) AS UNSIGNED) AS public
+         COUNT(*) FILTER (WHERE is_private) AS private,
+         COUNT(*) FILTER (WHERE NOT is_private) AS public
        FROM events`
     ),
     pool.query(

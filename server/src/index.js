@@ -16,7 +16,7 @@ import { reportsRouter } from './reports/routes.js'
 import { churchesRouter } from './churches/routes.js'
 import { categoriesRouter } from './categories/routes.js'
 import { privacyTagsRouter } from './privacyTags/routes.js'
-import { uploadsRouter, uploadsDir } from './uploads/routes.js'
+import { uploadsRouter } from './uploads/routes.js'
 
 const app = express()
 
@@ -48,8 +48,8 @@ app.use('/data/events', eventsRouter)
 app.use('/data/churches', churchesRouter)
 app.use('/data/categories', categoriesRouter)
 app.use('/data/privacy-tags', privacyTagsRouter)
-// Imagens carregadas: servidas estaticamente (GET) e endpoint de upload (POST).
-app.use('/data/uploads', express.static(uploadsDir))
+// Imagens de eventos: carregadas (POST) para o Supabase Storage, que serve os
+// URLs públicos diretamente — já não há ficheiros locais a servir.
 app.use('/data/uploads', uploadsRouter)
 
 // ── Frontend (build do Vite) ─────────────────────────────────────
