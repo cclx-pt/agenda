@@ -13,7 +13,6 @@
     "db:seed": "node src/db/seed.js"
   },
   "dependencies": {
-   //"@supabase/supabase-js": "^2.45.0",
     "@supabase/supabase-js": "^2.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
