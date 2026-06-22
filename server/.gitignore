@@ -2,4 +2,6 @@ node_modules/
 .env
 .env.local
 *.log
-uploads/
+# Apenas a pasta de uploads em runtime (server/uploads/), não o código-fonte
+# em server/src/uploads/. Ancorado com "/" para não apanhar subpastas.
+/uploads/
