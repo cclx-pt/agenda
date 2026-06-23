@@ -10,7 +10,7 @@ const ALLOWED = new Map([
   ['image/jpeg', '.jpg'],
 ])
 
-// O ficheiro fica em memória para ser reencaminhado ao Supabase Storage.
+// O ficheiro fica em memória para ser reencaminhado ao Supabase Storage..
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_BYTES, files: 1 },
