@@ -84,11 +84,14 @@ flowchart LR
     B --> E[Static dist build]
 ```
 
-**Single-process deployment**: in production the Express backend also serves the
-built Vite frontend (same-origin), so it runs as **one Node.js process** on
-**Hostinger** shared hosting. The frontend uses relative paths (`/auth`, `/data`,
-`/api`), so dev (Vite proxy on `:5173` → backend `:4000`) and prod both work
-without code changes.
+**Deployment (Vercel)**: the compiled Vite frontend (`dist/`) is served by
+Vercel's CDN, and the Express backend runs as a single **serverless function**
+(`server/serverless.js`). Routing (`vercel.json`) sends `/api`, `/auth`, `/data`
+and `/health` to the function; everything else falls back to the SPA. The
+frontend uses relative paths (`/auth`, `/data`, `/api`), so dev (Vite proxy on
+`:5173` → backend `:4000`) and prod (same-origin on Vercel) both work without
+code changes. Running as one combined Node process (`npm start`) is still
+supported for local/standalone use.
 
 ---
 
@@ -224,7 +227,7 @@ Categories are DB-managed; for inChurch events they are inferred from the name:
 | Script | Purpose |
 |--------|---------|
 | `npm run dev` | Vite dev server (`:5173`, proxies `/auth` `/data` → `:4000`) |
-| `npm run build` | Build frontend → `dist/` (runs `postbuild` to install server deps) |
+| `npm run build` | Build frontend → `dist/` (Vite) |
 | `npm start` | Run the Node backend (also serves `dist/`) |
 | `npm test` | Frontend tests (Vitest) |
 | `npm run db:migrate` / `db:seed` | DB migration / seed (via server) |
@@ -237,16 +240,19 @@ Backend dev: `cd server && npm run dev` (`node --watch`, `:4000`).
   tests against PostgreSQL (Supabase, or a local Postgres).
 
 ### Deployment
-- One Node.js app; Express serves both the API and the compiled frontend.
-- DB: **Supabase (managed Postgres)** — `DATABASE_URL` points at the Supavisor
-  session pooler (port 5432) with `DB_SSL` enabled.
+- **Vercel** (free/Hobby tier): static frontend on the CDN + the Express app as a
+  single serverless function (`server/serverless.js`); see `vercel.json` and
+  `DEPLOY.md`. Local/standalone single-process runs (`npm start`) still work.
+- DB: **Supabase (managed Postgres)** — in serverless `DATABASE_URL` points at the
+  Supavisor **transaction** pooler (port 6543) with `DB_SSL` enabled and a small
+  per-instance pool (`DB_POOL_SIZE=1`).
 - Images: **Supabase Storage** (public bucket) — set `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY` (backend only) and `SUPABASE_STORAGE_BUCKET`.
 - Required env: `NODE_ENV`, `JWT_SECRET`, `OTP_PEPPER`, `DATABASE_URL`, `DB_SSL`,
   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`,
   `CORS_ORIGIN`, `SMTP_*` (needed for OTP login), `INCHURCH_API_KEY/SECRET`.
-- `vite` and `@vitejs/plugin-react` are runtime dependencies so the host can
-  build with `NODE_ENV=production`.
+- `vite` and `@vitejs/plugin-react` are runtime dependencies so the build also
+  works when `NODE_ENV=production`.
 
 ---
 
@@ -255,9 +261,9 @@ Backend dev: `cd server && npm run dev` (`node --watch`, `:4000`).
 | Layer | Technologies |
 |-------|--------------|
 | **Frontend** | React 18, Vite, TanStack Query, framer-motion, sonner, Fuse.js, date-fns, zod, CSS Modules |
-| **Backend** | Node.js ≥20, Express 4, mysql2, jsonwebtoken, nodemailer, multer, cookie-parser, cors, express-rate-limit, zod |
-| **Database** | MySQL / MariaDB |
+| **Backend** | Node.js ≥20, Express 4, pg, @supabase/supabase-js, jsonwebtoken, nodemailer, multer, cookie-parser, cors, express-rate-limit, zod |
+| **Database** | Supabase (managed PostgreSQL) + Supabase Storage |
 | **Auth** | Passwordless OTP (email) + JWT (httpOnly cookie) |
 | **External** | inChurch / inRadar API (read-only, server-proxied) |
 | **Tooling** | ESLint, Prettier, Vitest, Node test runner |
-| **Hosting** | Hostinger shared hosting (single Node process + Nginx/LiteSpeed) |
+| **Hosting** | Vercel (static CDN + Node serverless function); Supabase for DB + Storage |

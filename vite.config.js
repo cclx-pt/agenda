@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.js',
       css: true,
+      // Apenas os testes do frontend. O backend tem o seu próprio runner
+      // (cd server && npm test, via node --test) e precisa de BD + env.
+      include: ['src/**/*.{test,spec}.{js,jsx}'],
     },
     build: {
       rollupOptions: {

@@ -1,16 +1,15 @@
 /**
- * server.js — ponto de entrada de produção (raiz do repositório).
+ * server.js — arranque combinado local / standalone (raiz do repositório).
  *
- * Arranca o servidor Express combinado (API + frontend Vite/React de `dist/`).
- * Existe na raiz para que plataformas que detetam um ficheiro de arranque
- * (ex.: preset Express/Other do Hostinger) o encontrem sem configuração extra.
+ * Arranca o servidor Express combinado (API + frontend Vite/React de `dist/`)
+ * como UMA app Node (`npm start`). Útil para correr/testar a app fora do Vercel
+ * (ex.: máquina local, VPS ou container). No Vercel NÃO é usado — lá a app corre
+ * como função serverless via `server/serverless.js` (ver `vercel.json`).
  *
  * Se o arranque falhar — tipicamente por faltar uma variável de ambiente — em
- * vez de o processo morrer (o que o host mostra como "503" sem pistas) sobe um
- * pequeno servidor de DIAGNÓSTICO que devolve a causa em JSON. Assim a causa
- * fica visível em https://<dominio>/health sem precisar dos logs do painel.
- * NÃO expõe valores de segredos: só a mensagem de erro e os NOMES das
- * variáveis em falta.
+ * vez de o processo morrer sem pistas, sobe um pequeno servidor de DIAGNÓSTICO
+ * que devolve a causa em JSON (`/health`). NÃO expõe valores de segredos: só a
+ * mensagem de erro e os NOMES das variáveis em falta.
  */
 const REQUIRED_ENV = [
   'JWT_SECRET',
