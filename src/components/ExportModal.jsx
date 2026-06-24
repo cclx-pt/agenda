@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { CalendarPlus, ChevronRight, Info, X } from 'lucide-react'
+
 import {
   downloadEventICS,
   downloadMultipleICS,
@@ -7,7 +9,6 @@ import {
   yahooCalendarUrl,
 } from '../utils/icsExport'
 import { useModalA11y } from '../hooks/useModalA11y'
-import styles from './ExportModal.module.css'
 
 const TARGETS = [
   {
@@ -85,63 +86,66 @@ export default function ExportModal({ events, filename, onClose }) {
 
   return (
     <motion.div
-      className={styles.overlay}
+      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/60 pt-20 max-[480px]:items-end max-[480px]:pt-0"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="dialog" aria-modal="true" aria-label="Exportar para calendário"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
       <motion.div
-        className={styles.modal}
+        className="w-[360px] max-w-[92vw] overflow-hidden rounded-lg border bg-background shadow-lg max-[480px]:w-full max-[480px]:rounded-b-none"
         ref={containerRef} tabIndex={-1}
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.97 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
       >
-        <div className={styles.header}>
-          <h3 className={styles.title}>
-            <i className="ti ti-calendar-share" aria-hidden="true" />
+        <div className="flex items-center justify-between px-[18px] pb-2 pt-4">
+          <h3 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
+            <CalendarPlus className="h-[18px] w-[18px]" aria-hidden="true" />
             Exportar para calendário
           </h3>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Fechar">
-            <i className="ti ti-x" aria-hidden="true" />
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            <X className="h-[18px] w-[18px]" aria-hidden="true" />
           </button>
         </div>
 
-        <div className={styles.subtitle}>
-          {isSingle
-            ? event.title
-            : `${events.length} eventos`}
+        <div className="truncate px-[18px] pb-3 text-xs font-medium text-muted-foreground">
+          {isSingle ? event.title : `${events.length} eventos`}
         </div>
 
-        <div className={styles.options}>
+        <div className="flex flex-col gap-1 px-2.5 pb-2.5">
           {TARGETS.map((t) => {
             const disabled = !isSingle && t.singleOnly
             return (
               <button
                 key={t.id}
-                className={`${styles.option} ${disabled ? styles.disabled : ''}`}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40"
                 onClick={() => !disabled && handlePick(t.id)}
                 disabled={disabled}
                 title={disabled ? 'Disponível apenas para evento único' : `Exportar para ${t.label}`}
               >
-                <span className={styles.optIcon} style={{ color: t.color }}>
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-muted text-lg" style={{ color: t.color }}>
                   <i className={t.icon} aria-hidden="true" />
                 </span>
-                <span className={styles.optLabel}>{t.label}</span>
+                <span className="flex-1">{t.label}</span>
                 {disabled && (
-                  <span className={styles.optBadge}>1 evento</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">1 evento</span>
                 )}
-                <i className="ti ti-chevron-right" aria-hidden="true" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50" aria-hidden="true" />
               </button>
             )
           })}
         </div>
 
         {!isSingle && (
-          <div className={styles.hint}>
-            <i className="ti ti-info-circle" aria-hidden="true" />
+          <div className="flex items-center gap-1.5 border-t border-border px-[18px] pb-3.5 pt-2.5 text-[11px] text-muted-foreground">
+            <Info className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
             Para Google, Outlook ou Yahoo, abre cada evento individualmente.
           </div>
         )}

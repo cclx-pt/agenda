@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { Lock, X } from 'lucide-react'
+
 import { useAuth } from '../hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
-import styles from './LoginModal.module.css'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 /**
  * LoginModal — autenticação passwordless por email + código (OTP).
@@ -50,7 +54,7 @@ export default function LoginModal({ onClose }) {
 
   return (
     <motion.div
-      className={styles.overlay}
+      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/60 pt-20 max-[600px]:items-end max-[600px]:pt-0"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -63,7 +67,7 @@ export default function LoginModal({ onClose }) {
       transition={{ duration: 0.2 }}
     >
       <motion.div
-        className={styles.modal}
+        className="w-[360px] max-w-[92vw] overflow-hidden rounded-lg border bg-background shadow-lg max-[600px]:w-full max-[600px]:max-w-full max-[600px]:rounded-b-none"
         ref={containerRef}
         tabIndex={-1}
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
@@ -71,61 +75,66 @@ export default function LoginModal({ onClose }) {
         exit={{ opacity: 0, y: 20, scale: 0.97 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
       >
-        <div className={styles.header}>
-          <h3 className={styles.title}>
-            <i className="ti ti-lock" aria-hidden="true" />
+        <div className="flex items-center justify-between px-[18px] pb-2 pt-4">
+          <h3 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
+            <Lock className="h-[18px] w-[18px] text-foreground" aria-hidden="true" />
             Entrar na gestão
           </h3>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Fechar">
-            <i className="ti ti-x" aria-hidden="true" />
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            <X className="h-[18px] w-[18px]" aria-hidden="true" />
           </button>
         </div>
 
         {step === 'email' ? (
-          <form className={styles.form} onSubmit={handleRequest}>
-            <label className={styles.label} htmlFor="login-email">
-              Email
-            </label>
-            <input
+          <form className="flex flex-col gap-2 px-[18px] pb-5 pt-2" onSubmit={handleRequest}>
+            <Label htmlFor="login-email">Email</Label>
+            <Input
               id="login-email"
               type="email"
-              className={styles.input}
               placeholder="o-teu-email@cclx.pt"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               required
             />
-            <button className={styles.submit} type="submit" disabled={busy}>
+            <Button className="mt-1" type="submit" disabled={busy}>
               {busy ? 'A enviar…' : 'Receber código'}
-            </button>
+            </Button>
           </form>
         ) : (
-          <form className={styles.form} onSubmit={handleVerify}>
-            <p className={styles.hint}>
-              Enviámos um código de 6 dígitos para <strong>{email}</strong>.
+          <form className="flex flex-col gap-2 px-[18px] pb-5 pt-2" onSubmit={handleVerify}>
+            <p className="mb-1 text-xs text-muted-foreground">
+              Enviámos um código de 6 dígitos para{' '}
+              <strong className="text-foreground">{email}</strong>.
             </p>
-            <label className={styles.label} htmlFor="login-code">
-              Código
-            </label>
-            <input
+            <Label htmlFor="login-code">Código</Label>
+            <Input
               id="login-code"
               inputMode="numeric"
               pattern="\d{6}"
               maxLength={6}
-              className={`${styles.input} ${styles.codeInput}`}
+              className="text-center text-xl font-bold tracking-[8px]"
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               autoComplete="one-time-code"
               required
             />
-            <button className={styles.submit} type="submit" disabled={busy || code.length !== 6}>
+            <Button
+              className="mt-1"
+              type="submit"
+              disabled={busy || code.length !== 6}
+            >
               {busy ? 'A validar…' : 'Entrar'}
-            </button>
+            </Button>
             <button
               type="button"
-              className={styles.linkBtn}
+              className="p-1 text-xs text-muted-foreground underline transition-colors hover:text-foreground"
               onClick={() => {
                 setStep('email')
                 setCode('')
