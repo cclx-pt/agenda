@@ -259,10 +259,11 @@ export default function App() {
               <span>Entrar</span>
             </button>
           )}
-          <StatusLights />
           <ThemeToggle isDark={isDark} onToggle={toggle} />
         </div>
       </header>
+
+      <StatusLights />
 
       {/* ── Shell: sidebar navy + calendário ─────────────────────── */}
       <div className={styles.shell}>
