@@ -2,7 +2,7 @@ import {
   WEEKDAYS_SHORT, MONTHS_PT,
   daysInMonth, mondayFirstDay, toDateKey, CATEGORY_META, STATUS_META, API_BADGE
 } from '../utils/calendarHelpers'
-import styles from './MonthView.module.css'
+import { cn } from '@/lib/utils'
 
 export default function MonthView({ year, month, eventsByDate, selectedKey, onDayClick }) {
   const firstDay = mondayFirstDay(new Date(year, month, 1))
@@ -37,40 +37,42 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className="w-full">
       {/* Day of week headers */}
-      <div className={styles.dowRow}>
+      <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAYS_SHORT.map(w => (
-          <div key={w} className={styles.dow}>{w}</div>
+          <div key={w} className="py-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{w}</div>
         ))}
       </div>
 
       {/* Day cells */}
-      <div className={styles.grid}>
+      <div className="grid grid-cols-7">
         {cells.map((cell, idx) => {
           const col = idx % 7
           const isWeekend = col >= 5
           const isSelected = cell.current && cell.dateKey === selectedKey
-          const cls = [
-            styles.day,
-            !cell.current  ? styles.other    : '',
-            cell.isToday   ? styles.today    : '',
-            isSelected     ? styles.selected : '',
-            isWeekend      ? styles.weekend  : '',
-          ].join(' ')
 
           return (
             <div
               key={cell.dateKey || `pad-${idx}`}
-              className={cls}
+              className={cn(
+                'min-h-[88px] cursor-pointer border-b border-r border-border p-1.5 outline-none transition-colors hover:bg-accent focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&:nth-child(7n)]:border-r-0 max-[600px]:min-h-[58px] max-[600px]:p-1',
+                !cell.current && 'pointer-events-none cursor-default bg-muted/30 opacity-45',
+                cell.isToday && 'bg-muted/40',
+                isWeekend && cell.current && 'bg-muted/20',
+                isSelected && 'relative z-10 ring-2 ring-inset ring-ring',
+              )}
               onClick={() => cell.current && onDayClick(cell.dateKey, cell.events)}
               role={cell.current ? 'button' : undefined}
               tabIndex={cell.current ? 0 : undefined}
               onKeyDown={e => e.key === 'Enter' && cell.current && onDayClick(cell.dateKey, cell.events)}
               aria-label={cell.current ? `${cell.day} de ${MONTHS_PT[month]}` : undefined}
             >
-              <div className={styles.dayNum}>
-                <span className={`${styles.dayNumVal} ${cell.isToday ? styles.todayNum : ''} ${isWeekend && cell.current ? styles.weekendNum : ''}`}>
+              <div className="mb-1 flex items-center justify-between">
+                <span className={cn(
+                  'flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold text-muted-foreground max-[600px]:h-[18px] max-[600px]:w-[18px] max-[600px]:text-[10px]',
+                  cell.isToday && 'bg-primary font-bold text-primary-foreground',
+                )}>
                   {cell.day}
                 </span>
               </div>
@@ -79,20 +81,24 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                 const cat = CATEGORY_META[evt.category] || CATEGORY_META.evento
                 const st = STATUS_META[evt.status]
                 return (
-                  <div key={evt.id} className={`${styles.evt} ${st ? styles.evtDraft : ''}`}
+                  <div key={evt.id}
+                    className={cn(
+                      'mb-0.5 flex items-center gap-[3px] overflow-hidden whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide max-[600px]:gap-0.5 max-[600px]:px-[3px] max-[600px]:py-px max-[600px]:text-[8px]',
+                      st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
+                    )}
                     style={{ background: st ? st.bg : cat.bgVar, color: cat.colorVar }}
                     title={st ? `${evt.title} — ${st.label}` : evt.title}>
-                    {evt.imageUrl && <span className={styles.imgDot} />}
-                    <span className={styles.evtDot} style={{ background: cat.colorVar }} />
-                    <span className={styles.evtTitle}>{evt.title}</span>
-                    {st && <i className={`ti ${st.icon} ${styles.evtDraftIcon}`} aria-hidden="true" />}
-                    {evt.isApi && <span className={styles.apiTag} title={API_BADGE.title}>{API_BADGE.label}</span>}
+                    {evt.imageUrl && <span className="h-[5px] w-[5px] flex-shrink-0 rounded-[1px] bg-current opacity-80" />}
+                    <span className="h-1 w-1 flex-shrink-0 rounded-full opacity-70" style={{ background: cat.colorVar }} />
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title}</span>
+                    {st && <i className={`ti ${st.icon} ml-auto flex-shrink-0 text-[9px] opacity-85`} aria-hidden="true" />}
+                    {evt.isApi && <span className="ml-auto flex-shrink-0 rounded-sm bg-blue-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={API_BADGE.title}>{API_BADGE.label}</span>}
                   </div>
                 )
               })}
 
               {cell.events?.length > 2 && (
-                <div className={styles.more}>+{cell.events.length - 2}</div>
+                <div className="px-1 py-px text-[9px] tracking-wide text-muted-foreground max-[600px]:text-[8px]">+{cell.events.length - 2}</div>
               )}
             </div>
           )
