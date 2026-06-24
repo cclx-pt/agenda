@@ -138,3 +138,15 @@
   color: var(--text-muted);
   margin: 0 0 4px;
 }
+
+@media (max-width: 600px) {
+  .overlay {
+    padding-top: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+}

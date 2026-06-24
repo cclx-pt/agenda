@@ -159,3 +159,16 @@
   color: #c0392b;
   font-size: 0.85rem;
 }
+
+@media (max-width: 600px) {
+  .page {
+    padding: 1.25rem 0.85rem 3rem;
+  }
+  .title {
+    font-size: 1.35rem;
+  }
+  .table th,
+  .table td {
+    padding: 0.5rem 0.6rem;
+  }
+}

@@ -15,7 +15,7 @@ import CalendarSidebar from './components/CalendarSidebar'
 import EventDetail from './components/EventDetail'
 import ExportModal from './components/ExportModal'
 import SearchBar from './components/SearchBar'
-import CalendarSkeleton from './components/CalendarSkeleton'
+import CalendarLoading from './components/CalendarLoading'
 import LoginModal from './components/LoginModal'
 import ManagePanel from './components/ManagePanel'
 import * as eventsService from './services/eventsService'
@@ -317,7 +317,7 @@ export default function App() {
 
           {/* ── Calendar body ─────────────────────────────────────── */}
           <main className={styles.body}>
-            {loading && <CalendarSkeleton />}
+            {loading && <CalendarLoading />}
 
             {error && (
               <div className={styles.errorState}>
