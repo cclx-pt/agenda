@@ -55,7 +55,10 @@ export const config = {
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === 'true',
+    // A porta 465 é TLS implícito (SMTPS) por definição: força secure=true.
+    // Evita o erro "Greeting never received" quando SMTP_SECURE não está a 'true'
+    // (ex.: variável em falta/errada no Vercel). 587/25 usam STARTTLS (secure=false).
+    secure: Number(process.env.SMTP_PORT ?? 587) === 465 ? true : process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.MAIL_FROM ?? 'Agenda CCLX <agenda@cclx.pt>',
