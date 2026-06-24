@@ -20,6 +20,15 @@ const pgPool = new Pool({
   max: config.db.poolSize,
 })
 
+// Clientes inativos no pool podem emitir erros mesmo sem nenhuma query a decorrer
+// (ex.: o Supavisor/Supabase fecha ligações ociosas → ECONNRESET). Sem este
+// handler, o pg-pool propaga o erro como uma exceção não tratada e DERRUBA o
+// processo. Registamos e deixamos o pool descartar a ligação partida; uma nova é
+// criada automaticamente no próximo acesso.
+pgPool.on('error', (err) => {
+  console.error('[db] erro numa ligação inativa do pool (ignorado):', err.message)
+})
+
 // O node-postgres já devolve { rows, rowCount } e aceita marcadores nativos
 // $1, $2, …, por isso o SQL dos repositórios usa-se tal como está.
 export async function query(text, params) {
