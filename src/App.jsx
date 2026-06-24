@@ -18,6 +18,7 @@ import SearchBar from './components/SearchBar'
 import CalendarSkeleton from './components/CalendarSkeleton'
 import LoginModal from './components/LoginModal'
 import ManagePanel from './components/ManagePanel'
+import DashboardPage from './components/DashboardPage'
 import * as eventsService from './services/eventsService'
 import { clearEventCache } from './services/apiService'
 import {
@@ -67,6 +68,7 @@ export default function App() {
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
+  const [dashboardOpen, setDashboardOpen] = useState(false) // painel de estatisticas
 
   const handleLogout = async () => {
     await logout()
@@ -231,6 +233,11 @@ export default function App() {
             title="Exportar vista atual">
             <i className="ti ti-calendar-share" aria-hidden="true" />
             <span>Exportar</span>
+          </button>
+          <button className={styles.icsExportBtn} onClick={() => setDashboardOpen(true)}
+            title="Painel de estatísticas">
+            <i className="ti ti-chart-donut" aria-hidden="true" />
+            <span>Painel</span>
           </button>
           {canManage && (
             <button className={styles.icsExportBtn} onClick={() => { setManageView('home'); setManageOpen(true) }}
@@ -424,6 +431,11 @@ export default function App() {
       {/* ── Painel de gestão ────────────────────────────────────── */}
       <AnimatePresence>
         {manageOpen && <ManagePanel initialView={manageView} onClose={() => setManageOpen(false)} />}
+      </AnimatePresence>
+
+      {/* ── Painel de estatísticas ──────────────────────────────── */}
+      <AnimatePresence>
+        {dashboardOpen && <DashboardPage onClose={() => setDashboardOpen(false)} />}
       </AnimatePresence>
 
       <style>{`

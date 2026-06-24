@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Guia de Deploy · Vercel — CCLX</title>
+<style>
+  :root{
+    --paper:#F3F0EA;
+    --card:#FFFFFF;
+    --ink:#14323B;
+    --teal:#11505E;
+    --teal-soft:#2A6F7E;
+    --gold:#D8A12A;
+    --terra:#C0563B;
+    --purple:#9B57C3;
+    --sky:#4FA3D1;
+    --green:#3E8E5A;
+    --line:#E7E1D6;
+    --muted:#6E6E6E;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(20,50,59,.04),0 8px 24px rgba(20,50,59,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:48px 24px 80px;
+  }
+  .wrap{max-width:1120px;margin:0 auto}
+
+  /* Header */
+  .eyebrow{
+    font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--teal-soft);margin:0 0 10px;
+  }
+  h1{font-size:38px;line-height:1.1;margin:0;font-weight:800;letter-spacing:-.01em}
+  h1 .accent{color:var(--teal)}
+  .sub{color:var(--muted);font-size:14px;margin:12px 0 0}
+  .rule{height:2px;background:linear-gradient(90deg,var(--teal),transparent);margin:24px 0 32px;border-radius:2px}
+  .header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;background:var(--teal);color:#fff;
+    font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:10px 16px;border-radius:999px;white-space:nowrap;
+  }
+  .pill .dot{width:8px;height:8px;border-radius:50%;background:#7BE0A0;box-shadow:0 0 0 4px rgba(123,224,160,.25)}
+
+  /* KPI cards */
+  .grid{display:grid;gap:18px}
+  .kpis{grid-template-columns:repeat(5,1fr);margin-bottom:30px}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.kpis{grid-template-columns:1fr}}
+  .kpi{
+    background:var(--card);border:1px solid var(--line);border-left:4px solid var(--teal);
+    border-radius:var(--radius);padding:20px 20px 18px;box-shadow:var(--shadow);
+  }
+  .kpi.gold{border-left-color:var(--gold)}
+  .kpi.terra{border-left-color:var(--terra)}
+  .kpi.green{border-left-color:var(--green)}
+  .kpi.sky{border-left-color:var(--sky)}
+  .kpi .big{font-size:28px;font-weight:800;letter-spacing:-.01em}
+  .kpi .lbl{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+  /* Section */
+  .section{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:28px;margin-bottom:22px;
+  }
+  .section h2{margin:0;font-size:19px;font-weight:800}
+  .section .desc{color:var(--muted);font-size:13.5px;margin:6px 0 22px}
+
+  /* Stepper */
+  .step{display:flex;gap:18px;padding:18px 0;border-top:1px solid var(--line)}
+  .step:first-of-type{border-top:none;padding-top:4px}
+  .num{
+    flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--teal);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;
+  }
+  .step.opt .num{background:var(--gold)}
+  .step-body h3{margin:4px 0 4px;font-size:15.5px;font-weight:700}
+  .step-body p{margin:0;color:var(--muted);font-size:13.5px}
+  code{
+    background:#EEF3F2;color:var(--teal);padding:1.5px 7px;border-radius:6px;
+    font-family:'SF Mono',ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;
+  }
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+       color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:2px 8px;margin-left:8px}
+
+  /* Env table */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-soft);font-weight:700}
+  tbody tr:last-child td{border-bottom:none}
+  .st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
+  .st.fill{background:var(--green)}
+  .st.todo{background:var(--gold)}
+  td .k{font-family:'SF Mono',ui-monospace,Consolas,monospace;font-weight:600;color:var(--ink)}
+
+  .foot{color:var(--muted);font-size:12.5px;margin-top:26px;text-align:center}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:14px}
+  .legend span{display:inline-flex;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header-row">
+    <div>
+      <p class="eyebrow">Comunidade Cristã de Lisboa · Agenda</p>
+      <h1>Guia de Deploy · <span class="accent">Vercel</span></h1>
+      <p class="sub">Repo <code>cclx-pt/agenda</code> · branch <code>main</code> · plano Hobby · Frontend Vite + Backend Express serverless · DB Supabase</p>
+    </div>
+    <span class="pill"><span class="dot"></span>Pronto para deploy</span>
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- KPI / estado -->
+  <div class="grid kpis">
+    <div class="kpi green">
+      <div class="big">Pushed</div>
+      <div class="lbl">Código em <code>origin/main</code></div>
+    </div>
+    <div class="kpi">
+      <div class="big">Other</div>
+      <div class="lbl">Application Preset (vercel.json legacy)</div>
+    </div>
+    <div class="kpi gold">
+      <div class="big">6543</div>
+      <div class="lbl">Supabase pooler (transaction)</div>
+    </div>
+    <div class="kpi sky">
+      <div class="big">20+</div>
+      <div class="lbl">Variáveis em <code>.env.vercel</code></div>
+    </div>
+    <div class="kpi terra">
+      <div class="big">Rever</div>
+      <div class="lbl">Deployment Protection (acesso público)</div>
+    </div>
+  </div>
+
+  <!-- Passos -->
+  <div class="section">
+    <h2>Passos do deploy</h2>
+    <p class="desc">Da importação do repositório ao site público.</p>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <h3>Importar o repositório</h3>
+        <p>Vercel → <strong>Add New… → Project</strong> → importar <code>cclx-pt/agenda</code> (branch <code>main</code>), equipa <strong>CCLX</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <h3>Nome de projeto único</h3>
+        <p>Se o botão <strong>Deploy</strong> estiver cinzento, é porque já existe um projeto <code>agenda</code>. Muda o nome (ex.: <code>agenda-cclx</code>) ou abre o projeto existente e faz <strong>Redeploy</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <h3>Application Preset → Other</h3>
+        <p>O <code>vercel.json</code> usa <code>builds</code> + <code>routes</code>, por isso escolhe <strong>Other</strong> e deixa Build/Output/Install Command vazios. Root Directory = <code>./</code>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <h3>Environment Variables</h3>
+        <p>Expande <strong>Environment Variables</strong> → <strong>Import .env</strong> → seleciona <code>.env.vercel</code>. Preenche os <code>&lt;...&gt;</code> a partir de <code>server/.env</code>. Aplica a Production.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">5</div>
+      <div class="step-body">
+        <h3>Deploy</h3>
+        <p>Carrega <strong>Deploy</strong>. O Vercel constrói o frontend para <code>dist/</code> e empacota o backend como função serverless (<code>server/serverless.js</code>).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">6</div>
+      <div class="step-body">
+        <h3>Definir o CORS_ORIGIN real</h3>
+        <p>Depois do 1.º deploy, copia o URL final (ex.: <code>https://agenda-cclx.vercel.app</code>) para a variável <code>CORS_ORIGIN</code> e faz <strong>Redeploy</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step opt">
+      <div class="num">7</div>
+      <div class="step-body">
+        <h3>Tornar público <span class="tag">opcional</span></h3>
+        <p>Se aparecer a página de login do Vercel, desliga <strong>Settings → Deployment Protection → Vercel Authentication</strong> para o domínio de produção ficar acessível a todos.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Env vars -->
+  <div class="section">
+    <h2>Variáveis de ambiente</h2>
+    <p class="desc">Resumo do <code>.env.vercel</code>. Verde = já preenchido · Âmbar = preencher antes do deploy.</p>
+    <table>
+      <thead>
+        <tr><th>Variável</th><th>Valor / origem</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="k">NODE_ENV</span></td><td>production</td><td><span class="st fill"></span>pronto</td></tr>
+        <tr><td><span class="k">CORS_ORIGIN</span></td><td>URL final do site (passo 6)</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">DATABASE_URL</span></td><td>Supabase pooler :6543 — copia a password</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">SUPABASE_SERVICE_ROLE_KEY</span></td><td>Supabase → Settings → API</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">JWT_SECRET</span> · <span class="k">OTP_PEPPER</span></td><td>segredos longos aleatórios</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">SMTP_HOST/USER/PASS</span></td><td>envio dos códigos OTP de login</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">INCHURCH_API_KEY/SECRET</span></td><td>integração inChurch (eventos)</td><td><span class="st todo"></span>preencher</td></tr>
+        <tr><td><span class="k">DB_SSL · DB_POOL_SIZE</span></td><td>true · 1 (serverless)</td><td><span class="st fill"></span>pronto</td></tr>
+        <tr><td><span class="k">SEED_ADMIN_EMAIL/NAME</span></td><td>admin@cclx.pt · Administrador CCLX</td><td><span class="st fill"></span>pronto</td></tr>
+      </tbody>
+    </table>
+    <div class="legend">
+      <span><span class="st fill"></span>já definido</span>
+      <span><span class="st todo"></span>preencher de <code>server/.env</code></span>
+      <span>⚠️ não definir <code>PORT</code> nem <code>DEV_MASTER_OTP</code></span>
+    </div>
+  </div>
+
+  <p class="foot">Agenda CCLX · guia gerado para deploy no Vercel · abre este ficheiro no browser para ver o visual completo</p>
+
+</div>
+</body>
+</html>
