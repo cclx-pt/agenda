@@ -1,3 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===================================================================
+   shadcn/ui — tema NEUTRO padrão (baseColor: neutral).
+   Tokens prefixados com --sc- para coexistirem com os tokens legados
+   (--accent, --border, ...) durante a migração. Light em :root,
+   dark em [data-theme="dark"] (aplicado pelo useTheme em <html>).
+   =================================================================== */
+@layer base {
+  :root {
+    --sc-background: 0 0% 100%;
+    --sc-foreground: 0 0% 3.9%;
+    --sc-card: 0 0% 100%;
+    --sc-card-foreground: 0 0% 3.9%;
+    --sc-popover: 0 0% 100%;
+    --sc-popover-foreground: 0 0% 3.9%;
+    --sc-primary: 0 0% 9%;
+    --sc-primary-foreground: 0 0% 98%;
+    --sc-secondary: 0 0% 96.1%;
+    --sc-secondary-foreground: 0 0% 9%;
+    --sc-muted: 0 0% 96.1%;
+    --sc-muted-foreground: 0 0% 45.1%;
+    --sc-accent: 0 0% 96.1%;
+    --sc-accent-foreground: 0 0% 9%;
+    --sc-destructive: 0 84.2% 60.2%;
+    --sc-destructive-foreground: 0 0% 98%;
+    --sc-border: 0 0% 89.8%;
+    --sc-input: 0 0% 89.8%;
+    --sc-ring: 0 0% 3.9%;
+    --sc-radius: 0.5rem;
+  }
+
+  [data-theme='dark'] {
+    --sc-background: 0 0% 3.9%;
+    --sc-foreground: 0 0% 98%;
+    --sc-card: 0 0% 3.9%;
+    --sc-card-foreground: 0 0% 98%;
+    --sc-popover: 0 0% 3.9%;
+    --sc-popover-foreground: 0 0% 98%;
+    --sc-primary: 0 0% 98%;
+    --sc-primary-foreground: 0 0% 9%;
+    --sc-secondary: 0 0% 14.9%;
+    --sc-secondary-foreground: 0 0% 98%;
+    --sc-muted: 0 0% 14.9%;
+    --sc-muted-foreground: 0 0% 63.9%;
+    --sc-accent: 0 0% 14.9%;
+    --sc-accent-foreground: 0 0% 98%;
+    --sc-destructive: 0 62.8% 30.6%;
+    --sc-destructive-foreground: 0 0% 98%;
+    --sc-border: 0 0% 14.9%;
+    --sc-input: 0 0% 14.9%;
+    --sc-ring: 0 0% 83.1%;
+  }
+
+  * {
+    @apply border-border;
+  }
+}
+
+/* ===================================================================
+   LEGADO — estilos/tokens dos componentes ainda por migrar.
+   Removidos no fim da migração para shadcn/ui.
+   =================================================================== */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
