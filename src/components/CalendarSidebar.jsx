@@ -19,6 +19,8 @@ const CAT_DOT = {
  * eventos desse dia e os filtros (igreja + categorias), ao estilo da referência.
  */
 export default function CalendarSidebar({
+  open,
+  onClose,
   selectedKey,
   dayEvents,
   onSelectEvent,
@@ -37,7 +39,21 @@ export default function CalendarSidebar({
   const weekdayCap = weekday.charAt(0).toUpperCase() + weekday.slice(1)
 
   return (
-    <aside className={styles.sidebar}>
+    <>
+      <div
+        className={`${styles.backdrop} ${open ? styles.backdropOpen : ''}`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+    <aside className={`${styles.sidebar} ${open ? styles.open : ''}`}>
+      <button
+        type="button"
+        className={styles.drawerClose}
+        onClick={onClose}
+        aria-label="Fechar menu"
+      >
+        <i className="ti ti-x" aria-hidden="true" />
+      </button>
       {canManage && (
         <button type="button" className={styles.newBtn} onClick={onNewEvent}>
           <i className="ti ti-plus" aria-hidden="true" />
@@ -151,5 +167,6 @@ export default function CalendarSidebar({
         </ul>
       </div>
     </aside>
+    </>
   )
 }

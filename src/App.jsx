@@ -67,6 +67,7 @@ export default function App() {
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
+  const [sidebarOpen,  setSidebarOpen]  = useState(false)   // gaveta lateral (telemovel/tablet)
 
   const handleLogout = async () => {
     await logout()
@@ -261,11 +262,13 @@ export default function App() {
       {/* ── Shell: sidebar navy + calendário ─────────────────────── */}
       <div className={styles.shell}>
         <CalendarSidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
           selectedKey={selectedKey}
           dayEvents={dayEvents}
-          onSelectEvent={(evt) => setDetailEvent(evt)}
+          onSelectEvent={(evt) => { setDetailEvent(evt); setSidebarOpen(false) }}
           canManage={canManage}
-          onNewEvent={() => { setManageView('form'); setManageOpen(true) }}
+          onNewEvent={() => { setManageView('form'); setManageOpen(true); setSidebarOpen(false) }}
           onExportDay={() =>
             setExportData({ events: dayEvents, filename: `cclx-${selectedKey}.ics` })
           }
@@ -280,6 +283,14 @@ export default function App() {
           {/* ── Cabeçalho: navegação + vistas ───────────────────── */}
           <div className={styles.mainHeader}>
             <div className={styles.periodNav}>
+              <button
+                className={styles.menuBtn}
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Abrir menu lateral"
+                title="Menu"
+              >
+                <i className="ti ti-menu-2" aria-hidden="true" />
+              </button>
               <button className={styles.navBtn} onClick={() => navigate(-1)} aria-label="Anterior">
                 <i className="ti ti-chevron-left" aria-hidden="true" />
               </button>

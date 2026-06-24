@@ -136,3 +136,11 @@
   padding: 1px 4px;
   letter-spacing: .03em;
 }
+
+@media (max-width: 600px) {
+  .dow { font-size: 8px; padding: 6px 0; }
+  .day { min-height: 58px; padding: 3px 4px; }
+  .dayNumVal { width: 18px; height: 18px; font-size: 10px; }
+  .evt { font-size: 8px; padding: 1px 3px; gap: 2px; }
+  .more { font-size: 8px; padding: 1px 3px; }
+}
