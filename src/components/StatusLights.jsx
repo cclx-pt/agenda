@@ -17,6 +17,7 @@ const STATE_LABEL = {
 export default function StatusLights() {
   const [server, setServer] = useState('unknown')
   const [db, setDb] = useState('unknown')
+  const [smtp, setSmtp] = useState('unknown')
 
   useEffect(() => {
     let alive = true
@@ -27,10 +28,12 @@ export default function StatusLights() {
         if (!alive) return
         setServer(res.ok ? 'up' : 'down')
         setDb(data.db === 'up' ? 'up' : 'down')
+        setSmtp(data.smtp === 'up' ? 'up' : data.smtp === 'down' ? 'down' : 'unknown')
       } catch {
         if (!alive) return
         setServer('down')
         setDb('down')
+        setSmtp('down')
       }
     }
     check()
@@ -45,6 +48,7 @@ export default function StatusLights() {
     { key: 'frontend', label: 'Frontend', state: 'up' },
     { key: 'server', label: 'Servidor', state: server },
     { key: 'db', label: 'Base de dados', state: db },
+    { key: 'smtp', label: 'Email (SMTP)', state: smtp },
   ]
 
   return (

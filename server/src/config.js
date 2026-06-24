@@ -45,6 +45,11 @@ export const config = {
     // Código mestre só para testes locais. NUNCA ativo em produção:
     // mesmo que DEV_MASTER_OTP esteja definido, é forçado a undefined quando isProd.
     devMasterCode: isProd ? undefined : process.env.DEV_MASTER_OTP || undefined,
+    // Recuperação de emergência: com OTP_LOG_CODES=true o código gerado é também
+    // escrito nos logs do servidor (ex.: Vercel) para o operador o poder ler
+    // quando o email/SMTP não funciona. Mantém TODAS as proteções do OTP
+    // (aleatório, uso único, validade, rate-limit). Desligar após recuperar acesso.
+    logCodes: process.env.OTP_LOG_CODES === 'true',
   },
 
   smtp: {

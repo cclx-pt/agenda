@@ -42,6 +42,44 @@ export async function sendOtpEmail(email, code) {
     return { mocked: true }
   }
 
+  // Recuperação de emergência (OTP_LOG_CODES=true): regista o código nos logs do
+  // servidor para o operador o ler quando o email não chega. Escreve-se ANTES do
+  // envio para funcionar mesmo que o SMTP falhe. Desligar depois de recuperar.
+  if (config.otp.logCodes) {
+    console.log(`[email:otp-log] Código OTP para ${email}: ${code}`)
+  }
+
   await tx.sendMail({ from: config.smtp.from, to: email, subject, text, html })
   return { mocked: false }
+}
+
+/**
+ * Verifica a ligação/credenciais SMTP (nodemailer transporter.verify()).
+ * O resultado fica em cache curta (60s) para não abrir uma ligação SMTP a cada
+ * sondagem do /health/full. Devolve { ok, configured, error }.
+ */
+let smtpCheck = { at: 0, result: null }
+const SMTP_CHECK_TTL_MS = 60_000
+
+export async function verifySmtp() {
+  const now = Date.now()
+  if (smtpCheck.result && now - smtpCheck.at < SMTP_CHECK_TTL_MS) {
+    return smtpCheck.result
+  }
+
+  const tx = getTransporter()
+  let result
+  if (!tx) {
+    result = { ok: false, configured: false, error: 'SMTP não configurado (modo consola).' }
+  } else {
+    try {
+      await tx.verify()
+      result = { ok: true, configured: true }
+    } catch (err) {
+      result = { ok: false, configured: true, error: err?.message ?? String(err) }
+    }
+  }
+
+  smtpCheck = { at: now, result }
+  return result
 }

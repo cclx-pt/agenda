@@ -79,6 +79,7 @@ export default function LogsPage() {
     { key: 'frontend', label: 'Frontend (React/Vite)', state: 'up' },
     { key: 'server', label: 'Servidor (Express)', state: health?.serverState ?? 'unknown' },
     { key: 'db', label: 'Base de dados (PostgreSQL)', state: health?.db ?? 'unknown' },
+    { key: 'smtp', label: 'Email / SMTP', state: health?.smtp ?? 'unknown' },
   ]
 
   return (
@@ -111,6 +112,12 @@ export default function LogsPage() {
             <>
               {' '}
               · <span className={styles.err}>BD: {health.dbError}</span>
+            </>
+          ) : null}
+          {health.smtpError ? (
+            <>
+              {' '}
+              · <span className={styles.err}>SMTP: {health.smtpError}</span>
             </>
           ) : null}
         </p>
