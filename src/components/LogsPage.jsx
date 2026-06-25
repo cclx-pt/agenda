@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import styles from './LogsPage.module.css'
+import { Button } from '@/components/ui/button'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 const STATE_LABEL = {
   up: 'Operacional',
@@ -7,8 +11,14 @@ const STATE_LABEL = {
   unknown: 'A verificar…',
 }
 
+const DOT = {
+  up: 'bg-emerald-500',
+  down: 'bg-red-500',
+  unknown: 'bg-amber-400',
+}
+
 function Dot({ state }) {
-  return <span className={`${styles.dot} ${styles[state] || styles.unknown}`} aria-hidden="true" />
+  return <span className={cn('h-3 w-3 flex-shrink-0 rounded-full', DOT[state] || DOT.unknown)} aria-hidden="true" />
 }
 
 function formatDateTime(iso) {
@@ -83,93 +93,98 @@ export default function LogsPage() {
   ]
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Estado da Agenda CCLX</h1>
-        <a className={styles.back} href="/">
+    <div className="mx-auto max-w-[920px] px-5 pb-16 pt-8">
+      <header className="mb-6 flex flex-wrap items-baseline justify-between gap-4">
+        <h1 className="text-2xl font-bold text-foreground">Estado da Agenda CCLX</h1>
+        <a className="text-sm text-primary hover:underline" href="/">
           ← Voltar à agenda
         </a>
       </header>
 
-      <section className={styles.cards}>
+      <section className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
         {components.map((c) => (
-          <div key={c.key} className={styles.card}>
+          <div key={c.key} className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-[0.9rem]">
             <Dot state={c.state} />
             <div>
-              <div className={styles.cardLabel}>{c.label}</div>
-              <div className={styles.cardState}>{STATE_LABEL[c.state] || c.state}</div>
+              <div className="text-sm font-semibold text-foreground">{c.label}</div>
+              <div className="text-xs text-muted-foreground">{STATE_LABEL[c.state] || c.state}</div>
             </div>
           </div>
         ))}
       </section>
 
       {health && (
-        <p className={styles.meta}>
-          Ambiente: <strong>{health.nodeEnv || '—'}</strong> · Uptime:{' '}
-          <strong>{health.uptimeSeconds != null ? `${health.uptimeSeconds}s` : '—'}</strong> · Desde:{' '}
-          <strong>{formatDateTime(health.startedAt)}</strong>
+        <p className="mb-8 text-xs text-muted-foreground">
+          Ambiente: <strong className="text-foreground">{health.nodeEnv || '—'}</strong> · Uptime:{' '}
+          <strong className="text-foreground">{health.uptimeSeconds != null ? `${health.uptimeSeconds}s` : '—'}</strong> · Desde:{' '}
+          <strong className="text-foreground">{formatDateTime(health.startedAt)}</strong>
           {health.dbError ? (
             <>
               {' '}
-              · <span className={styles.err}>BD: {health.dbError}</span>
+              · <span className="text-destructive">BD: {health.dbError}</span>
             </>
           ) : null}
           {health.smtpError ? (
             <>
               {' '}
-              · <span className={styles.err}>SMTP: {health.smtpError}</span>
+              · <span className="text-destructive">SMTP: {health.smtpError}</span>
             </>
           ) : null}
         </p>
       )}
 
       <section>
-        <div className={styles.logsHead}>
-          <h2 className={styles.subtitle}>Registo de reinícios</h2>
-          <button className={styles.refresh} onClick={refresh} disabled={loading}>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-foreground">Registo de reinícios</h2>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? 'A atualizar…' : 'Atualizar'}
-          </button>
+          </Button>
         </div>
 
-        {error && <p className={styles.err}>{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Data/hora</th>
-                <th>Evento</th>
-                <th>Estado</th>
-                <th>Ambiente</th>
-                <th>Versão</th>
-                <th>PID</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead>Data/hora</TableHead>
+                <TableHead>Evento</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Ambiente</TableHead>
+                <TableHead>Versão</TableHead>
+                <TableHead>PID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {restarts.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={6} className={styles.empty}>
+                <TableRow>
+                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                     Sem registos ainda.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 restarts.map((r) => (
-                  <tr key={r.id}>
-                    <td>{formatDateTime(r.created_at)}</td>
-                    <td>{r.event === 'stop' ? 'Paragem' : 'Arranque'}</td>
-                    <td>
-                      <span className={`${styles.badge} ${r.status === 'ok' ? styles.ok : styles.bad}`}>
+                  <TableRow key={r.id}>
+                    <TableCell>{formatDateTime(r.created_at)}</TableCell>
+                    <TableCell>{r.event === 'stop' ? 'Paragem' : 'Arranque'}</TableCell>
+                    <TableCell>
+                      <span className={cn(
+                        'inline-block rounded-full px-2 py-0.5 text-[0.72rem] font-semibold',
+                        r.status === 'ok'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-red-500/15 text-red-700 dark:text-red-400',
+                      )}>
                         {r.status}
                       </span>
-                    </td>
-                    <td>{r.node_env || '—'}</td>
-                    <td>{r.version || '—'}</td>
-                    <td>{r.pid ?? '—'}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell>{r.node_env || '—'}</TableCell>
+                    <TableCell>{r.version || '—'}</TableCell>
+                    <TableCell>{r.pid ?? '—'}</TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </section>
     </div>
