@@ -60,8 +60,8 @@
 }
 
 /* ===================================================================
-   LEGADO — estilos/tokens dos componentes ainda por migrar.
-   Removidos no fim da migração para shadcn/ui.
+   BASE — reset, tipografia (Barlow) e cores por tipo de evento.
+   O tema (claro/escuro) é gerido pelos tokens --sc-* acima.
    =================================================================== */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -73,39 +73,10 @@
   font-family: 'Barlow', sans-serif;
   font-size: 16px;
   line-height: 1.5;
-
-  /* ─── Cromado preto (barra de topo + sidebar) ─────────────────
-     Constante nos dois temas: o cromado é sempre preto com acento
-     dourado da marca CCLX. O conteúdo (calendário) segue o tema. */
-  --chrome-bg:          #0a0a0a;   /* preto principal (topbar) */
-  --chrome-bg2:         #0a0a0a;   /* preto (sidebar) */
-  --chrome-elev:        #262626;   /* cartões/hover sobre preto */
-  --chrome-elev-hover:  rgba(255,255,255,0.08); /* hover translúcido */
-  --chrome-text:        #eef2fb;   /* texto quase branco */
-  --chrome-muted:       #9aa6c6;   /* texto secundário azul-acinzentado */
-  --chrome-dim:         #6c7aa0;   /* texto ténue */
-  --chrome-border:      rgba(255,255,255,0.09);
-  --chrome-accent:      #F5A800;   /* dourado CCLX */
-  --chrome-accent-dark: #d89400;
-  --chrome-accent-text: #1a1205;
-  --weekend:            #e2574c;   /* fins de semana a vermelho */
 }
 
-/* ─── DARK THEME (default / night) ─────────────────────────────── */
+/* ─── Cores por tipo de evento (conteúdo) — mantidas no tema neutro ─ */
 [data-theme="dark"] {
-  --bg:           #111111;
-  --bg2:          #1c1c1c;
-  --bg3:          #252525;
-  --bg4:          #2e2e2e;
-  --border:       #2e2e2e;
-  --border-light: #3a3a3a;
-  --accent:       #F5A800;
-  --accent-dark:  #c98900;
-  --accent-text:  #111111;
-  --text:         #ffffff;
-  --text-muted:   #9a9a9a;
-  --text-dim:     #555555;
-  --shadow:       0 4px 24px rgba(0,0,0,0.5);
   --evt-culto-bg:     rgba(245,168,0,0.18);
   --evt-culto-text:   #F5A800;
   --evt-evento-bg:    rgba(255,255,255,0.09);
@@ -114,28 +85,9 @@
   --evt-formacao-text:#5db87a;
   --evt-jovens-bg:    rgba(100,160,255,0.15);
   --evt-jovens-text:  #6fa8ff;
-  --overlay-bg:   rgba(0,0,0,0.72);
-  --modal-bg:     #1c1c1c;
-  --other-day:    rgba(255,255,255,0.04);
-  --today-bg:     rgba(245,168,0,0.08);
-  --hover-day:    rgba(255,255,255,0.04);
 }
 
-/* ─── LIGHT THEME (day) ─────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg:           #f5f3ee;
-  --bg2:          #ffffff;
-  --bg3:          #f0ede6;
-  --bg4:          #e8e4da;
-  --border:       #ddd9d0;
-  --border-light: #c8c4bb;
-  --accent:       #c98900;
-  --accent-dark:  #a87000;
-  --accent-text:  #ffffff;
-  --text:         #1a1a1a;
-  --text-muted:   #5a5a5a;
-  --text-dim:     #aaaaaa;
-  --shadow:       0 4px 24px rgba(0,0,0,0.12);
   --evt-culto-bg:     rgba(201,137,0,0.12);
   --evt-culto-text:   #8a5e00;
   --evt-evento-bg:    rgba(0,0,0,0.06);
@@ -144,16 +96,11 @@
   --evt-formacao-text:#1e6b40;
   --evt-jovens-bg:    rgba(30,90,200,0.1);
   --evt-jovens-text:  #1a4fa0;
-  --overlay-bg:   rgba(0,0,0,0.45);
-  --modal-bg:     #ffffff;
-  --other-day:    rgba(0,0,0,0.025);
-  --today-bg:     rgba(201,137,0,0.08);
-  --hover-day:    rgba(0,0,0,0.03);
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: hsl(var(--sc-background));
+  color: hsl(var(--sc-foreground));
   transition: background 0.3s ease, color 0.3s ease;
   min-height: 100vh;
 }
@@ -165,6 +112,6 @@ button {
 
 /* ─── SCROLLBAR ─────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+::-webkit-scrollbar-track { background: hsl(var(--sc-muted)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--sc-border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--sc-muted-foreground)); }

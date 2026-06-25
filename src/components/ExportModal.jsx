@@ -43,7 +43,7 @@ const TARGETS = [
     id: 'ics',
     label: 'Ficheiro .ics',
     icon: 'ti ti-download',
-    color: 'var(--accent)',
+    color: 'hsl(var(--sc-primary))',
     singleOnly: false,
   },
 ]

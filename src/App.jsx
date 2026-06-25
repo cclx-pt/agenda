@@ -448,9 +448,6 @@ export default function App() {
         {manageOpen && <ManagePanel initialView={manageView} onClose={() => setManageOpen(false)} />}
       </AnimatePresence>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   )
 }
