@@ -25,7 +25,12 @@ import {
 } from './utils/calendarHelpers'
 import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
-import styles from './App.module.css'
+import {
+  AlertCircle, CalendarPlus, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
+  Eye, Lock, LogOut, Menu, RefreshCw, Settings,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const VIEWS = ['day', 'week', 'month', 'quarter', 'semester', 'year']
 const VIEW_META = {
@@ -197,7 +202,7 @@ export default function App() {
 
   // ─── Render ───────────────────────────────────────────────────────
   return (
-    <div className={styles.app}>
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Toaster
         position="bottom-right"
         theme={isDark ? 'dark' : 'light'}
@@ -205,53 +210,53 @@ export default function App() {
       />
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className={styles.topbar}>
-        <div className={styles.logoArea}>
-          <img src={logoUrl} alt="CCLX" className={styles.logoImg} />
-          <span className={styles.agendaTitle}>Agenda</span>
+      <header className="z-[12] flex h-[60px] flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 text-foreground max-[600px]:h-[52px] max-[600px]:gap-2 max-[600px]:px-3">
+        <div className="flex flex-shrink-0 items-center gap-3">
+          <img src={logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
+          <span className="border-l-2 border-border pl-3 text-xl font-bold uppercase tracking-wider text-foreground max-[600px]:hidden">Agenda</span>
         </div>
 
-        <div className={styles.topRight}>
+        <div className="flex flex-shrink-0 items-center gap-3.5 max-[980px]:gap-2">
           <SearchBar events={filteredEvents} onSelect={(evt) => setDetailEvent(evt)} />
           {canViewPrivate && (
-            <div className={styles.visibilitySelect}>
-              <i className="ti ti-eye" aria-hidden="true" />
-              <select
-                value={visibility}
-                onChange={(e) => setVisibility(e.target.value)}
-                aria-label="Visibilidade dos eventos"
-                title="Visibilidade dos eventos"
-              >
-                <option value="all">Ver tudo</option>
-                <option value="private">Só privados</option>
-                <option value="public">Só públicos</option>
-              </select>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Eye className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+              <div className="relative">
+                <select
+                  className="cursor-pointer appearance-none rounded-md border border-input bg-background py-[5px] pl-2.5 pr-7 text-[11px] font-semibold tracking-wide text-foreground transition-colors hover:border-ring focus:border-ring focus:outline-none"
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value)}
+                  aria-label="Visibilidade dos eventos"
+                  title="Visibilidade dos eventos"
+                >
+                  <option value="all">Ver tudo</option>
+                  <option value="private">Só privados</option>
+                  <option value="public">Só públicos</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              </div>
             </div>
           )}
-          <button className={styles.icsExportBtn} onClick={exportCurrentView}
-            title="Exportar vista atual">
-            <i className="ti ti-calendar-share" aria-hidden="true" />
-            <span>Exportar</span>
-          </button>
+          <Button variant="outline" size="sm" onClick={exportCurrentView} title="Exportar vista atual">
+            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+            <span className="max-[980px]:hidden">Exportar</span>
+          </Button>
           {canManage && (
-            <button className={styles.icsExportBtn} onClick={() => { setManageView('home'); setManageOpen(true) }}
-              title="Administração">
-              <i className="ti ti-calendar-cog" aria-hidden="true" />
-              <span>Admin</span>
-            </button>
+            <Button variant="outline" size="sm" onClick={() => { setManageView('home'); setManageOpen(true) }} title="Administração">
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">Admin</span>
+            </Button>
           )}
           {isAuthenticated ? (
-            <button className={styles.icsExportBtn} onClick={handleLogout}
-              title={`Sessão: ${user.name || user.email} (${user.role})`}>
-              <i className="ti ti-logout" aria-hidden="true" />
-              <span>Sair</span>
-            </button>
+            <Button variant="outline" size="sm" onClick={handleLogout} title={`Sessão: ${user.name || user.email} (${user.role})`}>
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">Sair</span>
+            </Button>
           ) : (
-            <button className={styles.icsExportBtn} onClick={() => setLoginOpen(true)}
-              title="Entrar na gestão">
-              <i className="ti ti-lock" aria-hidden="true" />
-              <span>Entrar</span>
-            </button>
+            <Button size="sm" onClick={() => setLoginOpen(true)} title="Entrar na gestão">
+              <Lock className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">Entrar</span>
+            </Button>
           )}
           <ThemeToggle isDark={isDark} onToggle={toggle} />
         </div>
@@ -260,7 +265,7 @@ export default function App() {
       <StatusLights />
 
       {/* ── Shell: sidebar navy + calendário ─────────────────────── */}
-      <div className={styles.shell}>
+      <div className="flex min-h-0 flex-1">
         <CalendarSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -279,62 +284,67 @@ export default function App() {
           onCategoryChange={setCategory}
         />
 
-        <section className={styles.main}>
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           {/* ── Cabeçalho: navegação + vistas ───────────────────── */}
-          <div className={styles.mainHeader}>
-            <div className={styles.periodNav}>
-              <button
-                className={styles.menuBtn}
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-[18px] py-3 max-[980px]:px-3 max-[980px]:py-2.5 max-[600px]:gap-2 max-[600px]:px-2.5 max-[600px]:py-2">
+            <div className="flex items-center gap-2 max-[600px]:gap-[5px]">
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden h-8 w-8 max-[980px]:inline-flex"
                 onClick={() => setSidebarOpen(true)}
                 aria-label="Abrir menu lateral"
                 title="Menu"
               >
-                <i className="ti ti-menu-2" aria-hidden="true" />
-              </button>
-              <button className={styles.navBtn} onClick={() => navigate(-1)} aria-label="Anterior">
-                <i className="ti ti-chevron-left" aria-hidden="true" />
-              </button>
-              <button className={styles.navBtn} onClick={() => navigate(1)} aria-label="Próximo">
-                <i className="ti ti-chevron-right" aria-hidden="true" />
-              </button>
-              <span className={styles.periodLabel}>{periodLabel()}</span>
-              <button className={styles.todayBtn} onClick={goToday}>Hoje</button>
+                <Menu className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label="Anterior">
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)} aria-label="Próximo">
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <span className="min-w-[160px] text-center text-base font-bold uppercase tracking-wider text-foreground max-[980px]:min-w-[90px] max-[980px]:text-[13px]">{periodLabel()}</span>
+              <Button variant="outline" size="sm" onClick={goToday}>Hoje</Button>
             </div>
 
-            <nav className={styles.viewPills} aria-label="Vista do calendário">
+            <nav className="flex flex-wrap gap-1" aria-label="Vista do calendário">
               {VIEWS.map(v => (
                 <button key={v}
-                  className={`${styles.vpill} ${view === v ? styles.active : ''}`}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors max-[980px]:px-2.5',
+                    view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
                   onClick={() => setView(v)}
                   aria-current={view === v ? 'page' : undefined}
                 >
-                  <i className={`ti ${VIEW_META[v].icon}`} aria-hidden="true" />
-                  <span>{VIEW_META[v].label}</span>
+                  <i className={`ti ${VIEW_META[v].icon} text-[15px]`} aria-hidden="true" />
+                  <span className="max-[980px]:hidden">{VIEW_META[v].label}</span>
                 </button>
               ))}
             </nav>
           </div>
 
           {/* ── Calendar body ─────────────────────────────────────── */}
-          <main className={styles.body}>
+          <main className="flex-1 overflow-auto">
             {loading && <CalendarLoading />}
 
             {error && (
-              <div className={styles.errorState}>
-                <i className="ti ti-alert-circle" aria-hidden="true" />
+              <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-xs uppercase tracking-wide text-destructive">
+                <AlertCircle className="h-7 w-7" aria-hidden="true" />
                 <span>{error}</span>
-                <button className={styles.retryBtn} onClick={() => reload()}>
-                  <i className="ti ti-refresh" aria-hidden="true" />
+                <Button variant="outline" size="sm" onClick={() => reload()}>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
                   <span>Tentar novamente</span>
-                </button>
+                </Button>
               </div>
             )}
 
             {!loading && !error && (
               <>
                 {periodEventCount === 0 && (
-                  <div className={styles.emptyState}>
-                    <i className="ti ti-calendar-off" aria-hidden="true" />
+                  <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-xs uppercase tracking-wide text-muted-foreground">
+                    <CalendarX className="h-7 w-7" aria-hidden="true" />
                     <span>Sem eventos neste período</span>
                   </div>
                 )}
@@ -366,7 +376,7 @@ export default function App() {
                 )}
 
                 {view === 'quarter' && (
-                  <div className={styles.multiGrid}>
+                  <div className="grid grid-cols-3 gap-4 p-5 max-[980px]:grid-cols-1">
                     {getMonthRange(3).map(({ year: y, month: m }) => (
                       <MiniMonth key={`${y}-${m}`} year={y} month={m}
                         eventsByDate={filteredByDate} size="md"
@@ -377,7 +387,7 @@ export default function App() {
                 )}
 
                 {view === 'semester' && (
-                  <div className={styles.multiGrid6}>
+                  <div className="grid grid-cols-3 gap-3 p-5 max-[980px]:grid-cols-2 max-[600px]:grid-cols-1">
                     {getMonthRange(6).map(({ year: y, month: m }) => (
                       <MiniMonth key={`${y}-${m}`} year={y} month={m}
                         eventsByDate={filteredByDate} size="sm"
@@ -388,7 +398,7 @@ export default function App() {
                 )}
 
                 {view === 'year' && (
-                  <div className={styles.yearGrid}>
+                  <div className="grid grid-cols-4 gap-2.5 p-5 max-[980px]:grid-cols-3 max-[600px]:grid-cols-2">
                     {Array.from({ length: 12 }, (_, i) => (
                       <MiniMonth key={i} year={year} month={i}
                         eventsByDate={filteredByDate} size="xs"
