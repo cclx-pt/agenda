@@ -9,7 +9,84 @@ import { useCategories, invalidateCategories } from '../hooks/useCategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
 import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
-import styles from './ManagePanel.module.css'
+
+// Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
+// antigo CSS module, mantendo intactas as referências styles.* no JSX.
+const styles = {
+  overlay: 'fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-12 max-[560px]:p-0',
+  panel: 'flex w-[720px] max-w-[96vw] flex-col rounded-xl border border-border bg-background shadow-lg max-h-[calc(100vh-96px)] max-[560px]:h-full max-[560px]:max-h-full max-[560px]:w-full max-[560px]:max-w-full max-[560px]:rounded-none max-[560px]:border-none',
+  header: 'flex flex-shrink-0 items-center justify-between border-b border-border px-5 py-4 max-[560px]:px-4 max-[560px]:py-3.5',
+  title: 'm-0 flex items-center gap-2 text-base font-bold text-foreground [&>i]:text-[20px] [&>i]:text-primary',
+  closeBtn: 'cursor-pointer rounded p-1 text-lg text-muted-foreground transition-colors hover:bg-accent',
+  body: 'flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-4 max-[560px]:px-4 max-[560px]:pb-[18px] max-[560px]:pt-3.5',
+  toolbar: 'flex justify-between gap-2',
+  toolbarHint: 'm-0 self-center text-[13px] text-muted-foreground [&_code]:font-semibold [&_code]:text-foreground',
+  toolbarActions: 'flex flex-shrink-0 gap-2',
+  muted: 'py-6 text-center text-sm text-muted-foreground',
+  primaryBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent bg-primary px-3.5 py-[9px] text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50',
+  ghostBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[9px] text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
+  list: 'm-0 flex list-none flex-col gap-2 p-0',
+  item: 'flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch',
+  itemMain: 'flex min-w-0 items-start gap-2.5',
+  itemText: 'flex min-w-0 flex-col gap-0.5',
+  itemTitle: 'text-sm text-foreground',
+  itemMeta: 'text-xs text-muted-foreground',
+  reason: 'mt-0.5 text-xs text-destructive',
+  badge: 'flex-shrink-0 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-bold uppercase tracking-wide',
+  draft: 'bg-muted text-muted-foreground',
+  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  published: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+  actions: 'flex flex-shrink-0 gap-1 max-[560px]:justify-end',
+  iconBtn: 'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-transparent text-[15px] text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40',
+  approve: 'hover:!bg-emerald-100 hover:!text-emerald-700 dark:hover:!bg-emerald-500/20 dark:hover:!text-emerald-400',
+  reject: 'hover:!bg-amber-100 hover:!text-amber-700 dark:hover:!bg-amber-500/20 dark:hover:!text-amber-400',
+  danger: 'hover:!bg-red-100 hover:!text-red-700 dark:hover:!bg-red-500/20 dark:hover:!text-red-400',
+  label: 'flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground',
+  input: 'rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground outline-none transition-colors focus:border-ring',
+  textarea: 'resize-y rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground outline-none transition-colors focus:border-ring',
+  colorInput: 'h-[38px] w-full cursor-pointer rounded-lg border border-input bg-background p-0.5',
+  colorDot: 'mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,0.15)]',
+  dropzone: 'cursor-pointer rounded-[10px] border-[1.5px] border-dashed border-input bg-background transition-colors hover:border-ring',
+  dropzoneActive: 'border-ring bg-accent',
+  dropzoneHint: 'flex aspect-video flex-col items-center justify-center gap-2 p-4 text-center text-[13px] font-medium text-muted-foreground [&>i]:text-[28px] [&>i]:text-primary',
+  imagePreviewWrap: 'relative aspect-video w-full',
+  imagePreview: 'block h-full w-full rounded-[9px] object-cover',
+  imageRemove: 'absolute right-2 top-2 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full border-none bg-black/60 text-base text-white hover:bg-black/85',
+  fieldHint: 'text-[11px] font-medium text-muted-foreground',
+  recurrence: 'm-0 flex flex-col gap-3 rounded-[10px] border border-border px-3.5 pb-3.5 pt-3 [&>legend]:px-1.5 [&>legend]:text-xs [&>legend]:font-bold [&>legend]:uppercase [&>legend]:tracking-wide [&>legend]:text-muted-foreground',
+  row: 'grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
+  checks: 'flex flex-wrap gap-5',
+  check: 'flex cursor-pointer items-center gap-[7px] text-[13px] font-medium text-foreground',
+  formActions: 'mt-1 flex justify-end gap-2',
+  backBtn: 'inline-flex cursor-pointer rounded-md border-none bg-transparent px-1 py-0.5 text-lg text-muted-foreground transition-colors hover:bg-accent',
+  menu: 'grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
+  menuCard: 'flex cursor-pointer flex-col gap-1 rounded-xl border border-border bg-muted/40 p-4 text-left transition-colors hover:border-ring hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:text-2xl [&>i]:text-primary',
+  menuTitle: 'text-[15px] font-bold text-foreground',
+  menuDesc: 'text-xs text-muted-foreground',
+  userForm: 'flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5',
+  checkInline: 'self-end pb-[9px]',
+  userControls: 'flex flex-shrink-0 flex-wrap items-center gap-3 max-[560px]:justify-between',
+  smallSelect: 'cursor-pointer rounded-lg border border-input bg-background px-2 py-1.5 text-[13px] text-foreground',
+  filters: 'flex flex-wrap items-center gap-2',
+  filterInput: 'min-w-0 flex-[1_1_160px] rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground',
+  userItemCol: '!flex-col !items-stretch',
+  userTop: 'flex items-center justify-between gap-3',
+  churchRow: 'mt-2.5 flex flex-col gap-2 border-t border-dashed border-border pt-2.5',
+  churchRowLabel: 'text-xs font-semibold text-muted-foreground',
+  churchPicker: 'flex flex-col gap-2',
+  churchGrid: 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-3.5 gap-y-1.5',
+  statGrid: 'grid grid-cols-3 gap-2.5 max-[560px]:grid-cols-2',
+  statCard: 'flex flex-col gap-0.5 rounded-[10px] border border-border bg-muted/40 p-3.5',
+  statNum: 'text-2xl font-bold text-primary',
+  statLabel: 'text-xs text-muted-foreground',
+  reportSection: 'flex flex-col gap-2',
+  reportHeading: 'mb-0 mt-1 text-[13px] font-bold uppercase tracking-wide text-muted-foreground',
+  barList: 'm-0 flex list-none flex-col gap-1 p-0',
+  barRow: 'flex justify-between rounded-lg border border-border bg-muted/40 px-3 py-[7px] text-[13px] text-foreground',
+  barLabel: 'min-w-0 truncate pr-2',
+  barValue: 'font-bold text-primary',
+}
 
 const STATUS_META = {
   rascunho: { label: 'Rascunho', cls: 'draft' },
@@ -1715,7 +1792,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                     <div className={styles.itemMain}>
                       <span
                         className={styles.colorDot}
-                        style={{ background: c.color || 'var(--text-muted)' }}
+                        style={{ background: c.color || 'hsl(var(--sc-muted-foreground))' }}
                         aria-hidden="true"
                       />
                       <div className={styles.itemText}>
