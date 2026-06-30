@@ -92,12 +92,16 @@ A agenda lê **só da base de dados**. Os eventos da inChurch são sincronizados
 periodicamente para a tabela `external_events` (INSERT/UPDATE/DELETE) por:
 
 - **Vercel Cron** — já configurado em `vercel.json`
-  (`/data/integration/sync/cron`, de hora a hora). Requer `CRON_SECRET` definido.
+  (`/data/integration/sync/cron`, **uma vez por dia** às 05:00 UTC — compatível
+  com o plano Hobby). Requer `CRON_SECRET` definido.
   O intervalo real respeita o valor configurado no painel **Admin → Integração**
   (a sincronização só corre se já tiver passado esse intervalo).
-  > No plano **Hobby** o Vercel Cron está limitado a **uma vez por dia**; no
-  > plano **Pro** podes baixar a cadência (ex.: `*/15 * * * *`) editando
-  > `crons[].schedule` em `vercel.json`.
+  > ⚠️ No plano **Hobby** o Vercel Cron **só pode correr 1×/dia** — uma expressão
+  > mais frequente (ex.: `0 * * * *`) **faz falhar o deploy**. No plano **Pro**
+  > podes baixar a cadência (ex.: `*/15 * * * *`) editando `crons[].schedule`.
+  > Para sincronizar mais vezes no plano gratuito, usa um serviço de cron externo
+  > (ex.: cron-job.org) a chamar o mesmo endpoint com o cabeçalho
+  > `Authorization: Bearer <CRON_SECRET>`.
 - **Botão "Sincronizar agora"** (Admin → Integração) — força uma sincronização
   imediata, ignorando o intervalo.
 - **Agendador em processo** — só quando se corre como app Node standalone

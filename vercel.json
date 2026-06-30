@@ -21,6 +21,6 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "crons": [
-    { "path": "/data/integration/sync/cron", "schedule": "0 * * * *" }
+    { "path": "/data/integration/sync/cron", "schedule": "0 5 * * *" }
   ]
 }
