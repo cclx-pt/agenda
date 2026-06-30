@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import * as repo from './repository.js'
+import * as externalRepo from '../external/repository.js'
 import * as categoriesService from '../categories/service.js'
 import * as privacyTagsService from '../privacyTags/service.js'
+import * as settingsService from '../settings/service.js'
 
 // Erro de domínio com código HTTP associado.
 export class EventError extends Error {
@@ -148,26 +150,55 @@ function ensureCanEdit(user, event) {
 
 // ── Leitura ──────────────────────────────────────────────────────
 
-/** Agenda pública: apenas publicados e não privados. */
-export function listPublic({ from, to } = {}) {
-  return repo.list({ status: 'publicado', includePrivate: false, from, to })
+// Ordena por data/hora de início (eventos do SoR e externos misturados).
+function sortByStart(events) {
+  return events.sort((a, b) =>
+    a.startDatetime < b.startDatetime ? -1 : a.startDatetime > b.startDatetime ? 1 : 0
+  )
+}
+
+// Lê os eventos externos (inChurch) já guardados na BD, se a integração estiver
+// ativa. São sempre públicos/publicados — entram em todas as vistas do calendário.
+async function loadExternal({ from, to } = {}) {
+  if (!(await settingsService.isExternalEnabled())) return []
+  return externalRepo.list({ from, to })
+}
+
+/** Agenda pública: publicados e não privados do SoR + eventos externos (inChurch). */
+export async function listPublic({ from, to } = {}) {
+  const [sor, external] = await Promise.all([
+    repo.list({ status: 'publicado', includePrivate: false, from, to }),
+    loadExternal({ from, to }),
+  ])
+  return sortByStart([...sor, ...external])
 }
 
 /**
- * Agenda para o calendário autenticado: eventos publicados, incluindo os
- * privados apenas se o utilizador tiver acesso (admin ou can_view_private).
- * Com `includeDrafts` (apenas staff), inclui também rascunhos e pendentes.
+ * Agenda para o calendário autenticado: eventos publicados (SoR), incluindo os
+ * privados apenas se o utilizador tiver acesso (admin ou can_view_private), mais
+ * os eventos externos (inChurch). Com `includeDrafts` (apenas staff), inclui
+ * também rascunhos e pendentes do SoR.
  */
 export async function listCalendar(user, { includeDrafts = false, from, to } = {}) {
   const includePrivate = canSeePrivate(user)
   const allowedPrivacyTags = userPrivacyTags(user)
+  const external = await loadExternal({ from, to })
+
   // Sem rascunhos (ou utilizador sem gestão): apenas eventos publicados.
   if (!includeDrafts || !canManageEvents(user.role)) {
-    return repo.list({ status: 'publicado', includePrivate, allowedPrivacyTags, from, to })
+    const sor = await repo.list({ status: 'publicado', includePrivate, allowedPrivacyTags, from, to })
+    return sortByStart([...sor, ...external])
   }
   // Admin vê rascunhos/pendentes de todas as igrejas.
   if (isAdmin(user.role)) {
-    return repo.list({ status: ['publicado', 'pendente', 'rascunho'], includePrivate, allowedPrivacyTags, from, to })
+    const sor = await repo.list({
+      status: ['publicado', 'pendente', 'rascunho'],
+      includePrivate,
+      allowedPrivacyTags,
+      from,
+      to,
+    })
+    return sortByStart([...sor, ...external])
   }
   // Gestor com âmbito: publicados de todas as igrejas + rascunhos/pendentes
   // apenas das igrejas a que tem acesso.
@@ -176,9 +207,7 @@ export async function listCalendar(user, { includeDrafts = false, from, to } = {
     repo.list({ status: 'publicado', includePrivate, allowedPrivacyTags, from, to }),
     repo.list({ status: ['pendente', 'rascunho'], communities, includePrivate, allowedPrivacyTags, from, to }),
   ])
-  return [...published, ...drafts].sort((a, b) =>
-    a.startDatetime < b.startDatetime ? -1 : a.startDatetime > b.startDatetime ? 1 : 0
-  )
+  return sortByStart([...published, ...drafts, ...external])
 }
 
 /** Lista para gestão, filtrada conforme o papel e o acesso por igreja. */

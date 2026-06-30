@@ -75,6 +75,13 @@ export const config = {
     apiSecret: process.env.INCHURCH_API_SECRET,
     apiVersion: process.env.INCHURCH_API_VERSION ?? 'v1',
   },
+
+  // Segredo partilhado que protege o endpoint de sincronização agendada
+  // (GET /data/integration/sync/cron). O Vercel Cron envia-o como
+  // "Authorization: Bearer <CRON_SECRET>". Em produção é obrigatório.
+  cron: {
+    secret: process.env.CRON_SECRET,
+  },
 }
 
 export const ROLES = ['admin', 'aprovador', 'editor', 'visitante']

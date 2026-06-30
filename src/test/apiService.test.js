@@ -1,34 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fetchAllEvents, clearEventCache, ApiError } from '../services/apiService'
 
-// Encaminha o fetch conforme a origem: inChurch (`/api/event`) ou SoR (`/data/events/public`).
-function mockFetch({
-  inchurch = { results: [], next: null },
-  sor = { events: [] },
-  inchurchStatus = 200,
-  sorStatus = 200,
-  integrationEnabled = true,
-} = {}) {
-  global.fetch = vi.fn((url) => {
-    const str = String(url)
-    if (str.includes('/data/integration/public')) {
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({ enabled: integrationEnabled }),
-      })
-    }
-    const isInchurch = str.includes('/api/event')
-    const status = isInchurch ? inchurchStatus : sorStatus
-    const payload = isInchurch ? inchurch : sor
-    return Promise.resolve({
-      ok: status >= 200 && status < 300,
-      status,
-      statusText: status === 200 ? 'OK' : 'Error',
-      json: async () => payload,
+// O frontend lê UMA origem: a base de dados (/data/events). Os eventos externos
+// (inChurch) já vêm combinados pelo servidor, mapeados e marcados com isApi:true
+// e id prefixado `ic-`.
+function mockFetch({ sor = { events: [] }, sorStatus = 200 } = {}) {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({
+      ok: sorStatus >= 200 && sorStatus < 300,
+      status: sorStatus,
+      statusText: sorStatus === 200 ? 'OK' : 'Error',
+      json: async () => sor,
     })
-  })
+  )
 }
 
 const sorEvent = (over = {}) => ({
@@ -50,16 +34,25 @@ const sorEvent = (over = {}) => ({
   ...over,
 })
 
-const inchurchRaw = (over = {}) => ({
-  id: 42,
-  name: 'Culto de Domingo',
+// Evento externo (inChurch) tal como o servidor o devolve (já mapeado).
+const apiEvent = (over = {}) => ({
+  id: 'ic-42',
+  title: 'Culto de Domingo',
   description: 'Celebração',
-  start_datetime: '2026-06-14T19:00:00',
-  end_datetime: '2026-06-14T20:30:00',
-  show_on_calendar: true,
-  responsible_church: { name: 'Sede' },
-  location: { address: 'Rua B', city: 'Lisboa' },
-  image: null,
+  date: '2026-06-14',
+  startDatetime: '2026-06-14T19:00:00.000Z',
+  endDatetime: '2026-06-14T20:30:00.000Z',
+  timeStart: '19:00',
+  timeEnd: '20:30',
+  allDay: false,
+  location: 'Rua B, Lisboa',
+  community: 'Sede',
+  category: 'culto',
+  status: 'publicado',
+  isPrivate: false,
+  privacyTag: null,
+  bannerUrl: null,
+  isApi: true,
   ...over,
 })
 
@@ -82,7 +75,7 @@ describe('fetchAllEvents', () => {
   beforeEach(() => clearEventCache())
   afterEach(() => vi.restoreAllMocks())
 
-  it('maps a SoR event to the app shape', async () => {
+  it('maps a SoR (managed) event to the app shape', async () => {
     mockFetch({ sor: { events: [sorEvent()] } })
     const events = await fetchAllEvents()
     const evt = events.find((e) => e.id === 'e1')
@@ -94,6 +87,7 @@ describe('fetchAllEvents', () => {
       date: '2026-06-14',
       timeStart: '10:30',
       timeEnd: '12:00',
+      isApi: false,
     })
     expect(evt.location).toContain('Rua A')
   })
@@ -105,8 +99,8 @@ describe('fetchAllEvents', () => {
     expect(evt.imageLabel).toBe('imagem do evento')
   })
 
-  it('maps an inChurch event and prefixes its id', async () => {
-    mockFetch({ inchurch: { results: [inchurchRaw()], next: null } })
+  it('keeps an external (inChurch) event marked as API with its ic- id', async () => {
+    mockFetch({ sor: { events: [apiEvent()] } })
     const [evt] = await fetchAllEvents()
     expect(evt).toMatchObject({
       id: 'ic-42',
@@ -114,58 +108,19 @@ describe('fetchAllEvents', () => {
       category: 'culto',
       community: 'Sede',
       date: '2026-06-14',
+      isApi: true,
     })
     expect(evt.location).toContain('Rua B')
   })
 
-  it('uses the inChurch responsible_church name directly', async () => {
+  it('sorts the combined events returned by the server', async () => {
     mockFetch({
-      inchurch: { results: [inchurchRaw({ responsible_church: { name: 'Porto' } })], next: null },
-    })
-    const [evt] = await fetchAllEvents()
-    expect(evt.community).toBe('Porto')
-  })
-
-  it('infers the church from the event name when responsible_church is null', async () => {
-    mockFetch({
-      inchurch: {
-        results: [inchurchRaw({ responsible_church: null, name: 'Celebração Almada' })],
-        next: null,
+      sor: {
+        events: [apiEvent({ id: 'ic-7', date: '2026-07-01' }), sorEvent({ id: 'a', date: '2026-06-01' })],
       },
-    })
-    const [evt] = await fetchAllEvents()
-    expect(evt.community).toBe('Almada')
-  })
-
-  it('ignores inChurch events hidden from the calendar', async () => {
-    mockFetch({ inchurch: { results: [inchurchRaw({ show_on_calendar: false })], next: null } })
-    const events = await fetchAllEvents()
-    expect(events).toHaveLength(0)
-  })
-
-  it('merges and sorts events from both sources', async () => {
-    mockFetch({
-      inchurch: { results: [inchurchRaw({ id: 7, start_datetime: '2026-07-01T19:00:00' })], next: null },
-      sor: { events: [sorEvent({ id: 'a', date: '2026-06-01' })] },
     })
     const events = await fetchAllEvents()
     expect(events.map((e) => e.id)).toEqual(['a', 'ic-7'])
-  })
-
-  it('still returns SoR events when inChurch fails', async () => {
-    mockFetch({ inchurchStatus: 500, sor: { events: [sorEvent()] } })
-    const events = await fetchAllEvents()
-    expect(events.map((e) => e.id)).toEqual(['e1'])
-  })
-
-  it('skips inChurch when the integration is disabled', async () => {
-    mockFetch({
-      integrationEnabled: false,
-      inchurch: { results: [inchurchRaw()], next: null },
-      sor: { events: [sorEvent()] },
-    })
-    const events = await fetchAllEvents()
-    expect(events.map((e) => e.id)).toEqual(['e1'])
   })
 
   it('returns an empty list when there are no events', async () => {
@@ -174,8 +129,8 @@ describe('fetchAllEvents', () => {
     expect(events).toHaveLength(0)
   })
 
-  it('throws an ApiError when both sources fail', async () => {
-    mockFetch({ inchurchStatus: 503, sorStatus: 503 })
+  it('throws an ApiError when the source fails', async () => {
+    mockFetch({ sorStatus: 503 })
     await expect(fetchAllEvents()).rejects.toBeInstanceOf(ApiError)
   })
 })

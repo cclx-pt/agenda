@@ -81,6 +81,30 @@ CREATE TABLE IF NOT EXISTS event_history (
 );
 CREATE INDEX IF NOT EXISTS idx_event_history_event ON event_history (event_id);
 
+-- ── Eventos externos (espelho da inChurch / inRadar) ────────────
+-- Preenchido pela sincronização periódica (server/src/integrations/inchurchSync.js).
+-- O calendário lê SÓ da base de dados; a sincronização faz upsert (INSERT/UPDATE)
+-- e remove (DELETE) as linhas que desaparecem da API. `external_id` é o id do
+-- evento na inChurch (único) usado para a reconciliação; `content_hash` deteta
+-- alterações de conteúdo entre sincronizações.
+CREATE TABLE IF NOT EXISTS external_events (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  external_id    TEXT NOT NULL UNIQUE,
+  title          TEXT NOT NULL,
+  description    TEXT,
+  start_datetime TIMESTAMPTZ NOT NULL,
+  end_datetime   TIMESTAMPTZ,
+  location       TEXT,
+  community      TEXT NOT NULL DEFAULT 'Sede',
+  category       TEXT NOT NULL DEFAULT 'evento',
+  image_url      TEXT,
+  content_hash   TEXT NOT NULL,
+  synced_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_external_events_start ON external_events (start_datetime);
+
 -- ── Definições da aplicação (key/value) ─────────────────────────
 -- Configurações geríveis em runtime (ex.: integração de saída com a inChurch:
 -- ativar sincronização, permitir PUT, permitir DELETE).

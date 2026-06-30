@@ -79,11 +79,29 @@ Depois de alterar variáveis é preciso **re-deploy** para terem efeito.
 | `OTP_PEPPER` | outra string longa e aleatória |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | credenciais de email para envio dos códigos OTP |
 | `INCHURCH_API_KEY` / `INCHURCH_API_SECRET` | credenciais da API inRadar (eventos externos) |
+| `CRON_SECRET` | segredo que protege a sincronização agendada — string longa e aleatória; o Vercel Cron envia-a automaticamente |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_NAME` | (opcional) admin inicial (omissão: `admin@cclx.pt`) |
 
 > **Não definas `PORT`** — em serverless a porta é gerida pela Vercel.
 > **Não definas `DEV_MASTER_OTP`** em produção — o código força-o a `undefined`
 > quando `NODE_ENV=production`, mas não o configures de qualquer forma.
+
+### Sincronização inChurch → base de dados
+
+A agenda lê **só da base de dados**. Os eventos da inChurch são sincronizados
+periodicamente para a tabela `external_events` (INSERT/UPDATE/DELETE) por:
+
+- **Vercel Cron** — já configurado em `vercel.json`
+  (`/data/integration/sync/cron`, de hora a hora). Requer `CRON_SECRET` definido.
+  O intervalo real respeita o valor configurado no painel **Admin → Integração**
+  (a sincronização só corre se já tiver passado esse intervalo).
+  > No plano **Hobby** o Vercel Cron está limitado a **uma vez por dia**; no
+  > plano **Pro** podes baixar a cadência (ex.: `*/15 * * * *`) editando
+  > `crons[].schedule` em `vercel.json`.
+- **Botão "Sincronizar agora"** (Admin → Integração) — força uma sincronização
+  imediata, ignorando o intervalo.
+- **Agendador em processo** — só quando se corre como app Node standalone
+  (`npm start`); no Vercel não corre. Desliga-se com `SYNC_SCHEDULER=off`.
 
 ## 5. Migrar e popular a base de dados
 
@@ -113,6 +131,8 @@ npm run db:seed
 > `JWT_SECRET`/`OTP_PEPPER` só são precisos para o `config.js` carregar — os
 > scripts de migração/seed não os usam, por isso um valor `x` serve. O migrate
 > cria as tabelas + 8 igrejas + 4 categorias; o seed garante o utilizador admin.
+> O `db:migrate` é idempotente — **volta a corrê-lo após esta versão** para criar
+> a nova tabela `external_events` (espelho dos eventos sincronizados da inChurch).
 > Ambos são idempotentes.
 
 ## 6. Deploy

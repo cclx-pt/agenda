@@ -63,16 +63,22 @@ export async function rejectEvent(id, reason) {
 
 // ── Integração inChurch (apenas admin) ───────────────────────────
 
-/** Lê a configuração da integração de saída com a inChurch. */
+/** Lê a configuração da integração inChurch (interruptor, intervalo, estado). */
 export async function getIntegration() {
   const { integration } = await request('/data/integration')
   return integration
 }
 
-/** Atualiza os toggles da integração (syncEnabled, allowPut, allowDelete). */
+/** Atualiza a configuração da integração (enabled, intervalMinutes). */
 export async function updateIntegration(payload) {
   const { integration } = await request('/data/integration', { method: 'PUT', body: payload })
   return integration
+}
+
+/** Força uma sincronização imediata com a inChurch. Devolve o resumo. */
+export async function syncIntegration() {
+  const { result } = await request('/data/integration/sync', { method: 'POST' })
+  return result
 }
 
 // ── Gestão de utilizadores (apenas admin) ────────────────────────

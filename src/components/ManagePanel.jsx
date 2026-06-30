@@ -362,6 +362,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   // Ao editar uma ocorrência de uma série, aplicar a toda a série.
   const [applyToSeries, setApplyToSeries] = useState(false)
   const [integration, setIntegration] = useState(null) // config da inChurch
+  const [syncing, setSyncing] = useState(false) // sincronização inChurch a decorrer
   const [users, setUsers] = useState([])
   const [newUser, setNewUser] = useState(emptyUser)
   const [report, setReport] = useState(null)
@@ -815,12 +816,19 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const setIntegrationField = (key) => (e) =>
     setIntegration((cfg) => ({ ...cfg, [key]: e.target.checked }))
 
+  const setIntegrationInterval = (e) => {
+    const value = e.target.value
+    setIntegration((cfg) => ({ ...cfg, intervalMinutes: value === '' ? '' : Number(value) }))
+  }
+
   const handleSaveIntegration = async (e) => {
     e.preventDefault()
     setBusy(true)
     try {
+      const interval = Number(integration.intervalMinutes)
       const saved = await eventsService.updateIntegration({
         enabled: integration.enabled,
+        intervalMinutes: Number.isFinite(interval) && interval > 0 ? interval : 30,
       })
       setIntegration(saved)
       toast.success('Integração atualizada.')
@@ -829,6 +837,35 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       toast.error(err.message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleSyncNow = async () => {
+    setSyncing(true)
+    try {
+      const result = await eventsService.syncIntegration()
+      if (result?.ok) {
+        toast.success(
+          `Sincronização concluída: ${result.fetched} eventos ` +
+            `(+${result.inserted} / ~${result.updated} / -${result.deleted}).`
+        )
+      } else if (result?.skipped) {
+        const reasons = {
+          disabled: 'Integração desativada.',
+          'not-configured': 'Credenciais da inChurch em falta no servidor.',
+          running: 'Já existe uma sincronização a decorrer.',
+          'not-due': 'Ainda não passou o intervalo configurado.',
+        }
+        toast.message(reasons[result.skipped] ?? 'Sincronização ignorada.')
+      } else {
+        toast.error(result?.error ?? 'Falha na sincronização.')
+      }
+      // Atualiza o estado mostrado (última sincronização).
+      setIntegration(await eventsService.getIntegration())
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -1222,9 +1259,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
         ) : view === 'api' ? (
           <form className={styles.body} onSubmit={handleSaveIntegration}>
             <p className={styles.muted}>
-              Controla se os eventos da inChurch são apresentados na agenda
-              pública. Quando desativada, a agenda mostra apenas os eventos
-              geridos aqui.
+              Os eventos da inChurch são sincronizados periodicamente para a base
+              de dados (a agenda lê sempre da base de dados, não da API ao vivo).
+              Quando desativada, a sincronização para e os eventos externos
+              deixam de aparecer na agenda.
             </p>
 
             <div className={styles.checks}>
@@ -1237,6 +1275,18 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 Integração com a inChurch ativa
               </label>
             </div>
+
+            <label className={styles.label}>
+              Intervalo de sincronização (minutos)
+              <input
+                className={styles.input}
+                type="number"
+                min="1"
+                max="1440"
+                value={integration?.intervalMinutes ?? ''}
+                onChange={setIntegrationInterval}
+              />
+            </label>
 
             <label className={styles.label}>
               Base URL (servidor)
@@ -1252,6 +1302,39 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 ? 'Credenciais configuradas no servidor.'
                 : 'Credenciais em falta no servidor (.env).'}
             </p>
+
+            <div className={styles.checks}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={handleSyncNow}
+                disabled={syncing || !integration?.enabled || !integration?.credentialsConfigured}
+              >
+                <i className={`ti ${syncing ? 'ti-loader-2' : 'ti-refresh'}`} aria-hidden="true" />{' '}
+                {syncing ? 'A sincronizar…' : 'Sincronizar agora'}
+              </button>
+            </div>
+
+            {integration?.sync ? (
+              <p className={styles.muted}>
+                <i
+                  className={`ti ${integration.sync.lastStatus === 'ok' ? 'ti-check' : 'ti-alert-triangle'}`}
+                  aria-hidden="true"
+                />{' '}
+                {integration.sync.lastSyncAt
+                  ? `Última sincronização: ${new Date(integration.sync.lastSyncAt).toLocaleString('pt-PT')}`
+                  : 'Ainda sem sincronização concluída.'}
+                {integration.sync.lastCounts
+                  ? ` — ${integration.sync.lastCounts.fetched} eventos ` +
+                    `(+${integration.sync.lastCounts.inserted} / ~${integration.sync.lastCounts.updated} / -${integration.sync.lastCounts.deleted}).`
+                  : ''}
+                {integration.sync.lastStatus === 'error' && integration.sync.lastError
+                  ? ` Erro: ${integration.sync.lastError}`
+                  : ''}
+              </p>
+            ) : (
+              <p className={styles.muted}>Ainda sem sincronização registada.</p>
+            )}
 
             <div className={styles.formActions}>
               <button
