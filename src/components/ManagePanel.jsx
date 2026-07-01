@@ -417,7 +417,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   // Gestão de etiquetas de privacidade (admin).
   const [privacyTagForm, setPrivacyTagForm] = useState(emptyPrivacyTag)
   // Filtros de gestão (Update 1 e 2).
-  const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', date: '' })
+  const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
   const [userFilters, setUserFilters] = useState({ q: '', role: 'Todos', status: 'Todos' })
 
   const section = SECTION[view] ?? SECTION.home
@@ -428,6 +428,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     return events.filter((e) => {
       if (title && !(e.title ?? '').toLowerCase().includes(title)) return false
       if (eventFilters.community !== 'Todas' && e.community !== eventFilters.community) return false
+      if (eventFilters.category !== 'Todas' && e.category !== eventFilters.category) return false
+      if (eventFilters.privacyTag !== 'Todas' && e.privacyTag !== eventFilters.privacyTag) return false
+      if (eventFilters.status !== 'Todos' && e.status !== eventFilters.status) return false
       if (eventFilters.date && e.date !== eventFilters.date) return false
       return true
     })
@@ -489,6 +492,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   }
 
   const goHome = () => setView('home')
+  // Ao sair do formulário de evento, volta ao menu "Gestão da agenda" se o painel
+  // foi aberto diretamente no formulário (ex.: "Novo evento" na barra lateral);
+  // caso contrário volta à lista de eventos.
+  const exitForm = () => setView(initialView === 'form' ? 'home' : 'events')
 
   const openEvents = () => setView('events')
 
@@ -1063,7 +1070,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
         )
       }
       await load()
-      setView('events')
+      exitForm()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -1260,6 +1267,46 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   </option>
                 ))}
               </select>
+              <select
+                className={styles.filterInput}
+                value={eventFilters.category}
+                onChange={(e) => setEventFilters((f) => ({ ...f, category: e.target.value }))}
+                title="Categoria"
+              >
+                <option value="Todas">Todas as categorias</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={styles.filterInput}
+                value={eventFilters.status}
+                onChange={(e) => setEventFilters((f) => ({ ...f, status: e.target.value }))}
+                title="Estado"
+              >
+                <option value="Todos">Todos os estados</option>
+                <option value="rascunho">Rascunho</option>
+                <option value="pendente">Pendente</option>
+                <option value="publicado">Publicado</option>
+                <option value="rejeitado">Rejeitado</option>
+              </select>
+              {dbPrivacyTags.length > 0 && (
+                <select
+                  className={styles.filterInput}
+                  value={eventFilters.privacyTag}
+                  onChange={(e) => setEventFilters((f) => ({ ...f, privacyTag: e.target.value }))}
+                  title="Etiqueta de privacidade"
+                >
+                  <option value="Todas">Todas as etiquetas</option>
+                  {dbPrivacyTags.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 type="date"
                 className={styles.filterInput}
@@ -1267,11 +1314,11 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 onChange={(e) => setEventFilters((f) => ({ ...f, date: e.target.value }))}
                 title="Data"
               />
-              {(eventFilters.title || eventFilters.community !== 'Todas' || eventFilters.date) && (
+              {(eventFilters.title || eventFilters.community !== 'Todas' || eventFilters.category !== 'Todas' || eventFilters.privacyTag !== 'Todas' || eventFilters.status !== 'Todos' || eventFilters.date) && (
                 <button
                   type="button"
                   className={styles.ghostBtn}
-                  onClick={() => setEventFilters({ title: '', community: 'Todas', date: '' })}
+                  onClick={() => setEventFilters({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })}
                 >
                   <i className="ti ti-x" aria-hidden="true" />
                   <span>Limpar</span>
@@ -2094,7 +2141,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
           </div>
         ) : (
           <form className={styles.body} onSubmit={handleSave}>
-            <label className={styles.label}>
+            <div className={styles.label}>
               Imagem do evento
               <div
                 className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
@@ -2154,9 +2201,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   e.target.value = ''
                 }}
               />
-            </label>
+            </div>
 
-            <label className={styles.label}>
+            <div className={styles.label}>
               Anexo (PDF, PNG ou JPG, até 5MB) — opcional
               {form.attachmentUrl ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2">
@@ -2199,7 +2246,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   e.target.value = ''
                 }}
               />
-            </label>
+            </div>
 
             <label className={styles.label}>
               Nome do evento *
@@ -2510,7 +2557,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               <button
                 type="button"
                 className={styles.ghostBtn}
-                onClick={() => setView('events')}
+                onClick={() => exitForm()}
                 disabled={busy}
               >
                 Cancelar
