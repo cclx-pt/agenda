@@ -111,3 +111,24 @@ translationsRouter.put('/', adminOnly, async (req, res, next) => {
     next(err)
   }
 })
+
+// ── Marca / logótipo ──────────────────────────────
+// GET público (a app e o ecrã de carregamento precisam do logótipo); PUT só admin.
+export const brandingRouter = Router()
+
+brandingRouter.get('/', async (_req, res, next) => {
+  try {
+    res.json({ branding: await service.getBranding() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+brandingRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const branding = await service.updateBranding(req.body?.branding ?? req.body, req.user.sub)
+    res.json({ branding })
+  } catch (err) {
+    next(err)
+  }
+})

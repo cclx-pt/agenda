@@ -12,6 +12,7 @@ import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
 import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
+import defaultLogoUrl from '../assets/cclx_line_logo.png'
 
 // Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
 // antigo CSS module, mantendo intactas as referências styles.* no JSX.
@@ -242,6 +243,7 @@ const SECTION = {
   api: { icon: 'ti-plug-connected', title: 'Configurar API externa' },
   reports: { icon: 'ti-chart-bar', title: 'Relatórios' },
   translations: { icon: 'ti-language', title: 'Traduções' },
+  branding: { icon: 'ti-photo', title: 'Aparência' },
 }
 
 function eventToForm(evt) {
@@ -368,7 +370,7 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
  */
 export default function ManagePanel({ onClose, initialView = 'home' }) {
   const { user, hasRole } = useAuth()
-  const { t, entity, entities, refreshTranslations } = useI18n()
+  const { t, entity, entities, refreshTranslations, logoUrl, refreshBranding } = useI18n()
   const containerRef = useModalA11y(onClose)
 
   const isAdmin = hasRole('admin')
@@ -424,6 +426,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [translationsForm, setTranslationsForm] = useState({})
   const [translationsLang, setTranslationsLang] = useState('pt')
   const [savingTranslations, setSavingTranslations] = useState(false)
+  // Aparência (admin): estado de upload/reposição do logótipo.
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [savingBranding, setSavingBranding] = useState(false)
   // Filtros de gestão (Update 1 e 2).
   const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
   const [userFilters, setUserFilters] = useState({ q: '', role: 'Todos', status: 'Todos' })
@@ -587,6 +592,46 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       toast.error(err.message)
     } finally {
       setSavingTranslations(false)
+    }
+  }
+
+  // ── Aparência / logótipo (admin) ───────────────────
+  const openBranding = () => setView('branding')
+
+  const handleLogoFile = async (file) => {
+    if (!file) return
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Formato inválido. Apenas PNG ou JPG.')
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error('Imagem demasiado grande (máx. 5MB).')
+      return
+    }
+    setUploadingLogo(true)
+    try {
+      const url = await eventsService.uploadEventImage(file)
+      await eventsService.updateBranding({ logoUrl: url })
+      await refreshBranding()
+      toast.success('Logótipo atualizado.')
+    } catch (err) {
+      console.error('[upload] logótipo falhou:', err)
+      toast.error(err.message)
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  const handleResetLogo = async () => {
+    setSavingBranding(true)
+    try {
+      await eventsService.updateBranding({ logoUrl: null })
+      await refreshBranding()
+      toast.success('Logótipo predefinido reposto.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSavingBranding(false)
     }
   }
 
@@ -807,6 +852,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const importInputRef = useRef(null)
   const imageInputRef = useRef(null)
   const attachmentInputRef = useRef(null)
+  const logoInputRef = useRef(null)
 
   // Valida e carrega uma imagem (PNG/JPG, ≤5MB) para o backend; guarda a URL.
   const handleImageFile = async (file) => {
@@ -1289,6 +1335,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   <i className="ti ti-language" aria-hidden="true" />
                   <span className={styles.menuTitle}>Traduções</span>
                   <span className={styles.menuDesc}>Idiomas (EN/PT/FR/ES), título e o termo “{entity}”.</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={openBranding} disabled={busy}>
+                  <i className="ti ti-photo" aria-hidden="true" />
+                  <span className={styles.menuTitle}>Aparência</span>
+                  <span className={styles.menuDesc}>Logótipo da aplicação.</span>
                 </button>
               )}
             </div>
@@ -2234,6 +2287,61 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               </button>
               <button type="button" className={styles.primaryBtn} onClick={handleSaveTranslations} disabled={savingTranslations}>
                 {savingTranslations ? 'A guardar…' : 'Guardar traduções'}
+              </button>
+            </div>
+          </div>
+        ) : view === 'branding' ? (
+          <div className={styles.body}>
+            <p className={styles.muted}>
+              Logótipo apresentado no topo da aplicação e no ecrã de carregamento.
+              Recomendado: PNG com fundo transparente. Deixe predefinido para usar o logótipo CCLX.
+            </p>
+            <div className="flex items-center gap-4 rounded-lg border border-border bg-muted/40 p-4">
+              <img
+                src={logoUrl || defaultLogoUrl}
+                alt="Logótipo"
+                className="h-10 w-auto object-contain invert dark:invert-0"
+              />
+              <span className={styles.muted}>
+                {logoUrl ? 'Logótipo personalizado ativo.' : 'A usar o logótipo predefinido.'}
+              </span>
+            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              onChange={(e) => {
+                handleLogoFile(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={goHome}
+                disabled={uploadingLogo || savingBranding}
+              >
+                Voltar
+              </button>
+              {logoUrl && (
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={handleResetLogo}
+                  disabled={uploadingLogo || savingBranding}
+                >
+                  Repor predefinido
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo || savingBranding}
+              >
+                {uploadingLogo ? 'A carregar…' : 'Carregar logótipo'}
               </button>
             </div>
           </div>

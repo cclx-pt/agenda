@@ -49,7 +49,7 @@ const VIEW_META = {
 
 export default function App() {
   const { toggle, isDark } = useTheme()
-  const { t, lang, setLang, languages } = useI18n()
+  const { t, lang, setLang, languages, logoUrl: customLogoUrl } = useI18n()
   const { user, isAuthenticated, logout, canViewPrivate } = useAuth()
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -246,7 +246,7 @@ export default function App() {
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <header className="z-[12] flex h-[60px] flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 text-foreground max-[600px]:h-[52px] max-[600px]:gap-2 max-[600px]:px-3">
         <div className="flex flex-shrink-0 items-center gap-3">
-          <img src={logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
+          <img src={customLogoUrl || logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
           <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold tracking-wide text-foreground max-[820px]:hidden">{t('appTitle')}</span>
         </div>
 

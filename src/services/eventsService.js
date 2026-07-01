@@ -144,6 +144,23 @@ export async function updateTranslations(translations) {
   return saved
 }
 
+// ── Marca / logótipo ────────────────────────────
+
+/** Lê a personalização de marca / logótipo (público). */
+export async function getBranding() {
+  const { branding } = await request('/data/branding')
+  return branding
+}
+
+/** Guarda a personalização de marca / logótipo (admin). */
+export async function updateBranding(branding) {
+  const { branding: saved } = await request('/data/branding', {
+    method: 'PUT',
+    body: { branding },
+  })
+  return saved
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {

@@ -25,11 +25,19 @@ export function I18nProvider({ children }) {
     () => localStorage.getItem(STORAGE_KEY) || DEFAULT_LANG
   )
   const [overrides, setOverrides] = useState({})
+  const [logoUrl, setLogoUrl] = useState(null)
 
   const refreshTranslations = useCallback(() => {
     return eventsService
       .getTranslations()
       .then((o) => setOverrides(o && typeof o === 'object' ? o : {}))
+      .catch(() => {})
+  }, [])
+
+  const refreshBranding = useCallback(() => {
+    return eventsService
+      .getBranding()
+      .then((b) => setLogoUrl(b?.logoUrl || null))
       .catch(() => {})
   }, [])
 
@@ -39,6 +47,12 @@ export function I18nProvider({ children }) {
       .getTranslations()
       .then((o) => {
         if (alive) setOverrides(o && typeof o === 'object' ? o : {})
+      })
+      .catch(() => {})
+    eventsService
+      .getBranding()
+      .then((b) => {
+        if (alive) setLogoUrl(b?.logoUrl || null)
       })
       .catch(() => {})
     return () => {
@@ -80,8 +94,10 @@ export function I18nProvider({ children }) {
       languages: LANGUAGES,
       overrides,
       refreshTranslations,
+      logoUrl,
+      refreshBranding,
     }
-  }, [lang, setLang, t, overrides, refreshTranslations])
+  }, [lang, setLang, t, overrides, refreshTranslations, logoUrl, refreshBranding])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
@@ -99,6 +115,8 @@ export function useI18n() {
       languages: LANGUAGES,
       overrides: {},
       refreshTranslations: () => Promise.resolve(),
+      logoUrl: null,
+      refreshBranding: () => Promise.resolve(),
     }
   }
   return ctx
