@@ -8,7 +8,9 @@ import {
   Image as ImageIcon,
   MapPin,
   Trash2,
+  Ticket,
   User,
+  UserCheck,
   X,
 } from 'lucide-react'
 
@@ -103,6 +105,28 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <User className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
               <span>{event.responsible}</span>
             </div>
+            {event.organizerName && (
+              <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <UserCheck className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <span>
+                  {event.organizerName}
+                  {event.organizerContact ? ` · ${event.organizerContact}` : ''}
+                </span>
+              </div>
+            )}
+            {event.registrationUrl && (
+              <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <Ticket className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <a
+                  href={event.registrationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  Inscrições
+                </a>
+              </div>
+            )}
           </div>
 
           <hr className="my-3.5 border-border" />

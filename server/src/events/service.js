@@ -41,6 +41,15 @@ export const eventInputSchema = z
     // privado (validado no frontend); aqui é apenas validada contra a BD se
     // fornecida, para não quebrar dados/legados sem etiqueta.
     privacyTag: z.string().trim().optional().nullable(),
+    // Responsável do evento e inscrições (todos opcionais).
+    organizerName: z.string().trim().max(200).optional().nullable(),
+    organizerContact: z.string().trim().max(200).optional().nullable(),
+    registrationUrl: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de inscrições inválido (use http/https).')
+      .optional()
+      .nullable(),
   })
   .refine(
     (d) => !d.endDatetime || Date.parse(d.endDatetime) >= Date.parse(d.startDatetime),

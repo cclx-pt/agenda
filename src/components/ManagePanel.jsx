@@ -25,6 +25,7 @@ const styles = {
   muted: 'py-6 text-center text-sm text-muted-foreground',
   primaryBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent bg-primary px-3.5 py-[9px] text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50',
   ghostBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[9px] text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
+  dangerBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-destructive/40 bg-transparent px-3.5 py-[9px] text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50',
   list: 'm-0 flex list-none flex-col gap-2 p-0',
   item: 'flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch',
   itemMain: 'flex min-w-0 items-start gap-2.5',
@@ -130,6 +131,9 @@ const emptyForm = {
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
+  organizerName: '',
+  organizerContact: '',
+  registrationUrl: '',
   seriesId: null,
   // Recorrência (apenas na criação).
   recurrenceType: 'unique', // 'unique' | 'recurrent'
@@ -225,6 +229,9 @@ function eventToForm(evt) {
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
+    organizerName: evt.organizerName ?? '',
+    organizerContact: evt.organizerContact ?? '',
+    registrationUrl: evt.registrationUrl ?? '',
     seriesId: evt.seriesId ?? null,
     // Recorrência não é reaplicada na edição (usa-se o âmbito "série").
     recurrenceType: 'unique',
@@ -363,6 +370,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [applyToSeries, setApplyToSeries] = useState(false)
   const [integration, setIntegration] = useState(null) // config da inChurch
   const [syncing, setSyncing] = useState(false) // sincronização inChurch a decorrer
+  const [purging, setPurging] = useState(false) // purga dos eventos externos a decorrer
   const [users, setUsers] = useState([])
   const [newUser, setNewUser] = useState(emptyUser)
   const [report, setReport] = useState(null)
@@ -869,6 +877,28 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     }
   }
 
+  const handlePurge = async () => {
+    if (
+      !window.confirm(
+        'Purgar TODOS os eventos importados da API (inChurch) da base de dados? ' +
+          'Esta ação é irreversível. Se a integração continuar ativa, os eventos ' +
+          'voltarão a ser importados na próxima sincronização.'
+      )
+    ) {
+      return
+    }
+    setPurging(true)
+    try {
+      const result = await eventsService.purgeIntegration()
+      toast.success(`Purga concluída: ${result?.deleted ?? 0} eventos removidos da base de dados.`)
+      setIntegration(await eventsService.getIntegration())
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setPurging(false)
+    }
+  }
+
   const buildPayload = () => {
     const payload = {
       title: form.title.trim(),
@@ -883,6 +913,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
       bannerUrl: form.bannerUrl.trim() || null,
+      organizerName: form.organizerName.trim() || null,
+      organizerContact: form.organizerContact.trim() || null,
+      registrationUrl: form.registrationUrl.trim() || null,
     }
     // Recorrência só na criação de um novo evento recorrente.
     if (!editingId && form.recurrenceType === 'recurrent') {
@@ -1335,6 +1368,23 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
             ) : (
               <p className={styles.muted}>Ainda sem sincronização registada.</p>
             )}
+
+            <div className={styles.checks}>
+              <button
+                type="button"
+                className={styles.dangerBtn}
+                onClick={handlePurge}
+                disabled={purging || syncing || busy}
+              >
+                <i className={`ti ${purging ? 'ti-loader-2' : 'ti-trash'}`} aria-hidden="true" />{' '}
+                {purging ? 'A purgar…' : 'Purgar registos da API'}
+              </button>
+            </div>
+            <p className={styles.muted}>
+              Remove todos os eventos importados da API (inChurch) da base de dados.
+              Se a integração continuar ativa, voltarão a ser importados na próxima
+              sincronização.
+            </p>
 
             <div className={styles.formActions}>
               <button
@@ -2129,6 +2179,38 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 className={styles.input}
                 value={form.location}
                 onChange={setField('location')}
+              />
+            </label>
+
+            <div className={styles.row}>
+              <label className={styles.label}>
+                Responsável do evento (opcional)
+                <input
+                  className={styles.input}
+                  value={form.organizerName}
+                  onChange={setField('organizerName')}
+                  placeholder="Nome do responsável"
+                />
+              </label>
+              <label className={styles.label}>
+                Contacto do responsável (opcional)
+                <input
+                  className={styles.input}
+                  value={form.organizerContact}
+                  onChange={setField('organizerContact')}
+                  placeholder="Email ou telefone"
+                />
+              </label>
+            </div>
+
+            <label className={styles.label}>
+              Link de inscrições (opcional)
+              <input
+                className={styles.input}
+                type="url"
+                value={form.registrationUrl}
+                onChange={setField('registrationUrl')}
+                placeholder="https://…"
               />
             </label>
 

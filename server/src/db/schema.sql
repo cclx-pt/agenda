@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS events (
   -- Etiqueta de privacidade (obrigatória só quando is_private, validada na app).
   privacy_tag      TEXT,
   banner_url       TEXT,
+  -- Responsável do evento e inscrições (opcionais).
+  organizer_name    TEXT,
+  organizer_contact TEXT,
+  registration_url  TEXT,
   external_id      TEXT,
   rejection_reason TEXT,
   created_by       UUID REFERENCES users (id) ON DELETE SET NULL,
@@ -68,6 +72,10 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events (status);
 CREATE INDEX IF NOT EXISTS idx_events_start ON events (start_datetime);
 CREATE INDEX IF NOT EXISTS idx_events_created_by ON events (created_by);
 CREATE INDEX IF NOT EXISTS idx_events_series ON events (series_id);
+-- Campos de responsável e inscrições (idempotente para BD existentes).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_name TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_contact TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS registration_url TEXT;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (

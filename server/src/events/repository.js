@@ -31,6 +31,9 @@ function mapRow(row) {
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
     bannerUrl: row.banner_url,
+    organizerName: row.organizer_name ?? null,
+    organizerContact: row.organizer_contact ?? null,
+    registrationUrl: row.registration_url ?? null,
     seriesId: row.series_id ?? null,
     externalId: row.external_id,
     rejectionReason: row.rejection_reason,
@@ -102,8 +105,9 @@ export async function insert(data, actorId) {
   await pool.query(
     `INSERT INTO events
       (id, title, description, start_datetime, end_datetime, all_day, location,
-       community, category, is_private, privacy_tag, banner_url, series_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+       community, category, is_private, privacy_tag, banner_url,
+       organizer_name, organizer_contact, registration_url, series_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [
       id,
       data.title,
@@ -117,6 +121,9 @@ export async function insert(data, actorId) {
       data.isPrivate ?? false,
       data.privacyTag ?? null,
       data.bannerUrl ?? null,
+      data.organizerName ?? null,
+      data.organizerContact ?? null,
+      data.registrationUrl ?? null,
       data.seriesId ?? null,
       actorId ?? null,
     ]
@@ -138,6 +145,9 @@ export async function update(id, data) {
        is_private = $10,
        privacy_tag = $11,
        banner_url = $12,
+       organizer_name = $13,
+       organizer_contact = $14,
+       registration_url = $15,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -153,6 +163,9 @@ export async function update(id, data) {
       data.isPrivate ?? false,
       data.privacyTag ?? null,
       data.bannerUrl ?? null,
+      data.organizerName ?? null,
+      data.organizerContact ?? null,
+      data.registrationUrl ?? null,
     ]
   )
   return findById(id)
@@ -197,8 +210,11 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        is_private = $8,
        privacy_tag = $9,
        banner_url = $10,
+       organizer_name = $11,
+       organizer_contact = $12,
+       registration_url = $13,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $11`,
+     WHERE series_id = $1 AND id <> $14`,
     [
       seriesId,
       data.title,
@@ -210,6 +226,9 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.isPrivate ?? false,
       data.privacyTag ?? null,
       data.bannerUrl ?? null,
+      data.organizerName ?? null,
+      data.organizerContact ?? null,
+      data.registrationUrl ?? null,
       exceptId,
     ]
   )
