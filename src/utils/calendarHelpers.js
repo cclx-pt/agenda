@@ -62,7 +62,7 @@ export function rangeForView(view, year, month, day = 1) {
       to: toDateKey(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()),
     }
   }
-  if (view === 'year') {
+  if (view === 'year' || view === 'list') {
     return { from: toDateKey(year, 0, 1), to: toDateKey(year, 11, 31) }
   }
   const span = view === 'quarter' ? 3 : view === 'semester' ? 6 : 1

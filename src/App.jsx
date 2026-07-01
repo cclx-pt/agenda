@@ -11,6 +11,7 @@ import MonthView from './components/MonthView'
 import MiniMonth from './components/MiniMonth'
 import DayView from './components/DayView'
 import WeekView from './components/WeekView'
+import ListView from './components/ListView'
 import CalendarSidebar from './components/CalendarSidebar'
 import EventDetail from './components/EventDetail'
 import ExportModal from './components/ExportModal'
@@ -27,12 +28,12 @@ import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
   AlertCircle, CalendarPlus, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, Lock, LogOut, Menu, RefreshCw, Settings,
+  Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const VIEWS = ['day', 'week', 'month', 'quarter', 'semester', 'year']
+const VIEWS = ['day', 'week', 'month', 'quarter', 'semester', 'year', 'list']
 const VIEW_META = {
   day:      { label: 'Diária',     icon: 'ti-calendar-event' },
   week:     { label: 'Semanal',    icon: 'ti-calendar-week' },
@@ -40,6 +41,7 @@ const VIEW_META = {
   quarter:  { label: 'Trimestral', icon: 'ti-calendar-stats' },
   semester: { label: 'Semestral',  icon: 'ti-calendars' },
   year:     { label: 'Anual',      icon: 'ti-calendar' },
+  list:     { label: 'Lista',      icon: 'ti-list-details' },
 }
 
 export default function App() {
@@ -73,6 +75,7 @@ export default function App() {
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
   const [sidebarOpen,  setSidebarOpen]  = useState(false)   // gaveta lateral (telemovel/tablet)
+  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage('cclx-sidebar-collapsed', false) // ocultar sidebar (desktop)
 
   const handleLogout = async () => {
     await logout()
@@ -269,6 +272,7 @@ export default function App() {
         <CalendarSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
           selectedKey={selectedKey}
           dayEvents={dayEvents}
           onSelectEvent={(evt) => { setDetailEvent(evt); setSidebarOpen(false) }}
@@ -297,6 +301,18 @@ export default function App() {
                 title="Menu"
               >
                 <Menu className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden h-8 w-8 min-[981px]:inline-flex"
+                onClick={() => setSidebarCollapsed((c) => !c)}
+                aria-label={sidebarCollapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral'}
+                title={sidebarCollapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral'}
+              >
+                {sidebarCollapsed
+                  ? <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+                  : <PanelLeftClose className="h-4 w-4" aria-hidden="true" />}
               </Button>
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label="Anterior">
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -406,6 +422,14 @@ export default function App() {
                       />
                     ))}
                   </div>
+                )}
+
+                {view === 'list' && (
+                  <ListView
+                    year={year}
+                    events={filteredEvents.filter((e) => e.date >= from && e.date <= to)}
+                    onSelectEvent={(evt) => setDetailEvent(evt)}
+                  />
                 )}
               </>
             )}
