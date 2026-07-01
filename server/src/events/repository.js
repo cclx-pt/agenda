@@ -33,6 +33,8 @@ function mapRow(row) {
     bannerUrl: row.banner_url,
     organizerName: row.organizer_name ?? null,
     organizerContact: row.organizer_contact ?? null,
+    organizerPhone: row.organizer_phone ?? null,
+    organizerEmail: row.organizer_email ?? null,
     registrationUrl: row.registration_url ?? null,
     attachmentUrl: row.attachment_url ?? null,
     attachmentName: row.attachment_name ?? null,
@@ -121,8 +123,8 @@ export async function insert(data, actorId) {
        community, category, is_private, privacy_tag, banner_url,
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
-       series_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+       series_id, created_by, organizer_phone, organizer_email)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
     [
       id,
       data.title,
@@ -146,6 +148,8 @@ export async function insert(data, actorId) {
       data.mapLng ?? null,
       data.seriesId ?? null,
       actorId ?? null,
+      data.organizerPhone ?? null,
+      data.organizerEmail ?? null,
     ]
   )
   return findById(id)
@@ -173,6 +177,8 @@ export async function update(id, data) {
        map_url = $18,
        map_lat = $19,
        map_lng = $20,
+       organizer_phone = $21,
+       organizer_email = $22,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -196,6 +202,8 @@ export async function update(id, data) {
       data.mapUrl ?? null,
       data.mapLat ?? null,
       data.mapLng ?? null,
+      data.organizerPhone ?? null,
+      data.organizerEmail ?? null,
     ]
   )
   return findById(id)
@@ -248,8 +256,10 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        map_url = $16,
        map_lat = $17,
        map_lng = $18,
+       organizer_phone = $19,
+       organizer_email = $20,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $19`,
+     WHERE series_id = $1 AND id <> $21`,
     [
       seriesId,
       data.title,
@@ -269,6 +279,8 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.mapUrl ?? null,
       data.mapLat ?? null,
       data.mapLng ?? null,
+      data.organizerPhone ?? null,
+      data.organizerEmail ?? null,
       exceptId,
     ]
   )

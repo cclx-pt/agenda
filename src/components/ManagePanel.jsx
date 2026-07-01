@@ -133,7 +133,8 @@ const emptyForm = {
   privacyTag: '',
   bannerUrl: '',
   organizerName: '',
-  organizerContact: '',
+  organizerPhone: '',
+  organizerEmail: '',
   registrationUrl: '',
   attachmentUrl: '',
   attachmentName: '',
@@ -155,6 +156,16 @@ const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg']
 // Anexo de evento: PDF além de imagens (limite de tamanho partilhado).
 const ALLOWED_ATTACHMENT_TYPES = ['application/pdf', 'image/png', 'image/jpeg']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+// Data máxima de fim de recorrência (6 meses após o início), em YYYY-MM-DD.
+function maxRecurrenceDate(startDate) {
+  if (!startDate) return undefined
+  const d = new Date(startDate)
+  if (Number.isNaN(d.getTime())) return undefined
+  d.setMonth(d.getMonth() + 6)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
 
 const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, churches: null, privacyTags: null }
 
@@ -246,7 +257,8 @@ function eventToForm(evt) {
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
     organizerName: evt.organizerName ?? '',
-    organizerContact: evt.organizerContact ?? '',
+    organizerPhone: evt.organizerPhone ?? '',
+    organizerEmail: evt.organizerEmail ?? '',
     registrationUrl: evt.registrationUrl ?? '',
     attachmentUrl: evt.attachmentUrl ?? '',
     attachmentName: evt.attachmentName ?? '',
@@ -961,7 +973,8 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
       bannerUrl: form.bannerUrl.trim() || null,
       organizerName: form.organizerName.trim() || null,
-      organizerContact: form.organizerContact.trim() || null,
+      organizerPhone: form.organizerPhone.trim() || null,
+      organizerEmail: form.organizerEmail.trim() || null,
       registrationUrl: form.registrationUrl.trim() || null,
       attachmentUrl: form.attachmentUrl.trim() || null,
       attachmentName: form.attachmentName.trim() || null,
@@ -986,7 +999,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     return payload
   }
 
-  const handleSave = async (e) => {
+  const handleSave = async (e, submitForApproval = false) => {
     e.preventDefault()
     if (!form.title.trim() || !form.startDate) {
       toast.error('Título e data de início são obrigatórios.')
@@ -1021,11 +1034,18 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
           toast.error('A data de fim da recorrência não pode ser anterior ao início.')
           return
         }
+        const maxRec = new Date(form.startDate)
+        maxRec.setMonth(maxRec.getMonth() + 6)
+        if (new Date(form.recEndDate) > maxRec) {
+          toast.error('As recorrências não podem exceder 6 meses a partir do início.')
+          return
+        }
       }
     }
     setBusy(true)
     try {
       const payload = buildPayload()
+      if (submitForApproval && !editingId) payload.submit = true
       if (editingId) {
         const scope = applyToSeries && form.seriesId ? 'series' : undefined
         await eventsService.updateEvent(editingId, payload, { scope })
@@ -1033,7 +1053,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       } else {
         await eventsService.createEvent(payload)
         toast.success(
-          form.recurrenceType === 'recurrent' ? 'Série de rascunhos criada.' : 'Rascunho criado.'
+          submitForApproval
+            ? form.recurrenceType === 'recurrent'
+              ? 'Série submetida para aprovação.'
+              : 'Evento submetido para aprovação.'
+            : form.recurrenceType === 'recurrent'
+              ? 'Série de rascunhos criada.'
+              : 'Rascunho criado.'
         )
       }
       await load()
@@ -2300,23 +2326,35 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               />
             </label>
 
+            <label className={styles.label}>
+              Responsável do evento (opcional)
+              <input
+                className={styles.input}
+                value={form.organizerName}
+                onChange={setField('organizerName')}
+                placeholder="Nome do responsável"
+              />
+            </label>
+
             <div className={styles.row}>
               <label className={styles.label}>
-                Responsável do evento (opcional)
+                Telefone do responsável (opcional)
                 <input
                   className={styles.input}
-                  value={form.organizerName}
-                  onChange={setField('organizerName')}
-                  placeholder="Nome do responsável"
+                  type="tel"
+                  value={form.organizerPhone}
+                  onChange={setField('organizerPhone')}
+                  placeholder="Ex.: 912 345 678"
                 />
               </label>
               <label className={styles.label}>
-                Contacto do responsável (opcional)
+                Email do responsável (opcional)
                 <input
                   className={styles.input}
-                  value={form.organizerContact}
-                  onChange={setField('organizerContact')}
-                  placeholder="Email ou telefone"
+                  type="email"
+                  value={form.organizerEmail}
+                  onChange={setField('organizerEmail')}
+                  placeholder="nome@exemplo.pt"
                 />
               </label>
             </div>
@@ -2441,11 +2479,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                     )}
                     {form.recEndType === 'date' && (
                       <label className={styles.label}>
-                        Data de fim da recorrência
+                        Data de fim da recorrência (máx. 6 meses)
                         <input
                           type="date"
                           className={styles.input}
                           value={form.recEndDate}
+                          min={form.startDate || undefined}
+                          max={maxRecurrenceDate(form.startDate)}
                           onChange={setField('recEndDate')}
                         />
                       </label>
@@ -2475,9 +2515,25 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               >
                 Cancelar
               </button>
-              <button type="submit" className={styles.primaryBtn} disabled={busy}>
-                {busy ? 'A guardar…' : editingId ? 'Guardar' : 'Criar rascunho'}
-              </button>
+              {editingId ? (
+                <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                  {busy ? 'A guardar…' : 'Guardar'}
+                </button>
+              ) : (
+                <>
+                  <button type="submit" className={styles.ghostBtn} disabled={busy}>
+                    {busy ? 'A guardar…' : 'Guardar rascunho'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    disabled={busy}
+                    onClick={(e) => handleSave(e, true)}
+                  >
+                    <i className="ti ti-send" aria-hidden="true" /> Submeter para aprovação
+                  </button>
+                </>
+              )}
             </div>
           </form>
         )}

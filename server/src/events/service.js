@@ -45,6 +45,8 @@ export const eventInputSchema = z
     // Responsável do evento e inscrições (todos opcionais).
     organizerName: z.string().trim().max(200).optional().nullable(),
     organizerContact: z.string().trim().max(200).optional().nullable(),
+    organizerPhone: z.string().trim().max(50).optional().nullable(),
+    organizerEmail: z.string().trim().max(200).optional().nullable(),
     registrationUrl: z
       .string()
       .trim()
@@ -67,6 +69,8 @@ export const eventInputSchema = z
       .nullable(),
     mapLat: z.number().min(-90).max(90).optional().nullable(),
     mapLng: z.number().min(-180).max(180).optional().nullable(),
+    // Ao criar, submeter logo para aprovação (em vez de guardar como rascunho).
+    submit: z.boolean().optional(),
   })
   .refine(
     (d) => !d.endDatetime || Date.parse(d.endDatetime) >= Date.parse(d.startDatetime),
@@ -76,6 +80,8 @@ export const eventInputSchema = z
 // Máximo de ocorrências geradas por série (limite de segurança, sobretudo para
 // recorrências "para sempre").
 const MAX_OCCURRENCES = 200
+// As recorrências não podem ultrapassar 6 meses a partir do início.
+const MAX_RECURRENCE_MONTHS = 6
 
 // Recorrência opcional. Quando ausente (ou frequency='none'), o evento é único.
 export const recurrenceSchema = z
@@ -119,10 +125,14 @@ function generateOccurrences(startDatetime, endDatetime, recurrence) {
   const limit =
     end.type === 'count' ? Math.min(end.count, MAX_OCCURRENCES) : MAX_OCCURRENCES
   const until = end.type === 'date' ? new Date(`${end.date}T23:59:59`) : null
+  // Limite rígido: nunca gerar ocorrências além de 6 meses do início.
+  const maxDate = new Date(start)
+  maxDate.setMonth(maxDate.getMonth() + MAX_RECURRENCE_MONTHS)
 
   const occurrences = []
   for (let i = 0; i < limit; i += 1) {
     const occStart = advance(start, frequency, i, interval)
+    if (occStart > maxDate) break
     if (until && occStart > until) break
     const occEnd = durationMs != null ? new Date(occStart.getTime() + durationMs) : null
     occurrences.push({
@@ -323,6 +333,19 @@ export async function getForUser(user, id) {
 
 // ── Escrita ──────────────────────────────────────────────────────
 
+// Transição direta rascunho→pendente ao criar com "submeter para aprovação".
+async function markSubmitted(user, id) {
+  const updated = await repo.updateStatus(id, { status: 'pendente', touchSubmitted: true })
+  await repo.addHistory({
+    eventId: id,
+    actorId: user.sub,
+    fromStatus: 'rascunho',
+    toStatus: 'pendente',
+    comment: 'Submetido para aprovação',
+  })
+  return updated
+}
+
 export async function create(user, input) {
   const data = eventInputSchema.parse(input)
   const recurrence = recurrenceSchema.parse(input.recurrence)
@@ -331,8 +354,9 @@ export async function create(user, input) {
   if (!canAccessChurch(user, data.community ?? 'Sede')) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
+  const submit = data.submit === true
 
-  // Evento único: comportamento original.
+  // Evento único.
   if (!recurrence) {
     const event = await repo.insert(data, user.sub)
     await repo.addHistory({
@@ -342,7 +366,7 @@ export async function create(user, input) {
       toStatus: 'rascunho',
       comment: 'Criado',
     })
-    return event
+    return submit ? markSubmitted(user, event.id) : event
   }
 
   // Série recorrente: materializa cada ocorrência partilhando um series_id.
@@ -361,7 +385,8 @@ export async function create(user, input) {
       toStatus: 'rascunho',
       comment: 'Criado (série)',
     })
-    if (!first) first = event
+    const created = submit ? await markSubmitted(user, event.id) : event
+    if (!first) first = created
   }
   return first
 }

@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS events (
   -- Responsável do evento e inscrições (opcionais).
   organizer_name    TEXT,
   organizer_contact TEXT,
+  organizer_phone   TEXT,
+  organizer_email   TEXT,
   registration_url  TEXT,
   -- Anexo (PDF/imagem) e localização no mapa (opcionais).
   attachment_url    TEXT,
@@ -81,6 +83,8 @@ CREATE INDEX IF NOT EXISTS idx_events_series ON events (series_id);
 -- Campos de responsável e inscrições (idempotente para BD existentes).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_name TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_contact TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_phone TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_email TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS registration_url TEXT;
 -- Anexo e localização no mapa (idempotente para BD existentes).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_url TEXT;

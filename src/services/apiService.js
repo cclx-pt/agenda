@@ -83,6 +83,8 @@ function mapSorEvent(e) {
     privacyTag: e.privacyTag ?? null,
     organizerName: e.organizerName ?? null,
     organizerContact: e.organizerContact ?? null,
+    organizerPhone: e.organizerPhone ?? null,
+    organizerEmail: e.organizerEmail ?? null,
     registrationUrl: e.registrationUrl ?? null,
     attachmentUrl: e.attachmentUrl ?? null,
     attachmentName: e.attachmentName ?? null,

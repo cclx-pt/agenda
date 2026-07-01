@@ -106,12 +106,13 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <User className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
               <span>{event.responsible}</span>
             </div>
-            {event.organizerName && (
+            {(event.organizerName || event.organizerPhone || event.organizerEmail || event.organizerContact) && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
                 <UserCheck className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
                 <span>
-                  {event.organizerName}
-                  {event.organizerContact ? ` · ${event.organizerContact}` : ''}
+                  {[event.organizerName, event.organizerPhone, event.organizerEmail || event.organizerContact]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </div>
             )}

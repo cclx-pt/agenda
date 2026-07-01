@@ -157,7 +157,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
       toast.info('Sem eventos para exportar nesta vista.')
       return
     }
-    const header = ['Data', 'Hora', 'Titulo', 'Igreja', 'Categoria', 'Estado', 'Responsavel', 'Contacto']
+    const header = ['Data', 'Hora', 'Titulo', 'Igreja', 'Categoria', 'Estado', 'Responsavel', 'Telefone', 'Email']
     const rows = visibleEvents.map((e) => [
       formatDateNumericValue(e.startDatetime),
       formatTimeRange(e.timeStart, e.timeEnd) || '',
@@ -166,7 +166,8 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
       categoryLabel(e.category),
       STATUS_LABEL[e.status] || e.status || '',
       e.organizerName || '',
-      e.organizerContact || '',
+      e.organizerPhone || '',
+      e.organizerEmail || e.organizerContact || '',
     ])
     const content = [header, ...rows].map((r) => r.map(csvEscape).join(';')).join('\r\n')
     downloadCsv(content, `aprovacoes-${status}-${new Date().toISOString().slice(0, 10)}.csv`)
