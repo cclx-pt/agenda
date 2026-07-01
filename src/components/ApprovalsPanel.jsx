@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useChurches } from '../hooks/useChurches'
 import { useCategories } from '../hooks/useCategories'
+import { usePrivacyTags } from '../hooks/usePrivacyTags'
 import * as eventsService from '../services/eventsService'
 import { CATEGORY_META, formatDateNumericValue, formatTimeRange } from '../utils/calendarHelpers'
 
@@ -54,6 +55,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const containerRef = useModalA11y(onClose)
   const { churches } = useChurches()
   const { categories } = useCategories()
+  const { privacyTags: dbPrivacyTags } = usePrivacyTags()
 
   const canManageDelegations = user?.role === 'admin' || user?.role === 'aprovador'
 
@@ -62,6 +64,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const [churchFilter, setChurchFilter] = useState('Todas')
   const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [privacyTagFilter, setPrivacyTagFilter] = useState('Todas')
+  const [visibilityFilter, setVisibilityFilter] = useState('todos') // todos | privados | publicos
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -119,20 +122,17 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     return Array.from(new Set(events.map((e) => e.category).filter(Boolean)))
   }, [events])
 
-  const privacyTagsInEvents = useMemo(() => {
-    const set = new Set(events.map((e) => e.privacyTag).filter(Boolean))
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt'))
-  }, [events])
-
   const visibleEvents = useMemo(
     () =>
       events.filter(
         (e) =>
           (churchFilter === 'Todas' || e.community === churchFilter) &&
           (categoryFilter === 'Todas' || e.category === categoryFilter) &&
-          (privacyTagFilter === 'Todas' || e.privacyTag === privacyTagFilter)
+          (privacyTagFilter === 'Todas' || e.privacyTag === privacyTagFilter) &&
+          (visibilityFilter === 'todos' ||
+            (visibilityFilter === 'privados' ? e.isPrivate : !e.isPrivate))
       ),
-    [events, churchFilter, categoryFilter, privacyTagFilter]
+    [events, churchFilter, categoryFilter, privacyTagFilter, visibilityFilter]
   )
 
   const handleApprove = async (evt) => {
@@ -356,6 +356,16 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+                <select
+                  className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
+                  value={visibilityFilter}
+                  onChange={(e) => setVisibilityFilter(e.target.value)}
+                  aria-label="Visibilidade"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="privados">Só privados</option>
+                  <option value="publicos">Só públicos</option>
+                </select>
                 {categoriesInEvents.length > 0 && (
                   <select
                     className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
@@ -369,7 +379,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                     ))}
                   </select>
                 )}
-                {privacyTagsInEvents.length > 0 && (
+                {dbPrivacyTags.length > 0 && (
                   <select
                     className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
                     value={privacyTagFilter}
@@ -377,8 +387,8 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                     aria-label="Etiqueta de privacidade"
                   >
                     <option value="Todas">Todas as etiquetas</option>
-                    {privacyTagsInEvents.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                    {dbPrivacyTags.map((t) => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
                     ))}
                   </select>
                 )}
