@@ -34,6 +34,11 @@ function mapRow(row) {
     organizerName: row.organizer_name ?? null,
     organizerContact: row.organizer_contact ?? null,
     registrationUrl: row.registration_url ?? null,
+    attachmentUrl: row.attachment_url ?? null,
+    attachmentName: row.attachment_name ?? null,
+    mapUrl: row.map_url ?? null,
+    mapLat: row.map_lat ?? null,
+    mapLng: row.map_lng ?? null,
     seriesId: row.series_id ?? null,
     externalId: row.external_id,
     rejectionReason: row.rejection_reason,
@@ -106,8 +111,10 @@ export async function insert(data, actorId) {
     `INSERT INTO events
       (id, title, description, start_datetime, end_datetime, all_day, location,
        community, category, is_private, privacy_tag, banner_url,
-       organizer_name, organizer_contact, registration_url, series_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+       organizer_name, organizer_contact, registration_url,
+       attachment_url, attachment_name, map_url, map_lat, map_lng,
+       series_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
     [
       id,
       data.title,
@@ -124,6 +131,11 @@ export async function insert(data, actorId) {
       data.organizerName ?? null,
       data.organizerContact ?? null,
       data.registrationUrl ?? null,
+      data.attachmentUrl ?? null,
+      data.attachmentName ?? null,
+      data.mapUrl ?? null,
+      data.mapLat ?? null,
+      data.mapLng ?? null,
       data.seriesId ?? null,
       actorId ?? null,
     ]
@@ -148,6 +160,11 @@ export async function update(id, data) {
        organizer_name = $13,
        organizer_contact = $14,
        registration_url = $15,
+       attachment_url = $16,
+       attachment_name = $17,
+       map_url = $18,
+       map_lat = $19,
+       map_lng = $20,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -166,6 +183,11 @@ export async function update(id, data) {
       data.organizerName ?? null,
       data.organizerContact ?? null,
       data.registrationUrl ?? null,
+      data.attachmentUrl ?? null,
+      data.attachmentName ?? null,
+      data.mapUrl ?? null,
+      data.mapLat ?? null,
+      data.mapLng ?? null,
     ]
   )
   return findById(id)
@@ -213,8 +235,13 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        organizer_name = $11,
        organizer_contact = $12,
        registration_url = $13,
+       attachment_url = $14,
+       attachment_name = $15,
+       map_url = $16,
+       map_lat = $17,
+       map_lng = $18,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $14`,
+     WHERE series_id = $1 AND id <> $19`,
     [
       seriesId,
       data.title,
@@ -229,6 +256,11 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.organizerName ?? null,
       data.organizerContact ?? null,
       data.registrationUrl ?? null,
+      data.attachmentUrl ?? null,
+      data.attachmentName ?? null,
+      data.mapUrl ?? null,
+      data.mapLat ?? null,
+      data.mapLng ?? null,
       exceptId,
     ]
   )

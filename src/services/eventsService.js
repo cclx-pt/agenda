@@ -81,6 +81,12 @@ export async function syncIntegration() {
   return result
 }
 
+/** Purga TODOS os eventos externos (API/inChurch) da base de dados. Devolve o resumo. */
+export async function purgeIntegration() {
+  const { result } = await request('/data/integration/purge', { method: 'POST' })
+  return result
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {
@@ -187,6 +193,25 @@ export async function uploadEventImage(file) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     throw new Error(data.error || 'Falha ao carregar a imagem.')
+  }
+  return data.url
+}
+
+/**
+ * Carrega um anexo (PDF/PNG/JPG, ≤5MB) e devolve a URL pública. Usa o mesmo
+ * endpoint de uploads (multipart/form-data).
+ */
+export async function uploadEventAttachment(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/data/uploads', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || 'Falha ao carregar o anexo.')
   }
   return data.url
 }

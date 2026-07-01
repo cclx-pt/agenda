@@ -1,4 +1,4 @@
-import { CalendarDays, Church, Clock, Lock, MapPin } from 'lucide-react'
+import { CalendarDays, Church, Clock, Lock, MapPin, Paperclip } from 'lucide-react'
 
 import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange } from '../utils/calendarHelpers'
 import { cn } from '@/lib/utils'
@@ -67,6 +67,23 @@ export default function EventCard({ event, onClick }) {
             {event.responsible}
           </div>
         </div>
+
+        {(event.mapUrl || event.attachmentUrl) && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {event.mapUrl && (
+              <a href={event.mapUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-accent">
+                <MapPin className="h-3 w-3" aria-hidden="true" /> Mapa
+              </a>
+            )}
+            {event.attachmentUrl && (
+              <a href={event.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-accent">
+                <Paperclip className="h-3 w-3" aria-hidden="true" /> Anexo
+              </a>
+            )}
+          </div>
+        )}
 
         <p className="border-t border-border pt-2 text-[11px] leading-relaxed text-muted-foreground">{event.description}</p>
       </div>

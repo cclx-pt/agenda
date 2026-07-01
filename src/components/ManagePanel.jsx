@@ -9,6 +9,7 @@ import { useCategories, invalidateCategories } from '../hooks/useCategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
 import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
+import MapPicker from './MapPicker'
 
 // Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
 // antigo CSS module, mantendo intactas as referências styles.* no JSX.
@@ -134,6 +135,11 @@ const emptyForm = {
   organizerName: '',
   organizerContact: '',
   registrationUrl: '',
+  attachmentUrl: '',
+  attachmentName: '',
+  mapUrl: '',
+  mapLat: null,
+  mapLng: null,
   seriesId: null,
   // Recorrência (apenas na criação).
   recurrenceType: 'unique', // 'unique' | 'recurrent'
@@ -146,6 +152,8 @@ const emptyForm = {
 
 // Imagem de evento: limites espelhados no backend (PNG/JPG, ≤5MB).
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg']
+// Anexo de evento: PDF além de imagens (limite de tamanho partilhado).
+const ALLOWED_ATTACHMENT_TYPES = ['application/pdf', 'image/png', 'image/jpeg']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, churches: null, privacyTags: null }
@@ -232,6 +240,11 @@ function eventToForm(evt) {
     organizerName: evt.organizerName ?? '',
     organizerContact: evt.organizerContact ?? '',
     registrationUrl: evt.registrationUrl ?? '',
+    attachmentUrl: evt.attachmentUrl ?? '',
+    attachmentName: evt.attachmentName ?? '',
+    mapUrl: evt.mapUrl ?? '',
+    mapLat: evt.mapLat ?? null,
+    mapLng: evt.mapLng ?? null,
     seriesId: evt.seriesId ?? null,
     // Recorrência não é reaplicada na edição (usa-se o âmbito "série").
     recurrenceType: 'unique',
@@ -365,6 +378,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [form, setForm] = useState(emptyForm)
   // Upload de imagem do evento.
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   // Ao editar uma ocorrência de uma série, aplicar a toda a série.
   const [applyToSeries, setApplyToSeries] = useState(false)
@@ -721,6 +735,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
 
   const importInputRef = useRef(null)
   const imageInputRef = useRef(null)
+  const attachmentInputRef = useRef(null)
 
   // Valida e carrega uma imagem (PNG/JPG, ≤5MB) para o backend; guarda a URL.
   const handleImageFile = async (file) => {
@@ -742,6 +757,29 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       toast.error(err.message)
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  // Valida e carrega um anexo (PDF/PNG/JPG, ≤5MB); guarda a URL e o nome original.
+  const handleAttachmentFile = async (file) => {
+    if (!file) return
+    if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type)) {
+      toast.error('Formato inválido. Apenas PDF, PNG ou JPG.')
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error('Ficheiro demasiado grande (máx. 5MB).')
+      return
+    }
+    setUploadingAttachment(true)
+    try {
+      const url = await eventsService.uploadEventAttachment(file)
+      setForm((f) => ({ ...f, attachmentUrl: url, attachmentName: file.name }))
+      toast.success('Anexo carregado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploadingAttachment(false)
     }
   }
 
@@ -916,6 +954,11 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       organizerName: form.organizerName.trim() || null,
       organizerContact: form.organizerContact.trim() || null,
       registrationUrl: form.registrationUrl.trim() || null,
+      attachmentUrl: form.attachmentUrl.trim() || null,
+      attachmentName: form.attachmentName.trim() || null,
+      mapUrl: form.mapUrl.trim() || null,
+      mapLat: form.mapLat ?? null,
+      mapLng: form.mapLng ?? null,
     }
     // Recorrência só na criação de um novo evento recorrente.
     if (!editingId && form.recurrenceType === 'recurrent') {
@@ -2078,6 +2121,51 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
             </label>
 
             <label className={styles.label}>
+              Anexo (PDF, PNG ou JPG, até 5MB) — opcional
+              {form.attachmentUrl ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2">
+                  <a
+                    href={form.attachmentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-primary underline underline-offset-2"
+                  >
+                    <i className="ti ti-paperclip" aria-hidden="true" />
+                    <span className="truncate">{form.attachmentName || 'Anexo'}</span>
+                  </a>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    onClick={() => setForm((f) => ({ ...f, attachmentUrl: '', attachmentName: '' }))}
+                    aria-label="Remover anexo"
+                  >
+                    <i className="ti ti-x" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachment}
+                >
+                  <i className={`ti ${uploadingAttachment ? 'ti-loader-2' : 'ti-paperclip'}`} aria-hidden="true" />
+                  {uploadingAttachment ? 'A carregar…' : 'Carregar anexo'}
+                </button>
+              )}
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept="application/pdf,image/png,image/jpeg"
+                hidden
+                onChange={(e) => {
+                  handleAttachmentFile(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
+            </label>
+
+            <label className={styles.label}>
               Nome do evento *
               <input
                 className={styles.input}
@@ -2179,6 +2267,26 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 className={styles.input}
                 value={form.location}
                 onChange={setField('location')}
+              />
+            </label>
+
+            <label className={styles.label}>
+              Localização no mapa (opcional)
+              <MapPicker
+                address={form.location}
+                value={
+                  form.mapLat != null && form.mapLng != null
+                    ? { lat: form.mapLat, lng: form.mapLng, url: form.mapUrl }
+                    : null
+                }
+                onChange={(next) =>
+                  setForm((f) => ({
+                    ...f,
+                    mapLat: next?.lat ?? null,
+                    mapLng: next?.lng ?? null,
+                    mapUrl: next?.url ?? '',
+                  }))
+                }
               />
             </label>
 

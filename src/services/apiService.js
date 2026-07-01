@@ -84,6 +84,11 @@ function mapSorEvent(e) {
     organizerName: e.organizerName ?? null,
     organizerContact: e.organizerContact ?? null,
     registrationUrl: e.registrationUrl ?? null,
+    attachmentUrl: e.attachmentUrl ?? null,
+    attachmentName: e.attachmentName ?? null,
+    mapUrl: e.mapUrl ?? null,
+    mapLat: e.mapLat ?? null,
+    mapLng: e.mapLng ?? null,
     status: e.status || 'publicado',
     isApi: !!e.isApi,
   }

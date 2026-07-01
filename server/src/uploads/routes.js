@@ -4,10 +4,11 @@ import { requireRole } from '../middleware/auth.js'
 import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-// Apenas imagens PNG e JPG (sem PDF).
+// Imagens PNG/JPG (banner) e PDF (anexos de evento).
 const ALLOWED = new Map([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
+  ['application/pdf', '.pdf'],
 ])
 
 // O ficheiro fica em memória para ser reencaminhado ao Supabase Storage...
@@ -16,7 +17,7 @@ const upload = multer({
   limits: { fileSize: MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED.has(file.mimetype)) {
-      cb(new Error('Formato inválido. Apenas PNG ou JPG.'))
+      cb(new Error('Formato inválido. Apenas PDF, PNG ou JPG.'))
       return
     }
     cb(null, true)

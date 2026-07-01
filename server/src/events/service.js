@@ -50,6 +50,22 @@ export const eventInputSchema = z
       .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de inscrições inválido (use http/https).')
       .optional()
       .nullable(),
+    // Anexo (PDF/imagem) e localização no mapa (todos opcionais).
+    attachmentUrl: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), 'URL de anexo inválido.')
+      .optional()
+      .nullable(),
+    attachmentName: z.string().trim().max(255).optional().nullable(),
+    mapUrl: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de mapa inválido.')
+      .optional()
+      .nullable(),
+    mapLat: z.number().min(-90).max(90).optional().nullable(),
+    mapLng: z.number().min(-180).max(180).optional().nullable(),
   })
   .refine(
     (d) => !d.endDatetime || Date.parse(d.endDatetime) >= Date.parse(d.startDatetime),

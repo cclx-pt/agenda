@@ -7,6 +7,7 @@ import {
   Clock,
   Image as ImageIcon,
   MapPin,
+  Paperclip,
   Trash2,
   Ticket,
   User,
@@ -124,6 +125,32 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                   className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
                 >
                   Inscrições
+                </a>
+              </div>
+            )}
+            {event.mapUrl && (
+              <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <a
+                  href={event.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  Ver no Google Maps
+                </a>
+              </div>
+            )}
+            {event.attachmentUrl && (
+              <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <Paperclip className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <a
+                  href={event.attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  {event.attachmentName || 'Anexo'}
                 </a>
               </div>
             )}

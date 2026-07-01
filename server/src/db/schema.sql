@@ -57,6 +57,12 @@ CREATE TABLE IF NOT EXISTS events (
   organizer_name    TEXT,
   organizer_contact TEXT,
   registration_url  TEXT,
+  -- Anexo (PDF/imagem) e localização no mapa (opcionais).
+  attachment_url    TEXT,
+  attachment_name   TEXT,
+  map_url           TEXT,
+  map_lat           DOUBLE PRECISION,
+  map_lng           DOUBLE PRECISION,
   external_id      TEXT,
   rejection_reason TEXT,
   created_by       UUID REFERENCES users (id) ON DELETE SET NULL,
@@ -76,6 +82,12 @@ CREATE INDEX IF NOT EXISTS idx_events_series ON events (series_id);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_name TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_contact TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS registration_url TEXT;
+-- Anexo e localização no mapa (idempotente para BD existentes).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_url TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_name TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS map_url TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lat DOUBLE PRECISION;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lng DOUBLE PRECISION;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (
