@@ -16,7 +16,7 @@ healthRouter.get('/full', async (_req, res) => {
   const uptimeSeconds = Math.round(process.uptime())
   // Host do Storage (NÃO é segredo — já aparece nos URLs públicos das imagens).
   // Serve para diagnosticar um SUPABASE_URL errado (ex.: .com em vez de .co).
-  let storageHost = null
+  let storageHost
   try {
     storageHost = config.supabase.url ? new URL(config.supabase.url).host : null
   } catch {
