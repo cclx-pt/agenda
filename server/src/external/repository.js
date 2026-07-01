@@ -155,3 +155,12 @@ export async function pruneNotIn(externalIds) {
   )
   return rowCount
 }
+
+/**
+ * Purga TOTAL: remove todos os eventos externos guardados. Usado pela ação
+ * manual de limpeza no painel de gestão. Devolve o número de linhas removidas.
+ */
+export async function purge() {
+  const { rowCount } = await pool.query('DELETE FROM external_events')
+  return rowCount
+}

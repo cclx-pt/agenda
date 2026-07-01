@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireRole } from '../middleware/auth.js'
 import { config } from '../config.js'
-import { runSync } from '../integrations/inchurchSync.js'
+import { runSync, purgeExternal } from '../integrations/inchurchSync.js'
 import * as service from './service.js'
 
 export const integrationRouter = Router()
@@ -45,6 +45,18 @@ integrationRouter.put('/', adminOnly, async (req, res, next) => {
 integrationRouter.post('/sync', adminOnly, async (_req, res, next) => {
   try {
     const result = await runSync({ force: true })
+    res.json({ result })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Purga manual (admin): remove TODOS os eventos externos da base de dados.
+// Não depende das credenciais nem do interruptor — permite limpar mesmo com a
+// integração desativada.
+integrationRouter.post('/purge', adminOnly, async (_req, res, next) => {
+  try {
+    const result = await purgeExternal()
     res.json({ result })
   } catch (err) {
     next(err)

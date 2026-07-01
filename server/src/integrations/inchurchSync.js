@@ -241,6 +241,18 @@ export async function runSync({ force = false } = {}) {
   }
 }
 
+/**
+ * Purga manual (admin): remove TODOS os eventos externos guardados na base de
+ * dados. Não altera o estado da sincronização — se a integração continuar ativa,
+ * os eventos voltam a ser importados na próxima sincronização. Devolve o número
+ * de linhas removidas.
+ */
+export async function purgeExternal() {
+  const deleted = await externalRepo.purge()
+  console.log(`[sync] purga manual — ${deleted} eventos externos removidos`)
+  return { ok: true, deleted }
+}
+
 // ── Agendador em processo (apenas standalone/local; NÃO no Vercel) ──
 
 let timer = null
