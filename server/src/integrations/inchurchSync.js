@@ -33,22 +33,8 @@ const TIMEOUT_MS = 20_000
 
 // ── Inferência (porta da lógica do frontend apiService.js) ───────
 
-const CATEGORY_RULES = [
-  { pattern: /celebra[çc][aã]o|culto|worship/i, category: 'culto' },
-  { pattern: /loud|jovens|youth|teen|young/i, category: 'jovens' },
-  {
-    pattern: /grupo|crescimento|\bgc\b|forma[çc][aã]o|escola|estudo|b1|be\s*one|oficina|logos/i,
-    category: 'formacao',
-  },
-]
-
-function inferCategory(name) {
-  const n = name || ''
-  for (const rule of CATEGORY_RULES) {
-    if (rule.pattern.test(n)) return rule.category
-  }
-  return 'evento'
-}
+// Todos os eventos importados da API recebem sempre a categoria fixa "Aplicação".
+const API_CATEGORY = 'aplicacao'
 
 function inferChurchFromText(text) {
   const t = text || ''
@@ -80,7 +66,7 @@ function mapInchurchEvent(raw) {
     endDatetime: raw.end_datetime || null,
     location: buildLocation(raw.location),
     community: inferCommunity(raw),
-    category: inferCategory(raw.name),
+    category: API_CATEGORY,
     imageUrl: raw.image || raw.app_image || null,
   }
 }

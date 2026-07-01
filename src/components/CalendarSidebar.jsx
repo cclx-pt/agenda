@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
-const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento']
+const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento', 'aplicacao']
 
 // Cores vivas para os pontos sobre o fundo navy (independentes do tema).
 const CAT_DOT = {
@@ -14,6 +14,7 @@ const CAT_DOT = {
   jovens: '#6fa8ff',
   formacao: '#5db87a',
   evento: '#b8c0d8',
+  aplicacao: '#818cf8',
 }
 
 /**

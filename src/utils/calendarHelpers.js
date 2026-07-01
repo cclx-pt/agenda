@@ -133,6 +133,11 @@ export const CATEGORY_META = {
     colorVar: 'var(--evt-jovens-text)',
     bgVar: 'var(--evt-jovens-bg)',
   },
+  aplicacao: {
+    label: 'Aplicação',
+    colorVar: 'var(--evt-aplicacao-text)',
+    bgVar: 'var(--evt-aplicacao-bg)',
+  },
 }
 
 // Estado editorial do evento. Eventos publicados nao mostram selo; rascunhos e

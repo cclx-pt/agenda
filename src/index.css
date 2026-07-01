@@ -85,6 +85,8 @@
   --evt-formacao-text:#5db87a;
   --evt-jovens-bg:    rgba(100,160,255,0.15);
   --evt-jovens-text:  #6fa8ff;
+  --evt-aplicacao-bg:   rgba(129,140,248,0.18);
+  --evt-aplicacao-text: #a5b4fc;
 }
 
 [data-theme="light"] {
@@ -96,6 +98,8 @@
   --evt-formacao-text:#1e6b40;
   --evt-jovens-bg:    rgba(30,90,200,0.1);
   --evt-jovens-text:  #1a4fa0;
+  --evt-aplicacao-bg:   rgba(99,102,241,0.12);
+  --evt-aplicacao-text: #4f46e5;
 }
 
 body {
