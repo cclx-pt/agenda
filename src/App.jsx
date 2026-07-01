@@ -234,7 +234,7 @@ export default function App() {
       <header className="z-[12] flex h-[60px] flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 text-foreground max-[600px]:h-[52px] max-[600px]:gap-2 max-[600px]:px-3">
         <div className="flex flex-shrink-0 items-center gap-3">
           <img src={logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
-          <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold uppercase tracking-wide text-foreground max-[820px]:hidden">A Nossa Agenda - Uma Igreja Ligada</span>
+          <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold tracking-wide text-foreground max-[820px]:hidden">A Nossa Agenda - Uma Igreja Ligada</span>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-3.5 max-[980px]:gap-2">
