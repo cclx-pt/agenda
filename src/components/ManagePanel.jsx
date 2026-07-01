@@ -195,16 +195,24 @@ function parseUserCsv(text) {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean)
+  // Vários valores numa célula (igrejas/etiquetas) separam-se por "|".
+  const splitMulti = (s) => s.split('|').map((x) => x.trim()).filter(Boolean)
   const out = []
   for (const line of lines) {
-    const [name = '', email = '', role = ''] = line
-      .split(/[;,]/)
+    const [name = '', email = '', role = '', churchesRaw = '', tagsRaw = ''] = line
+      .split(';')
       .map((c) => c.trim())
     if (!email.includes('@')) continue // salta cabeçalho e linhas inválidas
     const normalizedRole = ROLE_VALUES.includes(role.toLowerCase())
       ? role.toLowerCase()
       : 'visitante'
-    out.push({ name, email, role: normalizedRole })
+    out.push({
+      name,
+      email,
+      role: normalizedRole,
+      churches: churchesRaw ? splitMulti(churchesRaw) : null,
+      privacyTags: tagsRaw ? splitMulti(tagsRaw) : null,
+    })
   }
   return out
 }
@@ -785,9 +793,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
 
   const downloadUserTemplate = () => {
     const content = [
-      'Nome;email;role',
-      'João Exemplo;joao@cclx.pt;editor',
-      ';maria@cclx.pt;visitante',
+      'Nome;email;role;igrejas;etiquetas',
+      'João Exemplo;joao@cclx.pt;editor;Sede|Almada;',
+      'Maria Exemplo;maria@cclx.pt;aprovador;Sede;Confidencial',
+      ';carlos@cclx.pt;visitante;;',
     ].join('\r\n')
     downloadCsv(content, 'modelo-utilizadores.csv')
   }
@@ -805,7 +814,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     }
     const rows = parseUserCsv(text)
     if (!rows.length) {
-      toast.error('Sem linhas válidas. Formato esperado: Nome;email;role')
+      toast.error('Sem linhas válidas. Formato esperado: Nome;email;role;igrejas;etiquetas')
       return
     }
     setBusy(true)
@@ -818,8 +827,8 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
           name: row.name || null,
           role: row.role,
           canViewPrivate: SEES_ALL_PRIVATE.includes(row.role),
-          churches: null,
-          privacyTags: null,
+          churches: SCOPED_ROLES.includes(row.role) ? row.churches : null,
+          privacyTags: row.privacyTags,
         })
         created += 1
       } catch (err) {
@@ -1448,7 +1457,8 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
             <div className={styles.toolbar}>
               <p className={styles.toolbarHint}>
                 Importa vários utilizadores de um ficheiro CSV no formato{' '}
-                <code>Nome;email;role</code>.
+                <code>Nome;email;role;igrejas;etiquetas</code>. Vários valores em
+                igrejas/etiquetas separam-se por <code>|</code> (vazio = todas).
               </p>
               <div className={styles.toolbarActions}>
                 <button

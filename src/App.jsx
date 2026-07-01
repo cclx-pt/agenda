@@ -73,6 +73,7 @@ export default function App() {
   const [community,    setCommunity]    = useLocalStorage('cclx-community', 'Todas') // church filter
   const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
   const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
+  const [privacyTag,   setPrivacyTag]   = useState('Todas') // filtro por etiqueta de privacidade
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
@@ -121,10 +122,11 @@ export default function App() {
     return events.filter(e =>
       (community === 'Todas' || e.community === community) &&
       (category === 'Todos' || e.category === category) &&
+      (privacyTag === 'Todas' || e.privacyTag === privacyTag) &&
       (visibility === 'all' ||
         (visibility === 'private' ? e.isPrivate : !e.isPrivate))
     )
-  }, [events, community, category, visibility])
+  }, [events, community, category, privacyTag, visibility])
 
   const filteredByDate = useMemo(() => {
     const map = {}
@@ -142,6 +144,13 @@ export default function App() {
   const communities = useMemo(() => {
     const set = new Set(events.map((e) => e.community).filter(Boolean))
     return Array.from(set).sort(compareChurches)
+  }, [events])
+
+  // Etiquetas de privacidade presentes nos eventos visíveis (= disponíveis ao
+  // utilizador, pois o servidor já filtra pelas etiquetas permitidas).
+  const privacyTagsInUse = useMemo(() => {
+    const set = new Set(events.map((e) => e.privacyTag).filter(Boolean))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt'))
   }, [events])
 
   // Selecionar um dia: atualiza a sidebar (e, nas vistas mês/semana, a âncora).
@@ -258,6 +267,10 @@ export default function App() {
               </div>
             </div>
           )}
+          <Button variant="outline" size="sm" onClick={() => { clearEventCache(); reload(); refreshCategoriesInUse() }} title="Atualizar calendário">
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            <span className="max-[980px]:hidden">Atualizar</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={exportCurrentView} title="Exportar vista atual">
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="max-[980px]:hidden">Exportar</span>
@@ -311,6 +324,9 @@ export default function App() {
           category={category}
           onCategoryChange={setCategory}
           categoriesInUse={categoriesInUse}
+          privacyTag={privacyTag}
+          onPrivacyTagChange={setPrivacyTag}
+          privacyTags={privacyTagsInUse}
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">

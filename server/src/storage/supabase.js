@@ -22,6 +22,18 @@ export function isStorageConfigured() {
   return Boolean(config.supabase.url && config.supabase.serviceRoleKey)
 }
 
+// Garante (uma vez) que o bucket existe e é público — evita falhas de upload
+// caso o bucket ainda não tenha sido criado no projeto Supabase.
+let bucketReady = false
+async function ensureBucket(supabase, bucket) {
+  if (bucketReady) return
+  const { data } = await supabase.storage.getBucket(bucket)
+  if (!data) {
+    await supabase.storage.createBucket(bucket, { public: true }).catch(() => {})
+  }
+  bucketReady = true
+}
+
 /**
  * Carrega um buffer de imagem para o bucket configurado e devolve o URL
  * público. Lança se o Storage não estiver configurado ou o upload falhar.
@@ -32,6 +44,7 @@ export async function uploadImage(buffer, { ext, contentType }) {
     throw new Error('Supabase Storage não está configurado.')
   }
   const bucket = config.supabase.storageBucket
+  await ensureBucket(supabase, bucket)
   const objectName = `${randomUUID()}${ext}`
   const { error } = await supabase.storage.from(bucket).upload(objectName, buffer, {
     contentType,

@@ -1,7 +1,7 @@
 import {
   parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE,
 } from '../utils/calendarHelpers'
-import { CalendarPlus, Check, Church, Plus, X } from 'lucide-react'
+import { CalendarPlus, Check, Church, Lock, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,9 @@ export default function CalendarSidebar({
   category,
   onCategoryChange,
   categoriesInUse,
+  privacyTag,
+  onPrivacyTagChange,
+  privacyTags,
 }) {
   const { year, month, day } = parseDateKey(selectedKey)
   const date = new Date(year, month, day)
@@ -157,6 +160,28 @@ export default function CalendarSidebar({
           </select>
         </div>
       </div>
+
+      {Array.isArray(privacyTags) && privacyTags.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Privacidade</div>
+          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
+            <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            <select
+              className="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent py-2.5 pl-0 pr-1 text-[13px] font-semibold text-foreground outline-none"
+              value={privacyTag}
+              onChange={(e) => onPrivacyTagChange(e.target.value)}
+              aria-label="Filtrar por etiqueta de privacidade"
+            >
+              <option value="Todas">Todas as etiquetas</option>
+              {privacyTags.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Categorias</div>
