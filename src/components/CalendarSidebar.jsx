@@ -65,7 +65,7 @@ export default function CalendarSidebar({
       />
     <aside className={cn(
       collapsed ? 'hidden max-[980px]:flex' : 'flex',
-      'w-[280px] flex-shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-border bg-card p-4 pb-6 pt-[18px] text-foreground max-[980px]:fixed max-[980px]:inset-y-0 max-[980px]:left-0 max-[980px]:z-[60] max-[980px]:w-[min(86%,320px)] max-[980px]:pt-14 max-[980px]:transition-transform max-[980px]:duration-200',
+      'w-[280px] flex-shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-border bg-muted/60 p-4 pb-6 pt-[18px] text-foreground max-[980px]:fixed max-[980px]:inset-y-0 max-[980px]:left-0 max-[980px]:z-[60] max-[980px]:w-[min(86%,320px)] max-[980px]:bg-card max-[980px]:pt-14 max-[980px]:transition-transform max-[980px]:duration-200',
       open ? 'max-[980px]:translate-x-0 max-[980px]:shadow-2xl' : 'max-[980px]:-translate-x-full',
     )}>
       <button

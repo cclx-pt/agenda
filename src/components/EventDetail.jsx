@@ -7,11 +7,11 @@ import {
   Clock,
   Image as ImageIcon,
   Lock,
+  Church,
   MapPin,
   Paperclip,
   Trash2,
   Ticket,
-  User,
   UserCheck,
   X,
 } from 'lucide-react'
@@ -101,6 +101,10 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <Calendar className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
               <span>{formatDateLabel(event.date)}</span>
             </div>
+            <div className="flex items-start gap-2.5 text-xs font-bold text-foreground">
+              <Church className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span>{event.responsible}</span>
+            </div>
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
               <Clock className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
               <span>{formatTimeRange(event.timeStart, event.timeEnd)}</span>
@@ -108,10 +112,6 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
               <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
               <span>{event.location}</span>
-            </div>
-            <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-              <User className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
-              <span>{event.responsible}</span>
             </div>
             {(event.organizerName || event.organizerPhone || event.organizerEmail || event.organizerContact) && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
