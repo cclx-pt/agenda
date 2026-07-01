@@ -25,6 +25,7 @@ export default function StatusLights() {
   const [server, setServer] = useState('unknown')
   const [db, setDb] = useState('unknown')
   const [smtp, setSmtp] = useState('unknown')
+  const [storage, setStorage] = useState('unknown')
 
   useEffect(() => {
     let alive = true
@@ -36,11 +37,13 @@ export default function StatusLights() {
         setServer(res.ok ? 'up' : 'down')
         setDb(data.db === 'up' ? 'up' : 'down')
         setSmtp(data.smtp === 'up' ? 'up' : data.smtp === 'down' ? 'down' : 'unknown')
+        setStorage(data.storage === 'up' ? 'up' : data.storage === 'down' ? 'down' : 'unknown')
       } catch {
         if (!alive) return
         setServer('down')
         setDb('down')
         setSmtp('down')
+        setStorage('down')
       }
     }
     check()
@@ -56,6 +59,7 @@ export default function StatusLights() {
     { key: 'server', label: 'Servidor', state: server },
     { key: 'db', label: 'Base de dados', state: db },
     { key: 'smtp', label: 'Email (SMTP)', state: smtp },
+    { key: 'storage', label: 'Imagens (Storage)', state: storage },
   ]
 
   return (
