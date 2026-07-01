@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { checkDb, listRestarts } from './repository.js'
 import { verifySmtp } from '../auth/email.js'
 import { verifyStorage } from '../storage/supabase.js'
+import { config } from '../config.js'
 
 export const healthRouter = Router()
 
@@ -13,6 +14,14 @@ healthRouter.get('/', (_req, res) => res.json({ ok: true }))
 healthRouter.get('/full', async (_req, res) => {
   const [db, smtp, storage] = await Promise.all([checkDb(), verifySmtp(), verifyStorage()])
   const uptimeSeconds = Math.round(process.uptime())
+  // Host do Storage (NÃO é segredo — já aparece nos URLs públicos das imagens).
+  // Serve para diagnosticar um SUPABASE_URL errado (ex.: .com em vez de .co).
+  let storageHost = null
+  try {
+    storageHost = config.supabase.url ? new URL(config.supabase.url).host : null
+  } catch {
+    storageHost = `INVÁLIDO: ${config.supabase.url}`
+  }
   res.json({
     ok: db.ok,
     server: 'up',
@@ -28,6 +37,7 @@ healthRouter.get('/full', async (_req, res) => {
     storage: storage.ok ? 'up' : storage.configured ? 'down' : 'unknown',
     storageError: storage.ok ? undefined : storage.error,
     storageConfigured: storage.configured,
+    storageHost,
     uptimeSeconds,
     startedAt: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
     nodeEnv: process.env.NODE_ENV ?? null,
