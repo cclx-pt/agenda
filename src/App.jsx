@@ -14,6 +14,7 @@ import WeekView from './components/WeekView'
 import ListView from './components/ListView'
 import CalendarSidebar from './components/CalendarSidebar'
 import EventDetail from './components/EventDetail'
+import DayPopup from './components/DayPopup'
 import ExportModal from './components/ExportModal'
 import SearchBar from './components/SearchBar'
 import CalendarLoading from './components/CalendarLoading'
@@ -69,6 +70,7 @@ export default function App() {
 
   const [selected,     setSelected]     = useState({ y: today.getFullYear(), m: today.getMonth(), d: today.getDate() }) // dia selecionado (sidebar)
   const [detailEvent,  setDetailEvent]  = useState(null)   // event object
+  const [dayPopup,     setDayPopup]     = useState(null)   // { dateKey, events } (vistas multi-mes)
   const [exportData,   setExportData]   = useState(null)   // { events, filename }
   const [community,    setCommunity]    = useLocalStorage('cclx-community', 'Todas') // church filter
   const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
@@ -429,6 +431,7 @@ export default function App() {
                     eventsByDate={filteredByDate}
                     selectedKey={selectedKey}
                     onDayClick={(dateKey) => selectDayAndNavigate(dateKey)}
+                    onSelectEvent={(evt) => setDetailEvent(evt)}
                   />
                 )}
 
@@ -437,7 +440,7 @@ export default function App() {
                     {getMonthRange(3).map(({ year: y, month: m }) => (
                       <MiniMonth key={`${y}-${m}`} year={y} month={m}
                         eventsByDate={filteredByDate} size="md"
-                        onDayClick={(dateKey) => selectDay(dateKey)}
+                        onDayClick={(dateKey, evts) => { selectDay(dateKey); setDayPopup({ dateKey, events: evts }) }}
                       />
                     ))}
                   </div>
@@ -448,7 +451,7 @@ export default function App() {
                     {getMonthRange(6).map(({ year: y, month: m }) => (
                       <MiniMonth key={`${y}-${m}`} year={y} month={m}
                         eventsByDate={filteredByDate} size="sm"
-                        onDayClick={(dateKey) => selectDay(dateKey)}
+                        onDayClick={(dateKey, evts) => { selectDay(dateKey); setDayPopup({ dateKey, events: evts }) }}
                       />
                     ))}
                   </div>
@@ -459,7 +462,7 @@ export default function App() {
                     {Array.from({ length: 12 }, (_, i) => (
                       <MiniMonth key={i} year={year} month={i}
                         eventsByDate={filteredByDate} size="xs"
-                        onDayClick={(dateKey) => selectDay(dateKey)}
+                        onDayClick={(dateKey, evts) => { selectDay(dateKey); setDayPopup({ dateKey, events: evts }) }}
                       />
                     ))}
                   </div>
@@ -488,6 +491,19 @@ export default function App() {
             onBack={null}
             onExport={(evt) => setExportData({ events: [evt], filename: null })}
             onDelete={canManage && isSorEvent(detailEvent) ? handleDeleteEvent : null}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Popup de dia (vistas multi-mês) ──────────────────────── */}
+      <AnimatePresence>
+        {dayPopup && (
+          <DayPopup
+            dateKey={dayPopup.dateKey}
+            events={dayPopup.events}
+            onClose={() => setDayPopup(null)}
+            onSelectEvent={(evt) => { setDayPopup(null); setDetailEvent(evt) }}
+            onExport={(evts, filename) => setExportData({ events: evts, filename })}
           />
         )}
       </AnimatePresence>

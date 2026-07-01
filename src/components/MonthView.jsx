@@ -4,7 +4,7 @@ import {
 } from '../utils/calendarHelpers'
 import { cn } from '@/lib/utils'
 
-export default function MonthView({ year, month, eventsByDate, selectedKey, onDayClick }) {
+export default function MonthView({ year, month, eventsByDate, selectedKey, onDayClick, onSelectEvent }) {
   const firstDay = mondayFirstDay(new Date(year, month, 1))
   const totalDays = daysInMonth(year, month)
   const prevDays  = daysInMonth(year, month - 1)
@@ -83,14 +83,18 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                 return (
                   <div key={evt.id}
                     className={cn(
-                      'mb-0.5 flex items-center gap-[3px] overflow-hidden whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide max-[600px]:gap-0.5 max-[600px]:px-[3px] max-[600px]:py-px max-[600px]:text-[8px]',
+                      'mb-0.5 flex cursor-pointer items-center gap-[3px] overflow-hidden whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide hover:brightness-95 max-[600px]:gap-0.5 max-[600px]:px-[3px] max-[600px]:py-px max-[600px]:text-[8px]',
                       st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
                     )}
                     style={{ background: st ? st.bg : cat.bgVar, color: cat.colorVar }}
-                    title={st ? `${evt.title} — ${st.label}` : evt.title}>
+                    title={`${evt.title} (${evt.community})${st ? ` — ${st.label}` : ''}`}
+                    onClick={(e) => { e.stopPropagation(); onSelectEvent?.(evt) }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onSelectEvent?.(evt) } }}>
                     {evt.imageUrl && <span className="h-[5px] w-[5px] flex-shrink-0 rounded-[1px] bg-current opacity-80" />}
                     <span className="h-1 w-1 flex-shrink-0 rounded-full opacity-70" style={{ background: cat.colorVar }} />
-                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title}</span>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title} <span className="opacity-70">({evt.community})</span></span>
                     {st && <i className={`ti ${st.icon} ml-auto flex-shrink-0 text-[9px] opacity-85`} aria-hidden="true" />}
                     {evt.isApi && <span className="ml-auto flex-shrink-0 rounded-sm bg-blue-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={API_BADGE.title}>{API_BADGE.label}</span>}
                   </div>

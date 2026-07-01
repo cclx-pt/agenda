@@ -152,6 +152,28 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     }
   }
 
+  const handleApproveAll = async () => {
+    const pendentes = visibleEvents.filter((e) => e.status === 'pendente')
+    if (pendentes.length === 0) return
+    if (!window.confirm(`Aprovar os ${pendentes.length} eventos pendentes visíveis?`)) return
+    setBusy(true)
+    let ok = 0
+    const errs = []
+    for (const e of pendentes) {
+      try {
+        await eventsService.approveEvent(e.id)
+        ok += 1
+      } catch (err) {
+        errs.push(`${e.title}: ${err.message}`)
+      }
+    }
+    setBusy(false)
+    onChanged?.()
+    await loadApprovals()
+    if (ok) toast.success(`${ok} evento(s) aprovado(s).`)
+    if (errs.length) toast.error(`${errs.length} não aprovado(s). Ex.: ${errs[0]}`)
+  }
+
   const handleExport = () => {
     if (visibleEvents.length === 0) {
       toast.info('Sem eventos para exportar nesta vista.')
@@ -318,14 +340,27 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                   ))}
                 </select>
                 <span className="text-[13px] text-muted-foreground">{visibleEvents.length} evento{visibleEvents.length === 1 ? '' : 's'}</span>
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-accent"
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  Exportar Excel
-                </button>
+                <div className="ml-auto flex flex-wrap gap-2">
+                  {visibleEvents.some((e) => e.status === 'pendente') && (
+                    <button
+                      type="button"
+                      onClick={handleApproveAll}
+                      disabled={busy}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-transparent px-3 py-2 text-[13px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+                    >
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                      Aprovar tudo
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-accent"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    Exportar Excel
+                  </button>
+                </div>
               </div>
 
               {/* List */}

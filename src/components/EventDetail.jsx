@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   Clock,
   Image as ImageIcon,
+  Lock,
   MapPin,
   Paperclip,
   Trash2,
@@ -73,6 +74,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               style={{ background: cat.bgVar, color: cat.colorVar }}>
               {cat.label}
             </span>
+            {event.privacyTag && (
+              <span className="inline-flex items-center gap-1 rounded-sm bg-violet-600 px-2 py-[3px] text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Privacidade: ${event.privacyTag}`}>
+                <Lock className="h-2.5 w-2.5" aria-hidden="true" />
+                {event.privacyTag}
+              </span>
+            )}
             {status && (
               <span className="inline-flex items-center gap-1 rounded-sm border border-dashed border-amber-500/60 bg-amber-500/10 px-2 py-[3px] text-[9px] font-extrabold uppercase tracking-wider text-amber-700">
                 <i className={`ti ${status.icon}`} aria-hidden="true" />

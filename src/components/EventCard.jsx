@@ -25,13 +25,11 @@ export default function EventCard({ event, onClick }) {
 
       <div className="px-3.5 pb-3.5 pt-2.5">
         <div className="mb-[7px] flex flex-wrap items-center gap-1.5">
-          {!event.isApi && (
-            <span className="inline-block rounded-sm px-[7px] py-0.5 text-[9px] font-bold uppercase tracking-widest"
-              style={{ background: cat.bgVar, color: cat.colorVar }}>
-              {cat.label}
-            </span>
-          )}
-          {!event.isApi && event.privacyTag && (
+          <span className="inline-block rounded-sm px-[7px] py-0.5 text-[9px] font-bold uppercase tracking-widest"
+            style={{ background: cat.bgVar, color: cat.colorVar }}>
+            {cat.label}
+          </span>
+          {event.privacyTag && (
             <span className="inline-flex items-center gap-1 rounded-sm bg-violet-600 px-[7px] py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Privacidade: ${event.privacyTag}`}>
               <Lock className="h-2.5 w-2.5" aria-hidden="true" />
               {event.privacyTag}

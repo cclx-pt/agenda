@@ -49,6 +49,7 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                 >
                   {evt.timeStart && <span className="text-[0.65rem] font-bold opacity-85">{evt.timeStart}</span>}
                   <span className="line-clamp-2 text-[0.75rem] leading-tight">{evt.title}</span>
+                  <span className="text-[0.6rem] opacity-75">{evt.community}</span>
                   {st && (
                     <span className="mt-0.5 inline-flex items-center gap-[3px] text-[0.6rem] font-extrabold uppercase tracking-wide opacity-90">
                       <i className={`ti ${st.icon}`} aria-hidden="true" />
