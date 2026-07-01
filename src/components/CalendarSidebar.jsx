@@ -5,6 +5,7 @@ import { CalendarPlus, Check, Church, Lock, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../hooks/useI18n'
+import MultiSelectDropdown from './MultiSelectDropdown'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
 const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento', 'aplicacao']
@@ -16,48 +17,6 @@ const CAT_DOT = {
   formacao: '#5db87a',
   evento: '#b8c0d8',
   aplicacao: '#818cf8',
-}
-
-// Lista de filtro multi-seleção (comunidade / privacidade): seleção vazia = "Todas".
-function FilterMultiList({ options = [], selected = [], onChange, allLabel }) {
-  const rowCls = (active) =>
-    cn(
-      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-      active && 'text-foreground',
-    )
-  const box = (checked) => (
-    <span
-      className={cn(
-        'flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-[4px] border transition-colors',
-        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background',
-      )}
-    >
-      {checked && <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />}
-    </span>
-  )
-  const toggle = (val) =>
-    onChange(selected.includes(val) ? selected.filter((x) => x !== val) : [...selected, val])
-  return (
-    <ul className="flex list-none flex-col gap-[3px]">
-      <li>
-        <button type="button" className={rowCls(selected.length === 0)} onClick={() => onChange([])}>
-          {box(selected.length === 0)}
-          <span className="flex-1">{allLabel}</span>
-        </button>
-      </li>
-      {options.map((opt) => {
-        const active = selected.includes(opt)
-        return (
-          <li key={opt}>
-            <button type="button" className={rowCls(active)} onClick={() => toggle(opt)}>
-              {box(active)}
-              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{opt}</span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
-  )
 }
 
 /**
@@ -186,29 +145,27 @@ export default function CalendarSidebar({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          <Church className="h-3.5 w-3.5" aria-hidden="true" />
-          {entity}
-        </div>
-        <FilterMultiList
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{entity}</div>
+        <MultiSelectDropdown
           options={communities}
           selected={community}
           onChange={onCommunityChange}
           allLabel={t('allEntities', { entities })}
+          icon={Church}
+          ariaLabel={t('filterByEntity', { entity })}
         />
       </div>
 
       {Array.isArray(privacyTags) && privacyTags.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-            {t('privacy')}
-          </div>
-          <FilterMultiList
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('privacy')}</div>
+          <MultiSelectDropdown
             options={privacyTags}
             selected={privacyTag}
             onChange={onPrivacyTagChange}
             allLabel={t('allTags')}
+            icon={Lock}
+            ariaLabel="Filtrar por etiqueta de privacidade"
           />
         </div>
       )}
