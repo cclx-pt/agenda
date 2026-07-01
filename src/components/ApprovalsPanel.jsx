@@ -60,6 +60,8 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const [tab, setTab] = useState('approvals')
   const [status, setStatus] = useState('pendente')
   const [churchFilter, setChurchFilter] = useState('Todas')
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [privacyTagFilter, setPrivacyTagFilter] = useState('Todas')
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -113,9 +115,24 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt'))
   }, [events])
 
+  const categoriesInEvents = useMemo(() => {
+    return Array.from(new Set(events.map((e) => e.category).filter(Boolean)))
+  }, [events])
+
+  const privacyTagsInEvents = useMemo(() => {
+    const set = new Set(events.map((e) => e.privacyTag).filter(Boolean))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt'))
+  }, [events])
+
   const visibleEvents = useMemo(
-    () => (churchFilter === 'Todas' ? events : events.filter((e) => e.community === churchFilter)),
-    [events, churchFilter]
+    () =>
+      events.filter(
+        (e) =>
+          (churchFilter === 'Todas' || e.community === churchFilter) &&
+          (categoryFilter === 'Todas' || e.category === categoryFilter) &&
+          (privacyTagFilter === 'Todas' || e.privacyTag === privacyTagFilter)
+      ),
+    [events, churchFilter, categoryFilter, privacyTagFilter]
   )
 
   const handleApprove = async (evt) => {
@@ -339,6 +356,32 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+                {categoriesInEvents.length > 0 && (
+                  <select
+                    className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    aria-label="Categoria"
+                  >
+                    <option value="Todas">Todas as categorias</option>
+                    {categoriesInEvents.map((c) => (
+                      <option key={c} value={c}>{categoryLabel(c)}</option>
+                    ))}
+                  </select>
+                )}
+                {privacyTagsInEvents.length > 0 && (
+                  <select
+                    className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
+                    value={privacyTagFilter}
+                    onChange={(e) => setPrivacyTagFilter(e.target.value)}
+                    aria-label="Etiqueta de privacidade"
+                  >
+                    <option value="Todas">Todas as etiquetas</option>
+                    {privacyTagsInEvents.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                )}
                 <span className="text-[13px] text-muted-foreground">{visibleEvents.length} evento{visibleEvents.length === 1 ? '' : 's'}</span>
                 <div className="ml-auto flex flex-wrap gap-2">
                   {visibleEvents.some((e) => e.status === 'pendente') && (
