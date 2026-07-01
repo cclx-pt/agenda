@@ -781,6 +781,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       setForm((f) => ({ ...f, bannerUrl: url }))
       toast.success('Imagem carregada.')
     } catch (err) {
+      console.error('[upload] imagem falhou:', err)
       toast.error(err.message)
     } finally {
       setUploadingImage(false)
@@ -804,6 +805,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       setForm((f) => ({ ...f, attachmentUrl: url, attachmentName: file.name }))
       toast.success('Anexo carregado.')
     } catch (err) {
+      console.error('[upload] anexo falhou:', err)
       toast.error(err.message)
     } finally {
       setUploadingAttachment(false)

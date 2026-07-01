@@ -52,6 +52,10 @@ export default function EventCard({ event, onClick }) {
         <div className="mb-2 text-sm font-bold leading-tight tracking-wide text-foreground">{event.title}</div>
 
         <div className="mb-2 flex flex-col gap-1">
+          <div className="flex items-center gap-[7px] text-xs font-bold text-foreground">
+            <Church className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+            {event.responsible}
+          </div>
           <div className="flex items-center gap-[7px] text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             {formatTimeRange(event.timeStart, event.timeEnd)}
@@ -59,10 +63,6 @@ export default function EventCard({ event, onClick }) {
           <div className="flex items-center gap-[7px] text-[11px] text-muted-foreground">
             <MapPin className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             {event.location}
-          </div>
-          <div className="flex items-center gap-[7px] text-[11px] text-muted-foreground">
-            <Church className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            {event.responsible}
           </div>
         </div>
 

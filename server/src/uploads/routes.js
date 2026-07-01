@@ -52,8 +52,9 @@ uploadsRouter.post('/', manageRoles, (req, res) => {
       const url = await uploadImage(req.file.buffer, { ext, contentType: req.file.mimetype })
       res.status(201).json({ url })
     } catch (uploadErr) {
-      console.error('[uploads] Falha no Supabase Storage:', uploadErr?.message ?? uploadErr)
-      res.status(502).json({ error: 'Falha ao guardar a imagem.' })
+      const detail = uploadErr?.message ?? String(uploadErr)
+      console.error('[uploads] Falha no Supabase Storage:', detail)
+      res.status(502).json({ error: `Falha ao guardar o ficheiro: ${detail}` })
     }
   })
 })

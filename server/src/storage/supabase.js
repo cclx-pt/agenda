@@ -27,11 +27,37 @@ export function isStorageConfigured() {
 let bucketReady = false
 async function ensureBucket(supabase, bucket) {
   if (bucketReady) return
-  const { data } = await supabase.storage.getBucket(bucket)
+  const { data, error } = await supabase.storage.getBucket(bucket)
+  if (error) console.warn('[storage] getBucket falhou:', error.message)
   if (!data) {
-    await supabase.storage.createBucket(bucket, { public: true }).catch(() => {})
+    const { error: createErr } = await supabase.storage.createBucket(bucket, { public: true })
+    if (createErr && !/already exists|resource_already_exists/i.test(createErr.message || '')) {
+      console.warn('[storage] createBucket falhou:', createErr.message)
+    }
   }
   bucketReady = true
+}
+
+// Diagnóstico do Storage (cacheado 60s) — usado por /health/full para perceber
+// se as credenciais/o bucket estão OK sem tentar um upload real.
+let storageCheck = { at: 0, result: null }
+export async function verifyStorage() {
+  if (!isStorageConfigured()) return { ok: false, configured: false, error: null }
+  const now = Date.now()
+  if (storageCheck.result && now - storageCheck.at < 60_000) return storageCheck.result
+  let result
+  try {
+    const supabase = getClient()
+    const bucket = config.supabase.storageBucket
+    const { error } = await supabase.storage.getBucket(bucket)
+    result = error
+      ? { ok: false, configured: true, error: error.message }
+      : { ok: true, configured: true, error: null }
+  } catch (e) {
+    result = { ok: false, configured: true, error: e?.message ?? String(e) }
+  }
+  storageCheck = { at: now, result }
+  return result
 }
 
 /**
