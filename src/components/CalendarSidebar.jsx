@@ -36,11 +36,19 @@ export default function CalendarSidebar({
   communities,
   category,
   onCategoryChange,
+  categoriesInUse,
 }) {
   const { year, month, day } = parseDateKey(selectedKey)
   const date = new Date(year, month, day)
   const weekday = WEEKDAYS_FULL[(date.getDay() + 6) % 7]
   const weekdayCap = weekday.charAt(0).toUpperCase() + weekday.slice(1)
+
+  // Só mostra as categorias que existem em eventos na BD (qualquer estado).
+  const inUse = Array.isArray(categoriesInUse) ? categoriesInUse : []
+  const visibleCategories = [
+    ...CATEGORY_ORDER.filter((k) => inUse.includes(k)),
+    ...inUse.filter((c) => !CATEGORY_ORDER.includes(c)),
+  ]
 
   return (
     <>
@@ -167,7 +175,7 @@ export default function CalendarSidebar({
               {category === 'Todos' && <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />}
             </button>
           </li>
-          {CATEGORY_ORDER.map((key) => {
+          {visibleCategories.map((key) => {
             const active = category === key
             return (
               <li key={key}>
@@ -179,8 +187,8 @@ export default function CalendarSidebar({
                   )}
                   onClick={() => onCategoryChange(active ? 'Todos' : key)}
                 >
-                  <span className="h-[11px] w-[11px] flex-shrink-0 rounded-sm" style={{ background: CAT_DOT[key] }} />
-                  <span className="flex-1">{CATEGORY_META[key].label}</span>
+                  <span className="h-[11px] w-[11px] flex-shrink-0 rounded-sm" style={{ background: CAT_DOT[key] || '#94a3b8' }} />
+                  <span className="flex-1">{CATEGORY_META[key]?.label || key}</span>
                   {active && <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />}
                 </button>
               </li>

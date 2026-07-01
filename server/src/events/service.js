@@ -221,6 +221,19 @@ export async function listPublic({ from, to } = {}) {
 }
 
 /**
+ * Categorias distintas em uso por qualquer evento (SoR, qualquer estado) e
+ * pelos eventos externos (se a integração estiver ativa). Alimenta o filtro
+ * dinâmico de categorias na barra lateral.
+ */
+export async function categoriesInUse() {
+  const external = (await settingsService.isExternalEnabled())
+    ? await externalRepo.distinctCategories()
+    : []
+  const sor = await repo.distinctCategories()
+  return Array.from(new Set([...sor, ...external]))
+}
+
+/**
  * Agenda para o calendário autenticado: eventos publicados (SoR), incluindo os
  * privados apenas se o utilizador tiver acesso (admin ou can_view_private), mais
  * os eventos externos (inChurch). Com `includeDrafts` (apenas staff), inclui

@@ -75,6 +75,14 @@ export async function count() {
   return rows[0]?.n ?? 0
 }
 
+/** Categorias distintas em uso pelos eventos externos. */
+export async function distinctCategories() {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT category FROM external_events WHERE category IS NOT NULL'
+  )
+  return rows.map((r) => r.category).filter(Boolean)
+}
+
 const COLS = [
   'id',
   'external_id',

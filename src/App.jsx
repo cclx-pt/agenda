@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTheme } from './hooks/useTheme'
 import { useEvents } from './hooks/useEvents'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -72,12 +72,27 @@ export default function App() {
   const [exportData,   setExportData]   = useState(null)   // { events, filename }
   const [community,    setCommunity]    = useLocalStorage('cclx-community', 'Todas') // church filter
   const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
+  const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
   const [approvalsOpen, setApprovalsOpen] = useState(false) // painel de aprovacoes
   const [sidebarOpen,  setSidebarOpen]  = useState(false)   // gaveta lateral (telemovel/tablet)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage('cclx-sidebar-collapsed', false) // ocultar sidebar (desktop)
+
+  // Categorias existentes em eventos (BD, qualquer estado) — filtro dinâmico da sidebar.
+  const refreshCategoriesInUse = useCallback(() => {
+    eventsService.listCategoriesInUse().then(setCategoriesInUse).catch(() => {})
+  }, [])
+  useEffect(() => {
+    refreshCategoriesInUse()
+  }, [refreshCategoriesInUse, manageOpen])
+  // Se a categoria selecionada deixar de existir em eventos, volta a "Todos".
+  useEffect(() => {
+    if (category !== 'Todos' && categoriesInUse.length > 0 && !categoriesInUse.includes(category)) {
+      setCategory('Todos')
+    }
+  }, [categoriesInUse, category, setCategory])
 
   const handleLogout = async () => {
     await logout()
@@ -94,6 +109,7 @@ export default function App() {
       clearEventCache()
       setDetailEvent(null)
       await reload()
+      refreshCategoriesInUse()
       toast.success('Evento eliminado.')
     } catch (err) {
       toast.error(err.message)
@@ -218,7 +234,7 @@ export default function App() {
       <header className="z-[12] flex h-[60px] flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 text-foreground max-[600px]:h-[52px] max-[600px]:gap-2 max-[600px]:px-3">
         <div className="flex flex-shrink-0 items-center gap-3">
           <img src={logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
-          <span className="border-l-2 border-border pl-3 text-xl font-bold uppercase tracking-wider text-foreground max-[600px]:hidden">Agenda</span>
+          <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold uppercase tracking-wide text-foreground max-[820px]:hidden">A Nossa Agenda - Uma Igreja Ligada</span>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-3.5 max-[980px]:gap-2">
@@ -294,6 +310,7 @@ export default function App() {
           communities={communities}
           category={category}
           onCategoryChange={setCategory}
+          categoriesInUse={categoriesInUse}
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">

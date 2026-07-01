@@ -105,6 +105,14 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   return rows.map(mapRow)
 }
 
+// Categorias distintas em uso por qualquer evento (independentemente do estado).
+export async function distinctCategories() {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT category FROM events WHERE category IS NOT NULL'
+  )
+  return rows.map((r) => r.category).filter(Boolean)
+}
+
 export async function insert(data, actorId) {
   const id = randomUUID()
   await pool.query(

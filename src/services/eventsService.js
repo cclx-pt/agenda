@@ -21,6 +21,12 @@ export async function listEvents() {
   return events
 }
 
+/** Categorias distintas em uso por eventos (qualquer estado + externos). */
+export async function listCategoriesInUse() {
+  const { categories } = await request('/data/events/categories-in-use')
+  return categories
+}
+
 /** Histórico de transições de um evento. */
 export async function getHistory(id) {
   const { history } = await request(`/data/events/${id}/history`)

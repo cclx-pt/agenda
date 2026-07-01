@@ -52,6 +52,15 @@ eventsRouter.get(
   })
 )
 
+// Categorias distintas em uso (qualquer estado + externos) — alimenta o filtro
+// dinâmico da barra lateral. Público: o calendário anónimo também o usa.
+eventsRouter.get(
+  '/categories-in-use',
+  asyncHandler(async (_req, res) => {
+    res.json({ categories: await service.categoriesInUse() })
+  })
+)
+
 // A partir daqui, tudo exige autenticação.
 eventsRouter.use(requireAuth)
 
