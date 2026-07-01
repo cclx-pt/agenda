@@ -18,6 +18,48 @@ const CAT_DOT = {
   aplicacao: '#818cf8',
 }
 
+// Lista de filtro multi-seleção (comunidade / privacidade): seleção vazia = "Todas".
+function FilterMultiList({ options = [], selected = [], onChange, allLabel }) {
+  const rowCls = (active) =>
+    cn(
+      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+      active && 'text-foreground',
+    )
+  const box = (checked) => (
+    <span
+      className={cn(
+        'flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-[4px] border transition-colors',
+        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background',
+      )}
+    >
+      {checked && <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />}
+    </span>
+  )
+  const toggle = (val) =>
+    onChange(selected.includes(val) ? selected.filter((x) => x !== val) : [...selected, val])
+  return (
+    <ul className="flex list-none flex-col gap-[3px]">
+      <li>
+        <button type="button" className={rowCls(selected.length === 0)} onClick={() => onChange([])}>
+          {box(selected.length === 0)}
+          <span className="flex-1">{allLabel}</span>
+        </button>
+      </li>
+      {options.map((opt) => {
+        const active = selected.includes(opt)
+        return (
+          <li key={opt}>
+            <button type="button" className={rowCls(active)} onClick={() => toggle(opt)}>
+              {box(active)}
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{opt}</span>
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 /**
  * CalendarSidebar — coluna lateral (navy) com o dia selecionado, a lista de
  * eventos desse dia e os filtros (igreja + categorias), ao estilo da referência.
@@ -144,44 +186,30 @@ export default function CalendarSidebar({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{entity}</div>
-        <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
-          <Church className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-          <select
-            className="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent py-2.5 pl-0 pr-1 text-[13px] font-semibold text-foreground outline-none"
-            value={community}
-            onChange={(e) => onCommunityChange(e.target.value)}
-            aria-label={t('filterByEntity', { entity })}
-          >
-            <option value="Todas">{t('allEntities', { entities })}</option>
-            {communities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          <Church className="h-3.5 w-3.5" aria-hidden="true" />
+          {entity}
         </div>
+        <FilterMultiList
+          options={communities}
+          selected={community}
+          onChange={onCommunityChange}
+          allLabel={t('allEntities', { entities })}
+        />
       </div>
 
       {Array.isArray(privacyTags) && privacyTags.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('privacy')}</div>
-          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
-            <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            <select
-              className="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent py-2.5 pl-0 pr-1 text-[13px] font-semibold text-foreground outline-none"
-              value={privacyTag}
-              onChange={(e) => onPrivacyTagChange(e.target.value)}
-              aria-label="Filtrar por etiqueta de privacidade"
-            >
-              <option value="Todas">{t('allTags')}</option>
-              {privacyTags.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('privacy')}
           </div>
+          <FilterMultiList
+            options={privacyTags}
+            selected={privacyTag}
+            onChange={onPrivacyTagChange}
+            allLabel={t('allTags')}
+          />
         </div>
       )}
 

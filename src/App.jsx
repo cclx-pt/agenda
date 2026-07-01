@@ -74,10 +74,10 @@ export default function App() {
   const [detailEvent,  setDetailEvent]  = useState(null)   // event object
   const [dayPopup,     setDayPopup]     = useState(null)   // { dateKey, events } (vistas multi-mes)
   const [exportData,   setExportData]   = useState(null)   // { events, filename }
-  const [community,    setCommunity]    = useLocalStorage('cclx-community', 'Todas') // church filter
+  const [community,    setCommunity]    = useLocalStorage('cclx-communities', []) // filtro de igrejas (multi)
   const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
   const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
-  const [privacyTag,   setPrivacyTag]   = useState('Todas') // filtro por etiqueta de privacidade
+  const [privacyTag,   setPrivacyTag]   = useState([]) // filtro por etiquetas de privacidade (multi)
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
@@ -124,9 +124,9 @@ export default function App() {
   // ─── Filtered events by community + category ─────────────────
   const filteredEvents = useMemo(() => {
     return events.filter(e =>
-      (community === 'Todas' || e.community === community) &&
+      (community.length === 0 || community.includes(e.community)) &&
       (category === 'Todos' || e.category === category) &&
-      (privacyTag === 'Todas' || e.privacyTag === privacyTag) &&
+      (privacyTag.length === 0 || privacyTag.includes(e.privacyTag)) &&
       (visibility === 'all' ||
         (visibility === 'private' ? e.isPrivate : !e.isPrivate))
     )
