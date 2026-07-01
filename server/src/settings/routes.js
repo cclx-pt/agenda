@@ -87,3 +87,27 @@ integrationRouter.get('/sync/cron', async (req, res, next) => {
     next(err)
   }
 })
+
+// ── Traduções (i18n) ──────────────────────────────
+// GET público (a app precisa das traduções antes do login); PUT só admin.
+export const translationsRouter = Router()
+
+translationsRouter.get('/', async (_req, res, next) => {
+  try {
+    res.json({ translations: await service.getTranslations() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+translationsRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const translations = await service.updateTranslations(
+      req.body?.translations ?? req.body,
+      req.user.sub
+    )
+    res.json({ translations })
+  } catch (err) {
+    next(err)
+  }
+})

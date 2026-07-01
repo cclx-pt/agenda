@@ -4,6 +4,7 @@ import {
 import { CalendarPlus, Check, Church, Lock, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useI18n } from '../hooks/useI18n'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
 const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento', 'aplicacao']
@@ -41,6 +42,7 @@ export default function CalendarSidebar({
   onPrivacyTagChange,
   privacyTags,
 }) {
+  const { t, entity, entities } = useI18n()
   const { year, month, day } = parseDateKey(selectedKey)
   const date = new Date(year, month, day)
   const weekday = WEEKDAYS_FULL[(date.getDay() + 6) % 7]
@@ -79,7 +81,7 @@ export default function CalendarSidebar({
       {canManage && (
         <Button type="button" className="w-full" onClick={onNewEvent}>
           <Plus className="h-4 w-4" aria-hidden="true" />
-          <span>Novo evento</span>
+          <span>{t('newEvent')}</span>
         </Button>
       )}
 
@@ -106,9 +108,9 @@ export default function CalendarSidebar({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Eventos</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('events')}</div>
         {dayEvents.length === 0 ? (
-          <p className="text-xs italic text-muted-foreground">Sem eventos neste dia.</p>
+          <p className="text-xs italic text-muted-foreground">{t('noEventsDay')}</p>
         ) : (
           <ul className="flex list-none flex-col gap-[3px]">
             {dayEvents.map((evt) => {
@@ -142,16 +144,16 @@ export default function CalendarSidebar({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Igreja</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{entity}</div>
         <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
           <Church className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
           <select
             className="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent py-2.5 pl-0 pr-1 text-[13px] font-semibold text-foreground outline-none"
             value={community}
             onChange={(e) => onCommunityChange(e.target.value)}
-            aria-label="Filtrar por igreja"
+            aria-label={t('filterByEntity', { entity })}
           >
-            <option value="Todas">Todas as igrejas</option>
+            <option value="Todas">{t('allEntities', { entities })}</option>
             {communities.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -163,7 +165,7 @@ export default function CalendarSidebar({
 
       {Array.isArray(privacyTags) && privacyTags.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Privacidade</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('privacy')}</div>
           <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
             <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             <select
@@ -172,7 +174,7 @@ export default function CalendarSidebar({
               onChange={(e) => onPrivacyTagChange(e.target.value)}
               aria-label="Filtrar por etiqueta de privacidade"
             >
-              <option value="Todas">Todas as etiquetas</option>
+              <option value="Todas">{t('allTags')}</option>
               {privacyTags.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -184,7 +186,7 @@ export default function CalendarSidebar({
       )}
 
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Categorias</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('categories')}</div>
         <ul className="flex list-none flex-col gap-[3px]">
           <li>
             <button
@@ -196,7 +198,7 @@ export default function CalendarSidebar({
               onClick={() => onCategoryChange('Todos')}
             >
               <span className="h-[11px] w-[11px] flex-shrink-0 rounded-sm" style={{ background: CAT_DOT.culto }} />
-              <span className="flex-1">Todos</span>
+              <span className="flex-1">{t('all')}</span>
               {category === 'Todos' && <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />}
             </button>
           </li>

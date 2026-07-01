@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTheme } from './hooks/useTheme'
+import { useI18n } from './hooks/useI18n'
 import { useEvents } from './hooks/useEvents'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useAuth } from './hooks/useAuth'
@@ -48,6 +49,7 @@ const VIEW_META = {
 
 export default function App() {
   const { toggle, isDark } = useTheme()
+  const { t, lang, setLang, languages } = useI18n()
   const { user, isAuthenticated, logout, canViewPrivate } = useAuth()
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -245,7 +247,7 @@ export default function App() {
       <header className="z-[12] flex h-[60px] flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 text-foreground max-[600px]:h-[52px] max-[600px]:gap-2 max-[600px]:px-3">
         <div className="flex flex-shrink-0 items-center gap-3">
           <img src={logoUrl} alt="CCLX" className="h-8 w-auto object-contain invert dark:invert-0" />
-          <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold tracking-wide text-foreground max-[820px]:hidden">A Nossa Agenda - Uma Igreja Ligada</span>
+          <span className="whitespace-nowrap border-l-2 border-border pl-3 text-lg font-bold tracking-wide text-foreground max-[820px]:hidden">{t('appTitle')}</span>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-3.5 max-[980px]:gap-2">
@@ -261,45 +263,56 @@ export default function App() {
                   aria-label="Visibilidade dos eventos"
                   title="Visibilidade dos eventos"
                 >
-                  <option value="all">Ver tudo</option>
-                  <option value="private">Só privados</option>
-                  <option value="public">Só públicos</option>
+                  <option value="all">{t('seeAll')}</option>
+                  <option value="private">{t('onlyPrivate')}</option>
+                  <option value="public">{t('onlyPublic')}</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               </div>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => { clearEventCache(); reload(); refreshCategoriesInUse() }} title="Atualizar calendário">
+          <Button variant="outline" size="sm" onClick={() => { clearEventCache(); reload(); refreshCategoriesInUse() }} title={t('refresh')}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            <span className="max-[980px]:hidden">Atualizar</span>
+            <span className="max-[980px]:hidden">{t('refresh')}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCurrentView} title="Exportar vista atual">
+          <Button variant="outline" size="sm" onClick={exportCurrentView} title={t('export')}>
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-            <span className="max-[980px]:hidden">Exportar</span>
+            <span className="max-[980px]:hidden">{t('export')}</span>
           </Button>
           {canManage && (
-            <Button variant="outline" size="sm" onClick={() => setApprovalsOpen(true)} title="Aprovações">
+            <Button variant="outline" size="sm" onClick={() => setApprovalsOpen(true)} title={t('approvals')}>
               <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
-              <span className="max-[980px]:hidden">Aprovações</span>
+              <span className="max-[980px]:hidden">{t('approvals')}</span>
             </Button>
           )}
           {canManage && (
-            <Button variant="outline" size="sm" onClick={() => { setManageView('home'); setManageOpen(true) }} title="Administração">
+            <Button variant="outline" size="sm" onClick={() => { setManageView('home'); setManageOpen(true) }} title={t('admin')}>
               <Settings className="h-4 w-4" aria-hidden="true" />
-              <span className="max-[980px]:hidden">Admin</span>
+              <span className="max-[980px]:hidden">{t('admin')}</span>
             </Button>
           )}
           {isAuthenticated ? (
-            <Button variant="outline" size="sm" onClick={handleLogout} title={`Sessão: ${user.name || user.email} (${user.role})`}>
+            <Button variant="outline" size="sm" onClick={handleLogout} title={`${user.name || user.email} (${user.role})`}>
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              <span className="max-[980px]:hidden">Sair</span>
+              <span className="max-[980px]:hidden">{t('signOut')}</span>
             </Button>
           ) : (
-            <Button size="sm" onClick={() => setLoginOpen(true)} title="Entrar na gestão">
+            <Button size="sm" onClick={() => setLoginOpen(true)} title={t('signIn')}>
               <Lock className="h-4 w-4" aria-hidden="true" />
-              <span className="max-[980px]:hidden">Entrar</span>
+              <span className="max-[980px]:hidden">{t('signIn')}</span>
             </Button>
           )}
+          <select
+            className="cursor-pointer rounded-md border border-input bg-background px-1.5 py-[5px] text-[11px] font-semibold uppercase text-foreground outline-none hover:border-ring"
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+            aria-label={t('language')}
+            title={t('language')}
+          >
+            {languages.map((l) => (
+              <option key={l.code} value={l.code}>{l.code.toUpperCase()}</option>
+            ))}
+          </select>
           <ThemeToggle isDark={isDark} onToggle={toggle} />
         </div>
       </header>
@@ -364,7 +377,7 @@ export default function App() {
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Button>
               <span className="min-w-[160px] text-center text-base font-bold uppercase tracking-wider text-foreground max-[980px]:min-w-[90px] max-[980px]:text-[13px]">{periodLabel()}</span>
-              <Button variant="outline" size="sm" onClick={goToday}>Hoje</Button>
+              <Button variant="outline" size="sm" onClick={goToday}>{t('today')}</Button>
             </div>
 
             <nav className="flex flex-wrap gap-1" aria-label="Vista do calendário">
@@ -378,7 +391,7 @@ export default function App() {
                   aria-current={view === v ? 'page' : undefined}
                 >
                   <i className={`ti ${VIEW_META[v].icon} text-[15px]`} aria-hidden="true" />
-                  <span className="max-[980px]:hidden">{VIEW_META[v].label}</span>
+                  <span className="max-[980px]:hidden">{t(`view.${v}`)}</span>
                 </button>
               ))}
             </nav>
@@ -394,7 +407,7 @@ export default function App() {
                 <span>{error}</span>
                 <Button variant="outline" size="sm" onClick={() => reload()}>
                   <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  <span>Tentar novamente</span>
+                  <span>{t('retry')}</span>
                 </Button>
               </div>
             )}
@@ -404,7 +417,7 @@ export default function App() {
                 {periodEventCount === 0 && (
                   <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-xs uppercase tracking-wide text-muted-foreground">
                     <CalendarX className="h-7 w-7" aria-hidden="true" />
-                    <span>Sem eventos neste período</span>
+                    <span>{t('noEventsPeriod')}</span>
                   </div>
                 )}
                 {view === 'day' && (

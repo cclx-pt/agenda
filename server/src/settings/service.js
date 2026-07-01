@@ -76,3 +76,29 @@ export async function updateIntegration(input, actorId) {
   )
   return getIntegration()
 }
+
+// Chave das sobreposições de tradução (i18n) geridas pelo admin.
+const TRANSLATIONS_KEY = 'translations'
+
+/** Sobreposições de tradução: { lang: { key: value } }. Vazio por omissão. */
+export async function getTranslations() {
+  return (await repo.get(TRANSLATIONS_KEY)) || {}
+}
+
+/** Valida e persiste as sobreposições de tradução (admin). */
+export async function updateTranslations(input, actorId) {
+  const clean = {}
+  if (input && typeof input === 'object') {
+    for (const [lang, dict] of Object.entries(input)) {
+      if (dict && typeof dict === 'object' && !Array.isArray(dict)) {
+        const entries = {}
+        for (const [k, v] of Object.entries(dict)) {
+          if (typeof v === 'string' && v.length <= 500) entries[k] = v
+        }
+        if (Object.keys(entries).length) clean[lang] = entries
+      }
+    }
+  }
+  await repo.set(TRANSLATIONS_KEY, clean, actorId)
+  return clean
+}

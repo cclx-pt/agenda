@@ -127,6 +127,23 @@ export async function deleteDelegation(id) {
   await request(`/data/delegations/${id}`, { method: 'DELETE' })
 }
 
+// ── Traduções (i18n) ────────────────────────────
+
+/** Lê as sobreposições de tradução (público). */
+export async function getTranslations() {
+  const { translations } = await request('/data/translations')
+  return translations
+}
+
+/** Guarda as sobreposições de tradução (admin). */
+export async function updateTranslations(translations) {
+  const { translations: saved } = await request('/data/translations', {
+    method: 'PUT',
+    body: { translations },
+  })
+  return saved
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {

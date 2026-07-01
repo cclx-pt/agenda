@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './hooks/useAuth'
+import { I18nProvider } from './hooks/useI18n'
 import App from './App.jsx'
 import LogsPage from './components/LogsPage'
 import './index.css'
@@ -26,9 +27,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       {isLogsRoute ? (
         <LogsPage />
       ) : (
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </I18nProvider>
       )}
     </QueryClientProvider>
   </React.StrictMode>,

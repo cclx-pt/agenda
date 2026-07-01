@@ -10,6 +10,8 @@ import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
 import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
+import { useI18n } from '../hooks/useI18n'
+import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
 
 // Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
 // antigo CSS module, mantendo intactas as referências styles.* no JSX.
@@ -239,6 +241,7 @@ const SECTION = {
   privacyTags: { icon: 'ti-shield-lock', title: 'Etiquetas de privacidade' },
   api: { icon: 'ti-plug-connected', title: 'Configurar API externa' },
   reports: { icon: 'ti-chart-bar', title: 'Relatórios' },
+  translations: { icon: 'ti-language', title: 'Traduções' },
 }
 
 function eventToForm(evt) {
@@ -365,6 +368,7 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
  */
 export default function ManagePanel({ onClose, initialView = 'home' }) {
   const { user, hasRole } = useAuth()
+  const { t, entity, entities, refreshTranslations } = useI18n()
   const containerRef = useModalA11y(onClose)
 
   const isAdmin = hasRole('admin')
@@ -416,6 +420,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [editingCategoryId, setEditingCategoryId] = useState(null)
   // Gestão de etiquetas de privacidade (admin).
   const [privacyTagForm, setPrivacyTagForm] = useState(emptyPrivacyTag)
+  // Traduções (admin): { lang: { key: value } } + idioma em edição.
+  const [translationsForm, setTranslationsForm] = useState({})
+  const [translationsLang, setTranslationsLang] = useState('pt')
+  const [savingTranslations, setSavingTranslations] = useState(false)
   // Filtros de gestão (Update 1 e 2).
   const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
   const [userFilters, setUserFilters] = useState({ q: '', role: 'Todos', status: 'Todos' })
@@ -544,6 +552,42 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     setChurchForm(emptyChurch)
     setEditingChurchId(null)
     setView('churches')
+  }
+
+  // ── Traduções (admin) ──────────────────────────────────────────
+  const openTranslations = async () => {
+    setBusy(true)
+    try {
+      const overrides = await eventsService.getTranslations()
+      setTranslationsForm(overrides && typeof overrides === 'object' ? overrides : {})
+      setTranslationsLang('pt')
+      setView('translations')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setTranslationField = (key) => (e) => {
+    const value = e.target.value
+    setTranslationsForm((f) => ({
+      ...f,
+      [translationsLang]: { ...(f[translationsLang] || {}), [key]: value },
+    }))
+  }
+
+  const handleSaveTranslations = async () => {
+    setSavingTranslations(true)
+    try {
+      await eventsService.updateTranslations(translationsForm)
+      await refreshTranslations()
+      toast.success('Traduções guardadas.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSavingTranslations(false)
+    }
   }
 
   const setChurchField = (key) => (e) =>
@@ -1168,7 +1212,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               </button>
             )}
             <i className={`ti ${section.icon}`} aria-hidden="true" />
-            {view === 'form' ? (editingId ? 'Editar evento' : 'Novo evento') : section.title}
+            {view === 'form'
+              ? editingId ? 'Editar evento' : 'Novo evento'
+              : view === 'churches'
+                ? t('manageEntities', { entities })
+                : view === 'translations'
+                  ? 'Traduções'
+                  : section.title}
           </h3>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Fechar">
             <i className="ti ti-x" aria-hidden="true" />
@@ -1191,7 +1241,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openChurches} disabled={busy}>
                   <i className="ti ti-building-church" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Gestão de igrejas</span>
+                  <span className={styles.menuTitle}>{t('manageEntities', { entities })}</span>
                   <span className={styles.menuDesc}>
                     Nome, ID da inChurch, morada e código postal.
                   </span>
@@ -1232,6 +1282,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   <i className="ti ti-chart-bar" aria-hidden="true" />
                   <span className={styles.menuTitle}>Relatórios</span>
                   <span className={styles.menuDesc}>Resumo e atividade da agenda.</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={openTranslations} disabled={busy}>
+                  <i className="ti ti-language" aria-hidden="true" />
+                  <span className={styles.menuTitle}>Traduções</span>
+                  <span className={styles.menuDesc}>Idiomas (EN/PT/FR/ES), título e o termo “{entity}”.</span>
                 </button>
               )}
             </div>
@@ -2141,6 +2198,45 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               </ul>
             )}
           </div>
+        ) : view === 'translations' ? (
+          <div className={styles.body}>
+            <p className={styles.muted}>
+              Idioma da app e termos personalizáveis. Deixe vazio para usar o valor por omissão.
+            </p>
+            <div className={styles.filters}>
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  className={translationsLang === l.code ? styles.primaryBtn : styles.ghostBtn}
+                  onClick={() => setTranslationsLang(l.code)}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-2">
+              {TRANSLATION_KEYS.map((key) => (
+                <label key={key} className={styles.label}>
+                  {key}
+                  <input
+                    className={styles.input}
+                    value={translationsForm[translationsLang]?.[key] ?? ''}
+                    placeholder={DEFAULT_TRANSLATIONS[translationsLang]?.[key] ?? key}
+                    onChange={setTranslationField(key)}
+                  />
+                </label>
+              ))}
+            </div>
+            <div className={styles.formActions}>
+              <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingTranslations}>
+                Voltar
+              </button>
+              <button type="button" className={styles.primaryBtn} onClick={handleSaveTranslations} disabled={savingTranslations}>
+                {savingTranslations ? 'A guardar…' : 'Guardar traduções'}
+              </button>
+            </div>
+          </div>
         ) : (
           <form className={styles.body} onSubmit={handleSave}>
             <div className={styles.label}>
@@ -2317,7 +2413,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
 
             <div className={styles.row}>
               <label className={styles.label}>
-                Igreja responsável
+                {entity}
                 <select
                   className={styles.input}
                   value={form.community}
