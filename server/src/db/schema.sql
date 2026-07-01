@@ -101,6 +101,24 @@ CREATE TABLE IF NOT EXISTS event_history (
 );
 CREATE INDEX IF NOT EXISTS idx_event_history_event ON event_history (event_id);
 
+-- ── Delegações de aprovação ──────────────────────────────
+-- Um aprovador/admin delega a aprovação de eventos a um editor, opcionalmente
+-- restrita a uma igreja e/ou categoria, durante um intervalo de datas.
+CREATE TABLE IF NOT EXISTS approval_delegations (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  delegator_id UUID REFERENCES users (id) ON DELETE SET NULL,
+  delegate_id  UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  church       TEXT,
+  category     TEXT,
+  start_date   DATE NOT NULL,
+  end_date     DATE NOT NULL,
+  active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON approval_delegations (delegate_id);
+CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON approval_delegations (delegator_id);
+
 -- ── Eventos externos (espelho da inChurch / inRadar) ────────────
 -- Preenchido pela sincronização periódica (server/src/integrations/inchurchSync.js).
 -- O calendário lê SÓ da base de dados; a sincronização faz upsert (INSERT/UPDATE)

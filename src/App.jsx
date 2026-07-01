@@ -19,6 +19,7 @@ import SearchBar from './components/SearchBar'
 import CalendarLoading from './components/CalendarLoading'
 import LoginModal from './components/LoginModal'
 import ManagePanel from './components/ManagePanel'
+import ApprovalsPanel from './components/ApprovalsPanel'
 import * as eventsService from './services/eventsService'
 import { clearEventCache } from './services/apiService'
 import {
@@ -28,7 +29,7 @@ import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
   AlertCircle, CalendarPlus, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
+  ClipboardCheck, Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -74,6 +75,7 @@ export default function App() {
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
+  const [approvalsOpen, setApprovalsOpen] = useState(false) // painel de aprovacoes
   const [sidebarOpen,  setSidebarOpen]  = useState(false)   // gaveta lateral (telemovel/tablet)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage('cclx-sidebar-collapsed', false) // ocultar sidebar (desktop)
 
@@ -244,6 +246,12 @@ export default function App() {
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="max-[980px]:hidden">Exportar</span>
           </Button>
+          {canManage && (
+            <Button variant="outline" size="sm" onClick={() => setApprovalsOpen(true)} title="Aprovações">
+              <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">Aprovações</span>
+            </Button>
+          )}
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => { setManageView('home'); setManageOpen(true) }} title="Administração">
               <Settings className="h-4 w-4" aria-hidden="true" />
@@ -471,7 +479,15 @@ export default function App() {
       <AnimatePresence>
         {manageOpen && <ManagePanel initialView={manageView} onClose={() => setManageOpen(false)} />}
       </AnimatePresence>
-
+      {/* ── Painel de aprovações ──────────────────── */}
+      <AnimatePresence>
+        {approvalsOpen && (
+          <ApprovalsPanel
+            onClose={() => setApprovalsOpen(false)}
+            onChanged={() => { clearEventCache(); reload() }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

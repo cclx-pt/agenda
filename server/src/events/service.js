@@ -5,6 +5,7 @@ import * as externalRepo from '../external/repository.js'
 import * as categoriesService from '../categories/service.js'
 import * as privacyTagsService from '../privacyTags/service.js'
 import * as settingsService from '../settings/service.js'
+import * as delegationsRepo from '../delegations/repository.js'
 
 // Erro de domínio com código HTTP associado.
 export class EventError extends Error {
@@ -162,6 +163,27 @@ function canAccessChurch(user, community) {
   return churches === null || churches.includes(community)
 }
 
+// Delegação de aprovação (aditiva): verdadeiro se existe uma delegação ATIVA ao
+// utilizador que cobre a igreja e a categoria do evento (church/category nulos
+// na delegação = "todas"). Estende o âmbito de aprovação de um editor.
+async function hasActiveDelegation(user, event) {
+  if (!user?.sub) return false
+  const delegations = await delegationsRepo.listActiveForDelegate(user.sub)
+  return delegations.some(
+    (d) =>
+      (d.church == null || d.church === event.community) &&
+      (d.category == null || d.category === event.category)
+  )
+}
+
+// Verdadeiro se o utilizador pode moderar (aprovar/rejeitar) o evento: gere
+// eventos E (tem acesso à igreja OU há uma delegação ativa que a cobre).
+async function canModerate(user, event) {
+  if (!canManageEvents(user.role)) return false
+  if (canAccessChurch(user, event.community)) return true
+  return hasActiveDelegation(user, event)
+}
+
 // Admin gere tudo; aprovador/editor gerem os eventos das suas igrejas.
 function canEdit(user, event) {
   return canManageEvents(user.role) && canAccessChurch(user, event.community)
@@ -242,6 +264,35 @@ export function listForUser(user) {
   if (!canManageEvents(user.role)) return repo.list({ status: 'publicado' })
   // Aprovador/editor: eventos das igrejas a que têm acesso (null = todas).
   return repo.list({ communities: userChurches(user) })
+}
+
+// Estados relevantes para o painel de aprovações.
+const APPROVAL_STATUSES = ['pendente', 'publicado', 'rejeitado']
+function normalizeApprovalStatus(status) {
+  if (status === 'todos' || status === 'all') return APPROVAL_STATUSES
+  if (APPROVAL_STATUSES.includes(status)) return [status]
+  return ['pendente']
+}
+
+/**
+ * Lista para o painel de aprovações: eventos que o utilizador pode moderar,
+ * filtrados por estado. O admin vê todos; aprovador/editor veem os das suas
+ * igrejas MAIS os cobertos por delegações ativas.
+ */
+export async function listForApproval(user, { status } = {}) {
+  const statuses = normalizeApprovalStatus(status)
+  const all = await repo.list({ status: statuses })
+  if (isAdmin(user.role)) return all
+  const delegations = await delegationsRepo.listActiveForDelegate(user.sub)
+  return all.filter(
+    (e) =>
+      canAccessChurch(user, e.community) ||
+      delegations.some(
+        (d) =>
+          (d.church == null || d.church === e.community) &&
+          (d.category == null || d.category === e.category)
+      )
+  )
 }
 
 export async function getForUser(user, id) {
@@ -362,7 +413,7 @@ export async function approve(user, id) {
   const event = await repo.findById(id)
   if (!event) throw new EventError(404, 'Evento não encontrado.')
   // Aprovador/editor só aprovam pedidos das igrejas a que têm acesso.
-  if (!canAccessChurch(user, event.community)) {
+  if (!(await canModerate(user, event))) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
   if (event.status !== 'pendente') {
@@ -394,7 +445,7 @@ export async function reject(user, id, reason) {
   const event = await repo.findById(id)
   if (!event) throw new EventError(404, 'Evento não encontrado.')
   // Aprovador/editor só rejeitam pedidos das igrejas a que têm acesso.
-  if (!canAccessChurch(user, event.community)) {
+  if (!(await canModerate(user, event))) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
   if (event.status !== 'pendente') {

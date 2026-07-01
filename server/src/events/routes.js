@@ -65,6 +65,15 @@ eventsRouter.get(
   })
 )
 
+// Painel de aprovações: eventos que o utilizador pode moderar, por estado.
+eventsRouter.get(
+  '/approvals',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ events: await service.listForApproval(req.user, { status: req.query.status }) })
+  })
+)
+
 eventsRouter.get(
   '/',
   asyncHandler(async (req, res) => {

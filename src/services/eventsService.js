@@ -87,6 +87,40 @@ export async function purgeIntegration() {
   return result
 }
 
+// ── Aprovações e delegações ──────────────────────────────────────
+
+/** Lista os eventos para o painel de aprovações, filtrados por estado. */
+export async function listApprovals(status = 'pendente') {
+  const { events } = await request(`/data/events/approvals?status=${encodeURIComponent(status)}`)
+  return events
+}
+
+/** Lista as delegações de aprovação (admin: todas; aprovador: as suas). */
+export async function listDelegations() {
+  const { delegations } = await request('/data/delegations')
+  return delegations
+}
+
+/** Lista os editores ativos (candidatos a delegado). */
+export async function listDelegationEditors() {
+  const { editors } = await request('/data/delegations/editors')
+  return editors
+}
+
+export async function createDelegation(payload) {
+  const { delegation } = await request('/data/delegations', { method: 'POST', body: payload })
+  return delegation
+}
+
+export async function updateDelegation(id, payload) {
+  const { delegation } = await request(`/data/delegations/${id}`, { method: 'PUT', body: payload })
+  return delegation
+}
+
+export async function deleteDelegation(id) {
+  await request(`/data/delegations/${id}`, { method: 'DELETE' })
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {
