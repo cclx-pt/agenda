@@ -11,3 +11,4 @@ dist/
 
 # Artefactos de testes/browser (Playwright MCP)
 .playwright-mcp/
+loop-sede.png
