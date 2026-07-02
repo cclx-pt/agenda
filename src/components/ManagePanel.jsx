@@ -416,6 +416,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [purging, setPurging] = useState(false) // purga dos eventos externos a decorrer
   const [users, setUsers] = useState([])
   const [newUser, setNewUser] = useState(emptyUser)
+  const [editingUser, setEditingUser] = useState(null) // edição de um utilizador existente (estado local, gravação atómica)
   const [report, setReport] = useState(null)
   // Gestão de igrejas (admin).
   const [churchForm, setChurchForm] = useState(emptyChurch)
@@ -1028,6 +1029,53 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     try {
       const updated = await eventsService.updateUser(u.id, patch)
       setUsers((list) => list.map((x) => (x.id === u.id ? updated : x)))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Abre o formulário de edição de um utilizador (estado local — só grava ao
+  // confirmar, evitando que seleções intermédias sejam normalizadas no servidor).
+  const startEditUser = (u) => {
+    setEditingUser({
+      id: u.id,
+      email: u.email,
+      name: u.name || '',
+      role: u.role,
+      canViewPrivate: SEES_ALL_PRIVATE.includes(u.role) || u.canViewPrivate,
+      churches: u.churches ?? null,
+      privacyTags: u.privacyTags ?? null,
+    })
+  }
+
+  const setEditUserField = (key) => (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setEditingUser((u) => (u ? { ...u, [key]: value } : u))
+  }
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault()
+    if (!editingUser) return
+    setBusy(true)
+    try {
+      const role = editingUser.role
+      const patch = {
+        role,
+        canViewPrivate: editingUser.canViewPrivate,
+        churches: SCOPED_ROLES.includes(role) ? editingUser.churches : null,
+        privacyTags:
+          SEES_ALL_PRIVATE.includes(role) || editingUser.canViewPrivate
+            ? editingUser.privacyTags
+            : null,
+      }
+      const name = editingUser.name.trim()
+      if (name) patch.name = name
+      const updated = await eventsService.updateUser(editingUser.id, patch)
+      setUsers((list) => list.map((x) => (x.id === updated.id ? updated : x)))
+      setEditingUser(null)
+      toast.success('Utilizador atualizado.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -1860,15 +1908,15 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               <p className={styles.muted}>Nenhum utilizador corresponde aos filtros.</p>
             ) : (
               <ul className={styles.list}>
-                {visibleUsers.map((u) => (
+                {visibleUsers.map((u) => {
+                  const isEditing = editingUser?.id === u.id
+                  const scoped = SCOPED_ROLES.includes(u.role)
+                  const seesPrivate = SEES_ALL_PRIVATE.includes(u.role) || u.canViewPrivate
+                  return (
                   <li
                     key={u.id}
                     className={`${styles.item} ${
-                      SCOPED_ROLES.includes(u.role) ||
-                      SEES_ALL_PRIVATE.includes(u.role) ||
-                      u.canViewPrivate
-                        ? styles.userItemCol
-                        : ''
+                      isEditing || scoped || seesPrivate ? styles.userItemCol : ''
                     }`}
                   >
                     <div className={styles.userTop}>
@@ -1883,7 +1931,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                         <select
                           className={styles.smallSelect}
                           value={u.role}
-                          disabled={busy || u.id === user?.sub}
+                          disabled={busy || isEditing || u.id === user?.sub}
                           onChange={(e) => handleUserPatch(u, { role: e.target.value })}
                           title="Papel"
                         >
@@ -1897,22 +1945,19 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                           <input
                             type="checkbox"
                             checked={u.isActive}
-                            disabled={busy || u.id === user?.sub}
+                            disabled={busy || isEditing || u.id === user?.sub}
                             onChange={(e) => handleUserPatch(u, { isActive: e.target.checked })}
                           />
                           Ativo
                         </label>
-                        <label className={styles.check} title="Acesso a eventos privados">
-                          <input
-                            type="checkbox"
-                            checked={SEES_ALL_PRIVATE.includes(u.role) || u.canViewPrivate}
-                            disabled={busy || SEES_ALL_PRIVATE.includes(u.role)}
-                            onChange={(e) =>
-                              handleUserPatch(u, { canViewPrivate: e.target.checked })
-                            }
-                          />
-                          Privados
-                        </label>
+                        <button
+                          className={styles.iconBtn}
+                          onClick={() => (isEditing ? setEditingUser(null) : startEditUser(u))}
+                          disabled={busy}
+                          title={isEditing ? 'Fechar edição' : 'Editar / parametrizar'}
+                        >
+                          <i className={`ti ${isEditing ? 'ti-x' : 'ti-edit'}`} aria-hidden="true" />
+                        </button>
                         <button
                           className={`${styles.iconBtn} ${styles.danger}`}
                           onClick={() => handleDeleteUser(u)}
@@ -1923,32 +1968,107 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                         </button>
                       </div>
                     </div>
-                    {SCOPED_ROLES.includes(u.role) && (
-                      <div className={styles.churchRow}>
-                        <span className={styles.churchRowLabel}>Igrejas com acesso</span>
-                        <ChurchAccessPicker
-                          value={u.churches ?? null}
-                          disabled={busy || u.id === user?.sub}
-                          names={churchNames}
-                          onChange={(churches) => handleUserPatch(u, { churches })}
-                        />
-                      </div>
-                    )}
-                    {(SEES_ALL_PRIVATE.includes(u.role) || u.canViewPrivate) && (
-                      <div className={styles.churchRow}>
-                        <span className={styles.churchRowLabel}>
-                          Etiquetas de privacidade visíveis
-                        </span>
-                        <PrivacyTagPicker
-                          value={u.privacyTags ?? null}
-                          disabled={busy || u.id === user?.sub}
-                          tags={dbPrivacyTags}
-                          onChange={(privacyTags) => handleUserPatch(u, { privacyTags })}
-                        />
-                      </div>
+
+                    {isEditing ? (
+                      <form className={styles.userForm} onSubmit={handleUpdateUser}>
+                        <div className={styles.row}>
+                          <label className={styles.label}>
+                            Nome
+                            <input
+                              className={styles.input}
+                              value={editingUser.name}
+                              onChange={setEditUserField('name')}
+                            />
+                          </label>
+                          <label className={styles.label}>
+                            Papel
+                            <select
+                              className={styles.input}
+                              value={editingUser.role}
+                              onChange={setEditUserField('role')}
+                            >
+                              {ROLE_OPTIONS.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                  {r.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <label className={`${styles.check} ${styles.checkInline}`}>
+                          <input
+                            type="checkbox"
+                            checked={
+                              SEES_ALL_PRIVATE.includes(editingUser.role) ||
+                              editingUser.canViewPrivate
+                            }
+                            disabled={SEES_ALL_PRIVATE.includes(editingUser.role)}
+                            onChange={setEditUserField('canViewPrivate')}
+                          />
+                          Pode ver eventos privados
+                        </label>
+                        {SCOPED_ROLES.includes(editingUser.role) && (
+                          <div className={styles.churchRow}>
+                            <span className={styles.churchRowLabel}>Igrejas com acesso</span>
+                            <ChurchAccessPicker
+                              value={editingUser.churches}
+                              disabled={busy}
+                              names={churchNames}
+                              onChange={(churches) => setEditingUser((x) => ({ ...x, churches }))}
+                            />
+                          </div>
+                        )}
+                        {(SEES_ALL_PRIVATE.includes(editingUser.role) ||
+                          editingUser.canViewPrivate) && (
+                          <div className={styles.churchRow}>
+                            <span className={styles.churchRowLabel}>
+                              Etiquetas de privacidade visíveis
+                            </span>
+                            <PrivacyTagPicker
+                              value={editingUser.privacyTags}
+                              disabled={busy}
+                              tags={dbPrivacyTags}
+                              onChange={(privacyTags) =>
+                                setEditingUser((x) => ({ ...x, privacyTags }))
+                              }
+                            />
+                          </div>
+                        )}
+                        <div className={styles.formActions}>
+                          <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                            <i className="ti ti-device-floppy" aria-hidden="true" />
+                            <span>Guardar alterações</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.ghostBtn}
+                            onClick={() => setEditingUser(null)}
+                            disabled={busy}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      (scoped || seesPrivate) && (
+                        <div className={styles.churchRow}>
+                          {scoped && (
+                            <span className={styles.itemMeta}>
+                              Igrejas: {u.churches?.length ? u.churches.join(', ') : 'Todas'}
+                            </span>
+                          )}
+                          {seesPrivate && (
+                            <span className={styles.itemMeta}>
+                              Etiquetas:{' '}
+                              {u.privacyTags?.length ? u.privacyTags.join(', ') : 'Todas'}
+                            </span>
+                          )}
+                        </div>
+                      )
                     )}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </div>
