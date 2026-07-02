@@ -476,6 +476,91 @@ async function markSubmitted(user, id) {
   return updated
 }
 
+// ── Sobreposição de eventos ──────────────────────────────────────
+
+// Modo de sobreposição efetivo para um evento: categoria → igreja → omissão.
+function resolveOverlapMode(policy, { community, category }) {
+  return (
+    (category && policy.byCategory?.[category]) ||
+    (community && policy.byChurch?.[community]) ||
+    policy.default ||
+    'off'
+  )
+}
+
+// Intervalo [start, end) efetivo de um evento (Date), tratando o dia inteiro.
+function effectiveRange({ startDatetime, endDatetime, allDay }) {
+  const start = new Date(startDatetime)
+  if (allDay) {
+    const s = new Date(start)
+    s.setHours(0, 0, 0, 0)
+    const e = new Date(s)
+    e.setDate(e.getDate() + 1)
+    return { start: s, end: e }
+  }
+  const end = endDatetime ? new Date(endDatetime) : new Date(start.getTime() + 60 * 60 * 1000)
+  return { start, end }
+}
+
+// Resumo de um conflito para o cliente. Não revela o título de eventos privados
+// que o utilizador não pode ver.
+function summarizeConflict(event, user) {
+  const canSee = !event.isPrivate || canSeePrivate(user)
+  return {
+    id: event.id,
+    title: canSee ? event.title : null,
+    private: !!event.isPrivate,
+    community: event.community,
+    category: event.category,
+    date: event.date,
+    timeStart: event.timeStart,
+    timeEnd: event.timeEnd,
+    status: event.status,
+  }
+}
+
+// Verifica sobreposições segundo a política. Lança EventError(409) com a lista
+// de conflitos quando há colisão e não é permitido prosseguir.
+async function assertOverlapOk(user, data, { excludeId, excludeSeriesId, allowOverlap } = {}) {
+  const policy = await settingsService.getOverlapPolicy()
+  const mode = resolveOverlapMode(policy, { community: data.community, category: data.category })
+  if (mode === 'off') return
+  const { start, end } = effectiveRange({
+    startDatetime: data.startDatetime,
+    endDatetime: data.endDatetime,
+    allDay: data.allDay,
+  })
+  const overlaps = await repo.findOverlaps({ start, end, excludeId, excludeSeriesId })
+  if (overlaps.length === 0) return
+  // 'block': só admin pode forçar. 'warn': qualquer um pode forçar.
+  const canForce = mode === 'block' ? isAdmin(user.role) && allowOverlap === true : allowOverlap === true
+  if (canForce) return
+  const err = new EventError(
+    409,
+    mode === 'block'
+      ? 'Este horário sobrepõe-se a outro evento (sobreposição bloqueada).'
+      : 'Este horário sobrepõe-se a outro evento.'
+  )
+  err.overlaps = overlaps.map((o) => summarizeConflict(o, user))
+  err.overlapMode = mode
+  throw err
+}
+
+// Pré-visualização de sobreposições (aviso em tempo real no formulário).
+export async function overlapsPreview(user, { community, category, start, end, allDay, excludeId, excludeSeriesId } = {}) {
+  if (!start) return { mode: 'off', conflicts: [] }
+  const policy = await settingsService.getOverlapPolicy()
+  const mode = resolveOverlapMode(policy, { community, category })
+  if (mode === 'off') return { mode: 'off', conflicts: [] }
+  const range = effectiveRange({
+    startDatetime: start,
+    endDatetime: end || null,
+    allDay: allDay === true || allDay === 'true',
+  })
+  const overlaps = await repo.findOverlaps({ start: range.start, end: range.end, excludeId, excludeSeriesId })
+  return { mode, conflicts: overlaps.map((o) => summarizeConflict(o, user)) }
+}
+
 export async function create(user, input) {
   const data = eventInputSchema.parse(input)
   const recurrence = recurrenceSchema.parse(input.recurrence)
@@ -485,9 +570,11 @@ export async function create(user, input) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
   const submit = data.submit === true
+  const allowOverlap = input.allowOverlap === true
 
   // Evento único.
   if (!recurrence) {
+    await assertOverlapOk(user, data, { allowOverlap })
     const event = await repo.insert(data, user.sub)
     await repo.addHistory({
       eventId: event.id,
@@ -499,8 +586,15 @@ export async function create(user, input) {
     return submit ? markSubmitted(user, event.id) : event
   }
 
-  // Série recorrente: materializa cada ocorrência partilhando um series_id.
+  // Série recorrente: verifica TODAS as ocorrências antes de inserir qualquer uma.
   const occurrences = generateOccurrences(data.startDatetime, data.endDatetime, recurrence)
+  for (const occ of occurrences) {
+    await assertOverlapOk(
+      user,
+      { ...data, startDatetime: occ.startDatetime, endDatetime: occ.endDatetime },
+      { allowOverlap }
+    )
+  }
   const seriesId = randomUUID()
   let first = null
   for (const occ of occurrences) {
@@ -532,6 +626,12 @@ export async function update(user, id, input, { scope } = {}) {
   if (!canAccessChurch(user, data.community ?? 'Sede')) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
+  const allowOverlap = input.allowOverlap === true
+  await assertOverlapOk(user, data, {
+    excludeId: id,
+    excludeSeriesId: scope === 'series' ? existing.seriesId : undefined,
+    allowOverlap,
+  })
   const updated = await repo.update(id, data)
   // Âmbito "série": replica os campos partilhados (exceto datas) nas restantes
   // ocorrências, mantendo a data/hora própria de cada uma.

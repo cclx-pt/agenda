@@ -132,3 +132,24 @@ brandingRouter.put('/', adminOnly, async (req, res, next) => {
     next(err)
   }
 })
+
+// ── Política de sobreposição de eventos ────────────────
+// GET + PUT só admin.
+export const overlapPolicyRouter = Router()
+
+overlapPolicyRouter.get('/', adminOnly, async (_req, res, next) => {
+  try {
+    res.json({ policy: await service.getOverlapPolicy() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+overlapPolicyRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const policy = await service.updateOverlapPolicy(req.body?.policy ?? req.body, req.user.sub)
+    res.json({ policy })
+  } catch (err) {
+    next(err)
+  }
+})

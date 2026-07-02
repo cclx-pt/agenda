@@ -57,6 +57,33 @@ export async function findById(id) {
   return mapRow(rows[0])
 }
 
+// Eventos cujo horário se cruza com [start, end). Considera o dia inteiro dos
+// eventos all_day. `statuses` limita os estados. Exclui, se pedido, um id e/ou
+// uma série (para editar sem colidir consigo próprio).
+export async function findOverlaps({ start, end, excludeId, excludeSeriesId, statuses = ['publicado', 'pendente'] }) {
+  const params = [start, end, statuses]
+  const where = [
+    'status = ANY($3)',
+    "(CASE WHEN all_day THEN date_trunc('day', start_datetime) ELSE start_datetime END) < $2",
+    "(CASE WHEN all_day THEN date_trunc('day', start_datetime) + interval '1 day' ELSE COALESCE(end_datetime, start_datetime + interval '1 hour') END) > $1",
+  ]
+  let i = 4
+  if (excludeId) {
+    where.push(`id <> $${i}`)
+    params.push(excludeId)
+    i += 1
+  }
+  if (excludeSeriesId) {
+    where.push(`(series_id IS NULL OR series_id <> $${i})`)
+    params.push(excludeSeriesId)
+  }
+  const { rows } = await pool.query(
+    `SELECT * FROM events WHERE ${where.join(' AND ')} ORDER BY start_datetime LIMIT 50`,
+    params
+  )
+  return rows.map(mapRow)
+}
+
 // Lista com filtros opcionais. `status` aceita string ou array de estados.
 // `communities` restringe às igrejas indicadas (acesso por igreja).
 // `from`/`to` filtram por data de início (YYYY-MM-DD, inclusivo).

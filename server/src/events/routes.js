@@ -14,7 +14,10 @@ function asyncHandler(fn) {
       await fn(req, res)
     } catch (err) {
       if (err instanceof EventError) {
-        return res.status(err.status).json({ error: err.message })
+        const body = { error: err.message }
+        if (err.overlaps) body.overlaps = err.overlaps
+        if (err.overlapMode) body.overlapMode = err.overlapMode
+        return res.status(err.status).json(body)
       }
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: err.issues[0]?.message ?? 'Dados inválidos.' })
@@ -80,6 +83,15 @@ eventsRouter.get(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ events: await service.listForApproval(req.user, { status: req.query.status }) })
+  })
+)
+
+// Pré-visualização de sobreposições (aviso em tempo real no formulário).
+eventsRouter.get(
+  '/overlaps',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json(await service.overlapsPreview(req.user, req.query))
   })
 )
 

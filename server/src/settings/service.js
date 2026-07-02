@@ -126,3 +126,42 @@ export async function updateBranding(input, actorId) {
   await repo.set(BRANDING_KEY, { logoUrl }, actorId)
   return { logoUrl }
 }
+
+// Chave da política de sobreposição de eventos gerida pelo admin.
+const OVERLAP_KEY = 'overlap_policy'
+const OVERLAP_MODES = ['off', 'warn', 'block']
+
+function cleanOverlapMap(m) {
+  const out = {}
+  if (m && typeof m === 'object' && !Array.isArray(m)) {
+    for (const [k, v] of Object.entries(m)) {
+      if (typeof k === 'string' && OVERLAP_MODES.includes(v)) out[k] = v
+    }
+  }
+  return out
+}
+
+/**
+ * Política de sobreposição: { default, byCategory:{slug:mode}, byChurch:{name:mode} }.
+ * mode = 'off' (não verifica) | 'warn' (avisa, deixa forçar) | 'block' (recusa;
+ * só admin força). Por omissão 'off'.
+ */
+export async function getOverlapPolicy() {
+  const s = await repo.get(OVERLAP_KEY)
+  return {
+    default: OVERLAP_MODES.includes(s?.default) ? s.default : 'off',
+    byCategory: cleanOverlapMap(s?.byCategory),
+    byChurch: cleanOverlapMap(s?.byChurch),
+  }
+}
+
+/** Valida e persiste a política de sobreposição (admin). */
+export async function updateOverlapPolicy(input, actorId) {
+  const clean = {
+    default: OVERLAP_MODES.includes(input?.default) ? input.default : 'off',
+    byCategory: cleanOverlapMap(input?.byCategory),
+    byChurch: cleanOverlapMap(input?.byChurch),
+  }
+  await repo.set(OVERLAP_KEY, clean, actorId)
+  return clean
+}
