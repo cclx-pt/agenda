@@ -176,8 +176,8 @@ export async function listForLoop({ church, includeGeneral = true, from, to } = 
   params.push(church)
   where.push(
     includeGeneral
-      ? `(community = $${params.length} OR is_general = TRUE)`
-      : `community = $${params.length}`
+      ? `(lower(community) = lower($${params.length}) OR is_general = TRUE)`
+      : `lower(community) = lower($${params.length})`
   )
   const { rows } = await pool.query(
     `SELECT * FROM events WHERE ${where.join(' AND ')} ORDER BY start_datetime ASC`,

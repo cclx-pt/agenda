@@ -151,10 +151,11 @@ export async function getLoopConfig() {
   return stored && typeof stored === 'object' ? stored : {}
 }
 
-/** Configuração efetiva (com omissões) para uma igreja. */
+/** Configuração efetiva (com omissões) para uma igreja (nome insensível a maiúsculas). */
 export async function getLoopConfigForChurch(church) {
   const all = await getLoopConfig()
-  return normalizeLoopChurch(all[church])
+  const key = Object.keys(all).find((k) => k.toLowerCase() === String(church ?? '').toLowerCase())
+  return normalizeLoopChurch(key ? all[key] : null)
 }
 
 /** Valida e persiste o mapa de configuração do Loop (admin). */
