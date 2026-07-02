@@ -145,6 +145,8 @@ const emptyForm = {
   mapLat: null,
   mapLng: null,
   seriesId: null,
+  // Permitir sobreposição de horários (confirmação explícita do utilizador).
+  allowOverlap: false,
   // Recorrência (apenas na criação).
   recurrenceType: 'unique', // 'unique' | 'recurrent'
   frequency: 'weekly', // 'daily' | 'weekly' | 'monthly'
@@ -244,6 +246,7 @@ const SECTION = {
   reports: { icon: 'ti-chart-bar', title: 'Relatórios' },
   translations: { icon: 'ti-language', title: 'Traduções' },
   branding: { icon: 'ti-photo', title: 'Aparência' },
+  overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
 }
 
 function eventToForm(evt) {
@@ -429,6 +432,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   // Aparência (admin): estado de upload/reposição do logótipo.
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [savingBranding, setSavingBranding] = useState(false)
+  // Sobreposição: aviso em tempo real no formulário + política (admin).
+  const [overlapInfo, setOverlapInfo] = useState({ mode: 'off', conflicts: [] })
+  const [overlapPolicy, setOverlapPolicy] = useState({ default: 'off', byCategory: {}, byChurch: {} })
+  const [savingOverlapPolicy, setSavingOverlapPolicy] = useState(false)
   // Filtros de gestão (Update 1 e 2).
   const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
   const [userFilters, setUserFilters] = useState({ q: '', role: 'Todos', status: 'Todos' })
@@ -634,6 +641,70 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       setSavingBranding(false)
     }
   }
+
+  // ── Sobreposição de eventos (admin) ─────────────────
+  const openOverlaps = async () => {
+    setBusy(true)
+    try {
+      const policy = await eventsService.getOverlapPolicy()
+      setOverlapPolicy({
+        default: policy?.default || 'off',
+        byCategory: policy?.byCategory || {},
+        byChurch: policy?.byChurch || {},
+      })
+      setView('overlaps')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setOverlapMapValue = (mapKey, key, value) => {
+    setOverlapPolicy((p) => {
+      const map = { ...p[mapKey] }
+      if (value) map[key] = value
+      else delete map[key]
+      return { ...p, [mapKey]: map }
+    })
+  }
+
+  const handleSaveOverlapPolicy = async () => {
+    setSavingOverlapPolicy(true)
+    try {
+      await eventsService.updateOverlapPolicy(overlapPolicy)
+      toast.success('Política de sobreposição guardada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSavingOverlapPolicy(false)
+    }
+  }
+
+  // Aviso de sobreposição em tempo real no formulário (debounced).
+  useEffect(() => {
+    if (view !== 'form') return undefined
+    const start = form.startDate ? combineDateTime(form.startDate, form.startTime) : null
+    const handle = setTimeout(() => {
+      if (!start) {
+        setOverlapInfo({ mode: 'off', conflicts: [] })
+        return
+      }
+      const end = form.endDate ? combineDateTime(form.endDate, form.endTime) : null
+      eventsService
+        .previewOverlaps({
+          community: form.community,
+          category: form.category,
+          start,
+          end,
+          allDay: form.allDay,
+          excludeId: editingId || undefined,
+        })
+        .then((res) => setOverlapInfo({ mode: res?.mode || 'off', conflicts: res?.conflicts || [] }))
+        .catch(() => {})
+    }, 400)
+    return () => clearTimeout(handle)
+  }, [view, form.startDate, form.startTime, form.endDate, form.endTime, form.community, form.category, form.allDay, editingId])
 
   const setChurchField = (key) => (e) =>
     setChurchForm((c) => ({ ...c, [key]: e.target.value }))
@@ -1080,6 +1151,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       mapUrl: form.mapUrl.trim() || null,
       mapLat: form.mapLat ?? null,
       mapLng: form.mapLng ?? null,
+      allowOverlap: form.allowOverlap === true,
     }
     // Recorrência só na criação de um novo evento recorrente.
     if (!editingId && form.recurrenceType === 'recurrent') {
@@ -1342,6 +1414,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   <i className="ti ti-photo" aria-hidden="true" />
                   <span className={styles.menuTitle}>Aparência</span>
                   <span className={styles.menuDesc}>Logótipo da aplicação.</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={openOverlaps} disabled={busy}>
+                  <i className="ti ti-calendar-x" aria-hidden="true" />
+                  <span className={styles.menuTitle}>Sobreposições</span>
+                  <span className={styles.menuDesc}>Política de eventos com horários sobrepostos.</span>
                 </button>
               )}
             </div>
@@ -2345,6 +2424,73 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               </button>
             </div>
           </div>
+        ) : view === 'overlaps' ? (
+          <div className={styles.body}>
+            <p className={styles.muted}>
+              Define se eventos com horários sobrepostos (qualquer igreja) são permitidos.
+              “Avisar” deixa guardar com confirmação; “Bloquear” recusa (só admin pode forçar).
+              As exceções por categoria e por igreja têm prioridade sobre a política por omissão.
+            </p>
+            <label className={styles.label}>
+              Política por omissão
+              <select
+                className={styles.input}
+                value={overlapPolicy.default}
+                onChange={(e) => setOverlapPolicy((p) => ({ ...p, default: e.target.value }))}
+              >
+                <option value="off">Desligado</option>
+                <option value="warn">Avisar</option>
+                <option value="block">Bloquear</option>
+              </select>
+            </label>
+
+            <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Exceções por categoria
+            </div>
+            {categoryOptions.map((c) => (
+              <label key={c.value} className={styles.label}>
+                {c.label}
+                <select
+                  className={styles.input}
+                  value={overlapPolicy.byCategory[c.value] ?? ''}
+                  onChange={(e) => setOverlapMapValue('byCategory', c.value, e.target.value)}
+                >
+                  <option value="">(por omissão)</option>
+                  <option value="off">Desligado</option>
+                  <option value="warn">Avisar</option>
+                  <option value="block">Bloquear</option>
+                </select>
+              </label>
+            ))}
+
+            <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Exceções por igreja
+            </div>
+            {churchList.map((c) => (
+              <label key={c.id ?? c.name} className={styles.label}>
+                {c.name}
+                <select
+                  className={styles.input}
+                  value={overlapPolicy.byChurch[c.name] ?? ''}
+                  onChange={(e) => setOverlapMapValue('byChurch', c.name, e.target.value)}
+                >
+                  <option value="">(por omissão)</option>
+                  <option value="off">Desligado</option>
+                  <option value="warn">Avisar</option>
+                  <option value="block">Bloquear</option>
+                </select>
+              </label>
+            ))}
+
+            <div className={styles.formActions}>
+              <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingOverlapPolicy}>
+                Voltar
+              </button>
+              <button type="button" className={styles.primaryBtn} onClick={handleSaveOverlapPolicy} disabled={savingOverlapPolicy}>
+                {savingOverlapPolicy ? 'A guardar…' : 'Guardar política'}
+              </button>
+            </div>
+          </div>
         ) : (
           <form className={styles.body} onSubmit={handleSave}>
             <div className={styles.label}>
@@ -2549,6 +2695,36 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 </select>
               </label>
             </div>
+
+            {overlapInfo.conflicts.length > 0 && (
+              <div
+                className={`rounded-lg border p-3 text-sm ${
+                  overlapInfo.mode === 'block'
+                    ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
+                    : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300'
+                }`}
+              >
+                <p className="m-0 font-bold">
+                  {overlapInfo.mode === 'block' ? 'Conflito de horário (bloqueado)' : 'Conflito de horário'}
+                </p>
+                <ul className="mb-0 mt-1.5 list-disc pl-5">
+                  {overlapInfo.conflicts.map((c) => (
+                    <li key={c.id}>
+                      {c.title || '(evento privado)'} — {c.community} · {c.date}
+                      {c.timeStart ? ` · ${c.timeStart}` : ''}
+                    </li>
+                  ))}
+                </ul>
+                {overlapInfo.mode !== 'block' || isAdmin ? (
+                  <label className="mt-2.5 flex cursor-pointer items-center gap-2 font-semibold">
+                    <input type="checkbox" checked={form.allowOverlap} onChange={setField('allowOverlap')} />
+                    Permitir sobreposição mesmo assim
+                  </label>
+                ) : (
+                  <p className="mb-0 mt-2 text-xs">Sobreposição bloqueada — contacte um administrador.</p>
+                )}
+              </div>
+            )}
 
             <label className={styles.label}>
               Morada (igreja/comunidade)

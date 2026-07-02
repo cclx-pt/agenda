@@ -184,6 +184,32 @@ export async function updateBranding(branding) {
   return saved
 }
 
+// ── Sobreposição de eventos ─────────────────────────
+
+/** Lê a política de sobreposição (admin). */
+export async function getOverlapPolicy() {
+  const { policy } = await request('/data/overlap-policy')
+  return policy
+}
+
+/** Guarda a política de sobreposição (admin). */
+export async function updateOverlapPolicy(policy) {
+  const { policy: saved } = await request('/data/overlap-policy', { method: 'PUT', body: { policy } })
+  return saved
+}
+
+/** Pré-visualiza conflitos de horário para o formulário (aviso em tempo real). */
+export async function previewOverlaps({ community, category, start, end, allDay, excludeId } = {}) {
+  const qs = new URLSearchParams()
+  if (community) qs.set('community', community)
+  if (category) qs.set('category', category)
+  if (start) qs.set('start', start)
+  if (end) qs.set('end', end)
+  if (allDay) qs.set('allDay', 'true')
+  if (excludeId) qs.set('excludeId', excludeId)
+  return request(`/data/events/overlaps?${qs.toString()}`)
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {
