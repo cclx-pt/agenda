@@ -81,7 +81,7 @@ export default function App() {
   const [dayPopup,     setDayPopup]     = useState(null)   // { dateKey, events } (vistas multi-mes)
   const [exportData,   setExportData]   = useState(null)   // { events, filename }
   const [community,    setCommunity]    = useLocalStorage('cclx-communities', []) // filtro de igrejas (multi)
-  const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
+  const [category,     setCategory]     = useLocalStorage('cclx-categories', []) // filtro por categorias (multi)
   const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
   const [subcategory,  setSubcategory]  = useLocalStorage('cclx-subcategories', []) // filtro por subcategorias (multi)
   const [subcategoriesInUse, setSubcategoriesInUse] = useState([]) // subcategorias existentes em eventos (BD)
@@ -108,8 +108,9 @@ export default function App() {
   }, [refreshCategoriesInUse, manageOpen])
   // Se a categoria selecionada deixar de existir em eventos, volta a "Todos".
   useEffect(() => {
-    if (category !== 'Todos' && categoriesInUse.length > 0 && !categoriesInUse.includes(category)) {
-      setCategory('Todos')
+    if (category.length > 0 && categoriesInUse.length > 0) {
+      const valid = category.filter((c) => categoriesInUse.includes(c))
+      if (valid.length !== category.length) setCategory(valid)
     }
   }, [categoriesInUse, category, setCategory])
 
@@ -148,7 +149,7 @@ export default function App() {
   const filteredEvents = useMemo(() => {
     return events.filter(e =>
       (community.length === 0 || community.includes(e.community)) &&
-      (category === 'Todos' || e.category === category) &&
+      (category.length === 0 || category.includes(e.category)) &&
       (subcategory.length === 0 || subcategory.includes(e.subcategory)) &&
       (privacyTag.length === 0 || privacyTag.includes(e.privacyTag)) &&
       (visibility === 'all' ||

@@ -15,6 +15,7 @@ export default function MultiSelectDropdown({
   allLabel = 'Todas',
   icon: Icon,
   ariaLabel,
+  labelFor = (v) => v,
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -42,7 +43,7 @@ export default function MultiSelectDropdown({
     selected.length === 0
       ? allLabel
       : selected.length === 1
-        ? selected[0]
+        ? labelFor(selected[0])
         : `${selected.length} selecionadas`
 
   return (
@@ -70,7 +71,7 @@ export default function MultiSelectDropdown({
         >
           <Option checked={selected.length === 0} label={allLabel} onClick={() => onChange([])} />
           {options.map((opt) => (
-            <Option key={opt} checked={selected.includes(opt)} label={opt} onClick={() => toggle(opt)} />
+            <Option key={opt} checked={selected.includes(opt)} label={labelFor(opt)} onClick={() => toggle(opt)} />
           ))}
         </div>
       )}

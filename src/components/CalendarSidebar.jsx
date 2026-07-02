@@ -1,11 +1,12 @@
 import {
   parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE,
 } from '../utils/calendarHelpers'
-import { CalendarPlus, Check, Church, Lock, Plus, Tag, X } from 'lucide-react'
+import { CalendarPlus, Church, Lock, Plus, Tag, Tags, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../hooks/useI18n'
 import { useEventColors } from '../hooks/useEventColors'
+import { useCategories } from '../hooks/useCategories'
 import MultiSelectDropdown from './MultiSelectDropdown'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
@@ -49,6 +50,9 @@ export default function CalendarSidebar({
 }) {
   const { t, entity, entities } = useI18n()
   const { colorFor } = useEventColors()
+  const { categories: dbCategories } = useCategories()
+  const categoryLabel = (slug) =>
+    dbCategories.find((c) => c.slug === slug)?.label || CATEGORY_META[slug]?.label || slug
   const { year, month, day } = parseDateKey(selectedKey)
   const date = new Date(year, month, day)
   const weekday = WEEKDAYS_FULL[(date.getDay() + 6) % 7]
@@ -152,7 +156,7 @@ export default function CalendarSidebar({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{entity}</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{entities}</div>
         <MultiSelectDropdown
           options={communities}
           selected={community}
@@ -163,19 +167,18 @@ export default function CalendarSidebar({
         />
       </div>
 
-      {Array.isArray(privacyTags) && privacyTags.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('privacy')}</div>
-          <MultiSelectDropdown
-            options={privacyTags}
-            selected={privacyTag}
-            onChange={onPrivacyTagChange}
-            allLabel={t('allTags')}
-            icon={Lock}
-            ariaLabel="Filtrar por etiqueta de privacidade"
-          />
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('categories')}</div>
+        <MultiSelectDropdown
+          options={visibleCategories}
+          selected={category}
+          onChange={onCategoryChange}
+          allLabel={t('allCategories')}
+          icon={Tags}
+          ariaLabel={t('categories')}
+          labelFor={categoryLabel}
+        />
+      </div>
 
       {Array.isArray(subcategoriesInUse) && subcategoriesInUse.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -191,44 +194,19 @@ export default function CalendarSidebar({
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('categories')}</div>
-        <ul className="flex list-none flex-col gap-[3px]">
-          <li>
-            <button
-              type="button"
-              className={cn(
-                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                category === 'Todos' && 'text-foreground',
-              )}
-              onClick={() => onCategoryChange('Todos')}
-            >
-              <span className="h-[11px] w-[11px] flex-shrink-0 rounded-sm" style={{ background: CAT_DOT.culto }} />
-              <span className="flex-1">{t('all')}</span>
-              {category === 'Todos' && <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />}
-            </button>
-          </li>
-          {visibleCategories.map((key) => {
-            const active = category === key
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                    active && 'text-foreground',
-                  )}
-                  onClick={() => onCategoryChange(active ? 'Todos' : key)}
-                >
-                  <span className="h-[11px] w-[11px] flex-shrink-0 rounded-sm" style={{ background: CAT_DOT[key] || '#94a3b8' }} />
-                  <span className="flex-1">{CATEGORY_META[key]?.label || key}</span>
-                  {active && <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
+      {Array.isArray(privacyTags) && privacyTags.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('privacy')}</div>
+          <MultiSelectDropdown
+            options={privacyTags}
+            selected={privacyTag}
+            onChange={onPrivacyTagChange}
+            allLabel={t('allTags')}
+            icon={Lock}
+            ariaLabel="Filtrar por etiqueta de privacidade"
+          />
+        </div>
+      )}
     </aside>
     </>
   )
