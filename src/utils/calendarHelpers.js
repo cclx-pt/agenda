@@ -29,6 +29,20 @@ export function toDateKey(year, month, day) {
   return format(new Date(year, month, day), 'yyyy-MM-dd')
 }
 
+/** Chave (YYYY-MM-DD) do dia de hoje. */
+export function todayKey() {
+  const d = new Date()
+  return toDateKey(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+/** Verdadeiro se a data (YYYY-MM-DD) já passou (anterior a hoje). */
+export function isPastDateKey(dateKey) {
+  return typeof dateKey === 'string' && dateKey < todayKey()
+}
+
+// Realce subtil (esbatido) para dias/eventos que já passaram — usado em todas as vistas.
+export const PAST_DAY_CLASS = 'opacity-60'
+
 /** Parse YYYY-MM-DD into { year, month (0-based), day } */
 export function parseDateKey(key) {
   const d = parse(key, 'yyyy-MM-dd', new Date())

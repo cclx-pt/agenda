@@ -8,6 +8,8 @@ import {
   API_BADGE,
   formatTimeRange,
   parseDateKey,
+  isPastDateKey,
+  PAST_DAY_CLASS,
 } from '../utils/calendarHelpers'
 
 // Índice do dia da semana (0=Seg … 6=Dom) a partir de uma chave YYYY-MM-DD.
@@ -53,7 +55,7 @@ export default function ListView({ year, events, onSelectEvent }) {
               const status = STATUS_META[e.status]
               const { day } = parseDateKey(e.date)
               return (
-                <li key={e.id}>
+                <li key={e.id} className={isPastDateKey(e.date) ? PAST_DAY_CLASS : undefined}>
                   <button
                     type="button"
                     onClick={() => onSelectEvent(e)}

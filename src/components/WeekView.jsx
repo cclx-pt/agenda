@@ -1,4 +1,4 @@
-import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, CATEGORY_META, STATUS_META, API_BADGE } from '../utils/calendarHelpers'
+import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, CATEGORY_META, STATUS_META, API_BADGE, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
 import { cn } from '@/lib/utils'
 
 export default function WeekView({ year, month, day, eventsByDate, onSelectEvent, onDayClick }) {
@@ -13,6 +13,7 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
       label: WEEKDAYS_SHORT[i],
       dayNum: d.getDate(),
       isToday: d.toDateString() === today.toDateString(),
+      isPast: isPastDateKey(dateKey),
       events: eventsByDate[dateKey] || [],
     }
   })
@@ -23,6 +24,7 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
         <div key={col.dateKey} className={cn(
           'flex min-h-[340px] flex-col overflow-hidden rounded-lg border border-border bg-card max-[820px]:min-h-0',
           col.isToday && 'border-primary',
+          col.isPast && PAST_DAY_CLASS,
         )}>
           <button
             className="flex flex-col items-center gap-0.5 border-b border-border px-1 py-2.5 text-foreground transition-colors hover:bg-accent max-[820px]:flex-row max-[820px]:justify-start max-[820px]:gap-2"

@@ -1,6 +1,7 @@
 import {
   MONTHS_PT, WEEKDAYS_SHORT,
-  daysInMonth, mondayFirstDay, toDateKey, STATUS_META
+  daysInMonth, mondayFirstDay, toDateKey, STATUS_META,
+  isPastDateKey, PAST_DAY_CLASS
 } from '../utils/calendarHelpers'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
     cells.push({
       day: d, current: true, dateKey,
       isToday: isThisMonth && today.getDate() === d,
+      isPast: isPastDateKey(dateKey),
       hasEvents: events.length > 0,
       hasDraft: events.some(e => STATUS_META[e.status]),
       events,
@@ -49,6 +51,7 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
               cell.hasDraft && 'bg-destructive/15 hover:bg-destructive/25',
               !cell.current && '!bg-muted/40 opacity-35',
               cell.isToday && '!border-primary !bg-primary',
+              cell.isPast && !cell.isToday && PAST_DAY_CLASS,
             )}
             onClick={() => cell.current && cell.hasEvents && onDayClick(cell.dateKey, cell.events)}
             title={cell.current && cell.hasEvents ? `${cell.day}: ${cell.events.length} evento(s)` : undefined}

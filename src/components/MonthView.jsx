@@ -1,6 +1,7 @@
 import {
   WEEKDAYS_SHORT, MONTHS_PT,
-  daysInMonth, mondayFirstDay, toDateKey, CATEGORY_META, STATUS_META, API_BADGE
+  daysInMonth, mondayFirstDay, toDateKey, CATEGORY_META, STATUS_META, API_BADGE,
+  isPastDateKey, PAST_DAY_CLASS
 } from '../utils/calendarHelpers'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +27,7 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
       current: true,
       dateKey,
       isToday: isThisMonth && today.getDate() === d,
+      isPast: isPastDateKey(dateKey),
       events: eventsByDate[dateKey] || [],
     })
   }
@@ -60,6 +62,7 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                 !cell.current && 'pointer-events-none cursor-default bg-muted/30 opacity-45',
                 cell.isToday && 'bg-muted/40',
                 isWeekend && cell.current && 'bg-muted/20',
+                cell.isPast && PAST_DAY_CLASS,
                 isSelected && 'relative z-10 ring-2 ring-inset ring-ring',
               )}
               onClick={() => cell.current && onDayClick(cell.dateKey, cell.events)}

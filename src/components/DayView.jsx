@@ -1,11 +1,13 @@
 import EventCard from './EventCard'
 import { CalendarPlus, CalendarX } from 'lucide-react'
-import { toDateKey, formatDateLabel } from '../utils/calendarHelpers'
+import { toDateKey, formatDateLabel, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export default function DayView({ year, month, day, eventsByDate, onSelectEvent, onExport }) {
   const dateKey = toDateKey(year, month, day)
   const events = eventsByDate[dateKey] || []
+  const isPast = isPastDateKey(dateKey)
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
@@ -32,12 +34,12 @@ export default function DayView({ year, month, day, eventsByDate, onSelectEvent,
       </div>
 
       {events.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 px-5 py-16 text-muted-foreground max-[600px]:py-10">
+        <div className={cn('flex flex-col items-center gap-3 px-5 py-16 text-muted-foreground max-[600px]:py-10', isPast && PAST_DAY_CLASS)}>
           <CalendarX className="h-10 w-10 opacity-50" aria-hidden="true" />
           <span>Nenhum evento neste dia</span>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className={cn('overflow-hidden rounded-lg border border-border bg-card', isPast && PAST_DAY_CLASS)}>
           {events.map((evt) => (
             <EventCard key={evt.id} event={evt} onClick={onSelectEvent} />
           ))}
