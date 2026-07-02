@@ -249,6 +249,21 @@ const SECTION = {
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
 }
 
+// view → chave de tradução do título da secção (churches usa manageEntities;
+// form é especial: novo/editar evento).
+const SECTION_TKEY = {
+  home: 'manageAgenda',
+  events: 'manageEvents',
+  users: 'manageUsers',
+  categories: 'manageCategories',
+  privacyTags: 'privacyTagsTitle',
+  api: 'configApi',
+  reports: 'reports',
+  translations: 'translations',
+  branding: 'appearance',
+  overlaps: 'overlaps',
+}
+
 function eventToForm(evt) {
   return {
     title: evt.title ?? '',
@@ -513,10 +528,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   }
 
   const goHome = () => setView('home')
-  // Ao sair do formulário de evento, volta ao menu "Gestão da agenda" se o painel
-  // foi aberto diretamente no formulário (ex.: "Novo evento" na barra lateral);
-  // caso contrário volta à lista de eventos.
-  const exitForm = () => setView(initialView === 'form' ? 'home' : 'events')
+  // Ao sair do formulário: se o painel foi aberto diretamente no formulário
+  // (ex.: "Novo evento" na barra lateral), fecha e volta ao calendário (menu
+  // inicial); caso contrário volta à lista de eventos do painel.
+  const exitForm = () => {
+    if (initialView === 'form') onClose()
+    else setView('events')
+  }
 
   const openApi = async () => {
     setBusy(true)
@@ -1370,98 +1388,88 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 type="button"
                 className={styles.backBtn}
                 onClick={goHome}
-                aria-label="Voltar ao menu"
+                aria-label={t('backToMenu')}
               >
                 <i className="ti ti-arrow-left" aria-hidden="true" />
               </button>
             )}
             <i className={`ti ${section.icon}`} aria-hidden="true" />
             {view === 'form'
-              ? editingId ? 'Editar evento' : 'Novo evento'
+              ? editingId ? t('editEvent') : t('newEvent')
               : view === 'churches'
                 ? t('manageEntities', { entities })
-                : view === 'translations'
-                  ? 'Traduções'
-                  : section.title}
+                : t(SECTION_TKEY[view] ?? 'manageAgenda')}
           </h3>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Fechar">
+          <button className={styles.closeBtn} onClick={onClose} aria-label={t('close')}>
             <i className="ti ti-x" aria-hidden="true" />
           </button>
         </div>
 
         {view === 'home' ? (
           <div className={styles.body}>
-            <p className={styles.muted}>O que pretendes gerir?</p>
+            <p className={styles.muted}>{t('manageAgendaQ')}</p>
             <div className={styles.menu}>
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openUsers} disabled={busy}>
                   <i className="ti ti-users" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Gestão de utilizadores</span>
-                  <span className={styles.menuDesc}>
-                    Papéis, acesso a privados e estado das contas.
-                  </span>
+                  <span className={styles.menuTitle}>{t('manageUsers')}</span>
+                  <span className={styles.menuDesc}>{t('manageUsersDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openChurches} disabled={busy}>
                   <i className="ti ti-building-church" aria-hidden="true" />
                   <span className={styles.menuTitle}>{t('manageEntities', { entities })}</span>
-                  <span className={styles.menuDesc}>
-                    Nome, ID da inChurch, morada e código postal.
-                  </span>
+                  <span className={styles.menuDesc}>{t('manageChurchesDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openCategories} disabled={busy}>
                   <i className="ti ti-tags" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Gestão de categorias</span>
-                  <span className={styles.menuDesc}>
-                    Nome, cor e ordem das categorias dos eventos.
-                  </span>
+                  <span className={styles.menuTitle}>{t('manageCategories')}</span>
+                  <span className={styles.menuDesc}>{t('manageCategoriesDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openPrivacyTags} disabled={busy}>
                   <i className="ti ti-shield-lock" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Etiquetas de privacidade</span>
-                  <span className={styles.menuDesc}>
-                    Grupos de visibilidade dos eventos privados.
-                  </span>
+                  <span className={styles.menuTitle}>{t('privacyTagsTitle')}</span>
+                  <span className={styles.menuDesc}>{t('privacyTagsDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openApi} disabled={busy}>
                   <i className="ti ti-plug-connected" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Configurar API externa</span>
-                  <span className={styles.menuDesc}>Integração com a inChurch.</span>
+                  <span className={styles.menuTitle}>{t('configApi')}</span>
+                  <span className={styles.menuDesc}>{t('configApiDesc')}</span>
                 </button>
               )}
               {isManager && (
                 <button className={styles.menuCard} onClick={openReports} disabled={busy}>
                   <i className="ti ti-chart-bar" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Relatórios</span>
-                  <span className={styles.menuDesc}>Resumo e atividade da agenda.</span>
+                  <span className={styles.menuTitle}>{t('reports')}</span>
+                  <span className={styles.menuDesc}>{t('reportsDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openTranslations} disabled={busy}>
                   <i className="ti ti-language" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Traduções</span>
-                  <span className={styles.menuDesc}>Idiomas (EN/PT/FR/ES), título e o termo “{entity}”.</span>
+                  <span className={styles.menuTitle}>{t('translations')}</span>
+                  <span className={styles.menuDesc}>{t('translationsDesc', { entity })}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openBranding} disabled={busy}>
                   <i className="ti ti-photo" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Aparência</span>
-                  <span className={styles.menuDesc}>Logótipo da aplicação.</span>
+                  <span className={styles.menuTitle}>{t('appearance')}</span>
+                  <span className={styles.menuDesc}>{t('appearanceDesc')}</span>
                 </button>
               )}
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openOverlaps} disabled={busy}>
                   <i className="ti ti-calendar-x" aria-hidden="true" />
-                  <span className={styles.menuTitle}>Sobreposições</span>
-                  <span className={styles.menuDesc}>Política de eventos com horários sobrepostos.</span>
+                  <span className={styles.menuTitle}>{t('overlaps')}</span>
+                  <span className={styles.menuDesc}>{t('overlapsDesc')}</span>
                 </button>
               )}
             </div>
@@ -1471,7 +1479,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
             <div className={styles.toolbar}>
               <button className={styles.primaryBtn} onClick={openNew}>
                 <i className="ti ti-plus" aria-hidden="true" />
-                <span>Novo evento</span>
+                <span>{t('newEvent')}</span>
               </button>
               <button className={styles.ghostBtn} onClick={load} disabled={loading}>
                 <i className="ti ti-refresh" aria-hidden="true" />

@@ -48,6 +48,11 @@ const VIEW_META = {
   list:     { label: 'Lista',      icon: 'ti-list-details' },
 }
 
+// Versão + data de build (injetadas pelo Vite; ver vite.config.js `define`).
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+const BUILD_TIME = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : ''
+const BUILD_LABEL = BUILD_TIME ? BUILD_TIME.slice(0, 16).replace('T', ' ') : ''
+
 export default function App() {
   const { toggle, isDark } = useTheme()
   const { t, lang, setLang, languages, logoUrl: customLogoUrl } = useI18n()
@@ -255,8 +260,8 @@ export default function App() {
                   className="cursor-pointer appearance-none rounded-md border border-input bg-background py-[5px] pl-2.5 pr-7 text-[11px] font-semibold tracking-wide text-foreground transition-colors hover:border-ring focus:border-ring focus:outline-none"
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value)}
-                  aria-label="Visibilidade dos eventos"
-                  title="Visibilidade dos eventos"
+                  aria-label={t('visibility')}
+                  title={t('visibility')}
                 >
                   <option value="all">{t('seeAll')}</option>
                   <option value="private">{t('onlyPrivate')}</option>
@@ -270,13 +275,13 @@ export default function App() {
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             <span className="max-[980px]:hidden">{t('refresh')}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setSubscribeOpen(true)} title="Subscrever calendário" aria-label="Subscrever calendário">
+          <Button variant="outline" size="sm" onClick={() => setSubscribeOpen(true)} title={t('subscribe')} aria-label={t('subscribe')}>
             <CalendarSync className="h-4 w-4" aria-hidden="true" />
           </Button>
           {canManage && (
-            <Button variant="outline" size="sm" onClick={() => { setManageView('events'); setManageOpen(true) }} title="Gestão de eventos">
+            <Button variant="outline" size="sm" onClick={() => { setManageView('events'); setManageOpen(true) }} title={t('manageEvents')}>
               <CalendarCog className="h-4 w-4" aria-hidden="true" />
-              <span className="max-[980px]:hidden">Eventos</span>
+              <span className="max-[980px]:hidden">{t('events')}</span>
             </Button>
           )}
           {canManage && (
@@ -353,8 +358,8 @@ export default function App() {
                 size="icon"
                 className="hidden h-8 w-8 max-[980px]:inline-flex"
                 onClick={() => setSidebarOpen(true)}
-                aria-label="Abrir menu lateral"
-                title="Menu"
+                aria-label={t('menu')}
+                title={t('menu')}
               >
                 <Menu className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -363,17 +368,17 @@ export default function App() {
                 size="icon"
                 className="hidden h-8 w-8 min-[981px]:inline-flex"
                 onClick={() => setSidebarCollapsed((c) => !c)}
-                aria-label={sidebarCollapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral'}
-                title={sidebarCollapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral'}
+                aria-label={sidebarCollapsed ? t('showSidebar') : t('hideSidebar')}
+                title={sidebarCollapsed ? t('showSidebar') : t('hideSidebar')}
               >
                 {sidebarCollapsed
                   ? <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
                   : <PanelLeftClose className="h-4 w-4" aria-hidden="true" />}
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label="Anterior">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label={t('prev')}>
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)} aria-label="Próximo">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)} aria-label={t('next')}>
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Button>
               <span className="min-w-[160px] text-center text-base font-bold uppercase tracking-wider text-foreground max-[980px]:min-w-[90px] max-[980px]:text-[13px]">{periodLabel()}</span>
@@ -493,8 +498,18 @@ export default function App() {
           </main>
         </section>
       </div>
-
-
+      {/* ── Rodapé ─────────────────────────────────── */}
+      <footer className="flex h-6 flex-shrink-0 items-center justify-center gap-2 border-t border-border bg-card px-4 text-[10px] text-muted-foreground">
+        <span>© {new Date().getFullYear()} CCLX™</span>
+        <span aria-hidden="true">·</span>
+        <span>v{APP_VERSION}</span>
+        {BUILD_LABEL && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>build {BUILD_LABEL}</span>
+          </>
+        )}
+      </footer>
       {/* ── Event detail modal ───────────────────────────────────── */}
       <AnimatePresence>
         {detailEvent && (
