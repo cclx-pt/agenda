@@ -38,6 +38,9 @@ healthRouter.get('/full', async (_req, res) => {
     storageError: storage.ok ? undefined : storage.error,
     storageConfigured: storage.configured,
     storageHost,
+    // URL base usada nos links dos emails (ações de aprovação, delegações).
+    // Deve ser o domínio público; se apontar para localhost, falta APP_URL.
+    appUrl: config.appUrl,
     uptimeSeconds,
     startedAt: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
     nodeEnv: process.env.NODE_ENV ?? null,
