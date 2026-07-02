@@ -90,6 +90,7 @@ export default function App() {
   const [subscribeOpen, setSubscribeOpen] = useState(false) // modal de subscrição (feed iCal)
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
+  const [editEvent,    setEditEvent]    = useState(null)    // evento a editar diretamente (a partir do detalhe)
   // Abre via ?aprovacoes=1 (link do email de delegação); só renderiza se canManage.
   const [approvalsOpen, setApprovalsOpen] = useState(
     () => new URLSearchParams(window.location.search).get('aprovacoes') === '1'
@@ -119,6 +120,15 @@ export default function App() {
 
   // Apagar um evento do SoR a partir do calendário (eventos da inChurch são só-leitura).
   const isSorEvent = (evt) => evt && !String(evt.id).startsWith('ic-')
+  // Abrir o formulário de edição diretamente a partir do detalhe do evento
+  // (só para quem gere: admin/aprovador/editor e eventos do SoR).
+  const handleEditEvent = (evt) => {
+    if (!isSorEvent(evt)) return
+    setEditEvent(evt)
+    setDetailEvent(null)
+    setManageView('form')
+    setManageOpen(true)
+  }
   const handleDeleteEvent = async (evt) => {
     if (!isSorEvent(evt)) return
     if (!window.confirm(`Eliminar "${evt.title}"? Esta ação é irreversível.`)) return
@@ -338,7 +348,7 @@ export default function App() {
           dayEvents={dayEvents}
           onSelectEvent={(evt) => { setDetailEvent(evt); setSidebarOpen(false) }}
           canManage={canManage}
-          onNewEvent={() => { setManageView('form'); setManageOpen(true); setSidebarOpen(false) }}
+          onNewEvent={() => { setEditEvent(null); setManageView('form'); setManageOpen(true); setSidebarOpen(false) }}
           onExportDay={() =>
             setExportData({ events: dayEvents, filename: `cclx-${selectedKey}.ics` })
           }
@@ -525,6 +535,7 @@ export default function App() {
             onClose={() => setDetailEvent(null)}
             onBack={null}
             onExport={(evt) => setExportData({ events: [evt], filename: null })}
+            onEdit={canManage && isSorEvent(detailEvent) ? handleEditEvent : null}
             onDelete={canManage && isSorEvent(detailEvent) ? handleDeleteEvent : null}
           />
         )}
@@ -565,7 +576,13 @@ export default function App() {
 
       {/* ── Painel de gestão ────────────────────────────────────── */}
       <AnimatePresence>
-        {manageOpen && <ManagePanel initialView={manageView} onClose={() => setManageOpen(false)} />}
+        {manageOpen && (
+          <ManagePanel
+            initialView={manageView}
+            initialEditEvent={editEvent}
+            onClose={() => { setManageOpen(false); setEditEvent(null); clearEventCache(); reload(); refreshCategoriesInUse() }}
+          />
+        )}
       </AnimatePresence>
       {/* ── Painel de aprovações ──────────────────── */}
       <AnimatePresence>

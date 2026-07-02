@@ -396,7 +396,7 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
  * ManagePanel — backoffice da agenda (System of Record).
  * Lista, cria/edita eventos e gere o fluxo de aprovação conforme o papel.
  */
-export default function ManagePanel({ onClose, initialView = 'home' }) {
+export default function ManagePanel({ onClose, initialView = 'home', initialEditEvent = null }) {
   const { user, hasRole } = useAuth()
   const { t, entity, entities, refreshTranslations, logoUrl, subcategoryColors, refreshBranding } = useI18n()
   const containerRef = useModalA11y(onClose)
@@ -428,9 +428,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [view, setView] = useState(initialView) // 'home'|'events'|'form'|'users'|'api'|'reports'
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(emptyForm)
+  const [view, setView] = useState(initialEditEvent ? 'form' : initialView) // 'home'|'events'|'form'|'users'|'api'|'reports'
+  const [editingId, setEditingId] = useState(initialEditEvent?.id ?? null)
+  const [form, setForm] = useState(initialEditEvent ? eventToForm(initialEditEvent) : emptyForm)
   // Se a categoria selecionada no formulário exige subcategoria.
   const formCategoryRequiresSub =
     dbCategories.find((c) => c.slug === form.category)?.requiresSubcategory ?? false

@@ -10,6 +10,7 @@ import {
   Church,
   MapPin,
   Paperclip,
+  Pencil,
   Trash2,
   Ticket,
   UserCheck,
@@ -22,7 +23,7 @@ import { useEventColors } from '../hooks/useEventColors'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export default function EventDetail({ event, onClose, onBack, onExport, onDelete }) {
+export default function EventDetail({ event, onClose, onBack, onExport, onDelete, onEdit }) {
   const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
   const status = STATUS_META[event.status]
   const { subColorMap } = useEventColors()
@@ -66,24 +67,6 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                 <span className="text-[10px] uppercase tracking-wider">Sem imagem</span>
               </div>
           }
-          {/* Selos sobre a imagem: [Comunidade] [Categoria] [Subcategoria] */}
-          <div className="absolute inset-x-0 top-0 flex flex-wrap items-center gap-1.5 p-2.5 pr-11">
-            {event.featured && <i className="ti ti-star-filled cclx-blink text-[15px] text-amber-400 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.55))]" aria-hidden="true" />}
-            <span className="inline-flex items-center gap-1 rounded-sm bg-black/55 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-              <Church className="h-2.5 w-2.5" aria-hidden="true" />
-              {event.community || event.responsible}
-            </span>
-            <span className="inline-block rounded-sm px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide shadow-sm"
-              style={{ background: cat.bgVar, color: cat.colorVar }}>
-              {cat.label}
-            </span>
-            {event.subcategory && (
-              <span className="inline-block rounded-sm bg-white/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-700 shadow-sm"
-                style={subColor ? { background: subColor, color: '#334155' } : undefined}>
-                {event.subcategory}
-              </span>
-            )}
-          </div>
           <button className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/75" onClick={onClose} aria-label="Fechar">
             <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -91,6 +74,21 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
 
         <div className={cn('flex-1 overflow-y-auto px-5 pb-5 pt-[18px]', status && 'bg-destructive/5')}>
           <div className="mb-2.5 flex flex-wrap items-center gap-2 empty:hidden">
+            {event.featured && <i className="ti ti-star-filled cclx-blink text-[13px] text-amber-500" aria-hidden="true" />}
+            <span className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-[3px] text-[9px] font-bold uppercase tracking-wide text-foreground">
+              <Church className="h-2.5 w-2.5 text-primary" aria-hidden="true" />
+              {event.community || event.responsible}
+            </span>
+            <span className="inline-block rounded-sm px-2 py-[3px] text-[9px] font-bold uppercase tracking-widest"
+              style={{ background: cat.bgVar, color: cat.colorVar }}>
+              {cat.label}
+            </span>
+            {event.subcategory && (
+              <span className="inline-block rounded-sm bg-muted px-2 py-[3px] text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
+                style={subColor ? { background: subColor, color: '#334155' } : undefined}>
+                {event.subcategory}
+              </span>
+            )}
             {event.privacyTag && (
               <span className="inline-flex items-center gap-1 rounded-sm bg-violet-600 px-2 py-[3px] text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Privacidade: ${event.privacyTag}`}>
                 <Lock className="h-2.5 w-2.5" aria-hidden="true" />
@@ -189,6 +187,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <CalendarPlus className="h-4 w-4" aria-hidden="true" />
               Guardar no calendário
             </Button>
+            {onEdit && (
+              <Button variant="outline" className="flex-1" onClick={() => onEdit(event)}>
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Editar
+              </Button>
+            )}
             {onDelete && (
               <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground" onClick={() => onDelete(event)}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
