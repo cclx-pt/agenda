@@ -5,6 +5,7 @@ import { AuthProvider } from './hooks/useAuth'
 import { I18nProvider } from './hooks/useI18n'
 import App from './App.jsx'
 import LogsPage from './components/LogsPage'
+import ApprovalActionPage from './components/ApprovalActionPage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -18,13 +19,17 @@ const queryClient = new QueryClient({
   },
 })
 
-// Rota simples sem react-router: /logs mostra a página de estado/registos.
-const isLogsRoute = window.location.pathname.replace(/\/+$/, '') === '/logs'
+// Rotas simples sem react-router: /logs (estado) e /acao (ação de aprovação).
+const routePath = window.location.pathname.replace(/\/+$/, '')
+const isLogsRoute = routePath === '/logs'
+const isActionRoute = routePath === '/acao'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      {isLogsRoute ? (
+      {isActionRoute ? (
+        <ApprovalActionPage />
+      ) : isLogsRoute ? (
         <LogsPage />
       ) : (
         <I18nProvider>

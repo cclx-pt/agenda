@@ -63,6 +63,21 @@ export async function listActiveForDelegate(delegateId) {
   return rows.map(mapRow)
 }
 
+// IDs dos editores com delegação ATIVA que cobre (igreja, categoria) de um
+// evento — para saber quem notificar quando um evento é submetido para aprovação.
+export async function listActiveForEvent(church, category) {
+  const { rows } = await pool.query(
+    `SELECT delegate_id
+       FROM approval_delegations
+      WHERE active = TRUE
+        AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+        AND (church IS NULL OR church = $1)
+        AND (category IS NULL OR category = $2)`,
+    [church ?? null, category ?? null]
+  )
+  return rows.map((r) => r.delegate_id)
+}
+
 export async function findById(id) {
   const { rows } = await pool.query(`${SELECT_FULL} WHERE d.id = $1`, [id])
   return mapRow(rows[0])

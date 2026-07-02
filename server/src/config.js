@@ -14,6 +14,9 @@ export const config = {
   isProd,
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // URL pública da app (para links em emails, ex.: ações de aprovação). No
+  // Vercel define APP_URL; localmente cai no CORS_ORIGIN.
+  appUrl: process.env.APP_URL ?? process.env.CORS_ORIGIN ?? 'http://localhost:5173',
 
   db: {
     // String de ligação PostgreSQL (Supabase Supavisor, modo sessão, porta 5432):

@@ -7,7 +7,9 @@ import * as privacyTagsService from '../privacyTags/service.js'
 import * as settingsService from '../settings/service.js'
 import * as delegationsRepo from '../delegations/repository.js'
 import * as usersRepo from '../users/repository.js'
-import { sendEventStatusEmail } from '../auth/email.js'
+import { sendEventStatusEmail, sendApprovalRequestEmail } from '../auth/email.js'
+import { signApprovalToken } from '../approvals/token.js'
+import { config } from '../config.js'
 import { waitUntil } from '@vercel/functions'
 
 // Erro de domínio com código HTTP associado.
@@ -236,6 +238,59 @@ function notifyCreator(event, status, { reason, actorId } = {}) {
   }
 }
 
+// Moderadores a notificar quando um evento é submetido: admins ativos +
+// aprovadores ativos com acesso à igreja + editores com delegação ativa que
+// cobre (igreja, categoria).
+async function listApproversFor(event) {
+  const users = await usersRepo.list()
+  const byId = new Map()
+  for (const u of users) {
+    if (!u.isActive) continue
+    if (u.role === 'admin') {
+      byId.set(u.id, u)
+    } else if (u.role === 'aprovador') {
+      const ch = Array.isArray(u.churches) && u.churches.length ? u.churches : null
+      if (ch === null || ch.includes(event.community)) byId.set(u.id, u)
+    }
+  }
+  const delegateIds = await delegationsRepo.listActiveForEvent(event.community, event.category)
+  if (delegateIds.length) {
+    for (const u of users) {
+      if (u.isActive && delegateIds.includes(u.id)) byId.set(u.id, u)
+    }
+  }
+  return [...byId.values()]
+}
+
+// Notifica (em segundo plano) os moderadores de que há um evento para aprovar,
+// com um link seguro (token) para aprovar/rejeitar sem sessão. Exclui o autor.
+function notifyApprovers(event, submitterId) {
+  const task = (async () => {
+    const approvers = await listApproversFor(event)
+    const base = config.appUrl.replace(/\/+$/, '')
+    for (const approver of approvers) {
+      if (!approver?.email || approver.id === submitterId) continue
+      const token = signApprovalToken({ eventId: event.id, approverId: approver.id })
+      const link = `${base}/acao?t=${encodeURIComponent(token)}`
+      await sendApprovalRequestEmail(approver.email, {
+        name: approver.name,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventTime: event.timeStart,
+        community: event.community,
+        link,
+      })
+    }
+  })().catch((err) => {
+    console.error('[events] Falha ao notificar aprovadores:', err?.message ?? err)
+  })
+  try {
+    waitUntil(task)
+  } catch {
+    /* fora do runtime Vercel: no-op; o processo persistente conclui a task */
+  }
+}
+
 // ── Leitura ──────────────────────────────────────────────────────
 
 // Ordena por data/hora de início (eventos do SoR e externos misturados).
@@ -374,6 +429,7 @@ async function markSubmitted(user, id) {
     toStatus: 'pendente',
     comment: 'Submetido para aprovação',
   })
+  if (!updated.seriesId) notifyApprovers(updated, user.sub)
   return updated
 }
 
@@ -476,6 +532,7 @@ export async function submit(user, id) {
     toStatus: 'pendente',
     comment: 'Submetido para aprovação',
   })
+  notifyApprovers(updated, user.sub)
   return updated
 }
 

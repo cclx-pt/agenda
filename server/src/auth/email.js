@@ -145,6 +145,60 @@ export async function sendEventStatusEmail(to, { name, eventTitle, status, reaso
 }
 
 /**
+ * Pede a um aprovador que aprove/rejeite um evento submetido. Inclui dois botões
+ * (Aprovar/Rejeitar) que abrem a página de confirmação /acao com o token.
+ */
+export async function sendApprovalRequestEmail(to, { name, eventTitle, eventDate, eventTime, community, link }) {
+  const title = eventTitle || 'Evento'
+  const subject = `Agenda CCLX — Aprovação pendente: ${title}`
+  const greeting = name ? `Olá ${name},` : 'Olá,'
+  const approveLink = `${link}&a=aprovar`
+  const rejectLink = `${link}&a=rejeitar`
+
+  const whenParts = []
+  if (eventDate) {
+    const [y, m, d] = String(eventDate).split('-')
+    if (y && m && d) whenParts.push(`${d}/${m}/${y}`)
+  }
+  if (eventTime) whenParts.push(eventTime)
+  const whenText = whenParts.join(' às ')
+
+  const text =
+    `${greeting}\n\nFoi submetido um evento para aprovação.\n\nEvento: ${title}` +
+    (whenText ? `\nData: ${whenText}` : '') +
+    (community ? `\nComunidade: ${community}` : '') +
+    `\n\nAprovar: ${approveLink}\nRejeitar: ${rejectLink}\n\nAgenda CCLX`
+
+  const whenHtml = whenText ? `<p style="margin:6px 0;color:#6b7280">${escapeHtml(whenText)}</p>` : ''
+  const communityHtml = community
+    ? `<p style="margin:2px 0;color:#6b7280">Comunidade: ${escapeHtml(community)}</p>`
+    : ''
+
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#1f2937">Agenda CCLX</h2>
+      <p style="margin:0 0 8px">${escapeHtml(greeting)}</p>
+      <p style="margin:8px 0;color:#374151">Foi submetido um evento para aprovação:</p>
+      <p style="margin:14px 0 2px;font-size:18px;font-weight:700;color:#111827">${escapeHtml(title)}</p>
+      ${whenHtml}
+      ${communityHtml}
+      <div style="margin:22px 0">
+        <a href="${approveLink}" style="display:inline-block;margin-right:8px;padding:10px 22px;border-radius:8px;background:#16a34a;color:#fff;font-weight:700;text-decoration:none">Aprovar</a>
+        <a href="${rejectLink}" style="display:inline-block;padding:10px 22px;border-radius:8px;background:#dc2626;color:#fff;font-weight:700;text-decoration:none">Rejeitar</a>
+      </div>
+      <p style="color:#9ca3af;font-size:12px">Abre uma página de confirmação. Ligação válida por 7 dias.</p>
+    </div>`
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Para: ${to}\n[email:mock] Aprovação pendente: ${title}\n${approveLink}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
+/**
  * Verifica a ligação/credenciais SMTP (nodemailer transporter.verify()).
  * O resultado fica em cache curta (60s) para não abrir uma ligação SMTP a cada
  * sondagem do /health/full. Devolve { ok, configured, error }.

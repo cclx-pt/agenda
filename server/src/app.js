@@ -18,6 +18,7 @@ import { categoriesRouter } from './categories/routes.js'
 import { privacyTagsRouter } from './privacyTags/routes.js'
 import { delegationsRouter } from './delegations/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
+import { approvalActionRouter } from './approvals/routes.js'
 import { healthRouter } from './health/routes.js'
 
 /**
@@ -66,6 +67,9 @@ app.use('/data/delegations', delegationsRouter)
 // Imagens de eventos: carregadas (POST) para o Supabase Storage, que serve os
 // URLs públicos diretamente — já não há ficheiros locais a servir.
 app.use('/data/uploads', uploadsRouter)
+// Ações de aprovação por email (aprovar/rejeitar sem sessão): PÚBLICO, a
+// autenticação é feita pelo token assinado no link.
+app.use('/data/approval-action', approvalActionRouter)
 
 // ── Frontend (build do Vite) ─────────────────────────────────────
 // Só serve o frontend compilado quando o `dist/` existe — ou seja, quando se
