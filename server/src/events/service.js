@@ -6,6 +6,9 @@ import * as categoriesService from '../categories/service.js'
 import * as privacyTagsService from '../privacyTags/service.js'
 import * as settingsService from '../settings/service.js'
 import * as delegationsRepo from '../delegations/repository.js'
+import * as usersRepo from '../users/repository.js'
+import { sendEventStatusEmail } from '../auth/email.js'
+import { waitUntil } from '@vercel/functions'
 
 // Erro de domínio com código HTTP associado.
 export class EventError extends Error {
@@ -202,6 +205,34 @@ function canEdit(user, event) {
 function ensureCanEdit(user, event) {
   if (!canEdit(user, event)) {
     throw new EventError(403, 'Sem permissão para alterar este evento.')
+  }
+}
+
+// Notifica (por email, em segundo plano) o criador do evento sobre uma mudança
+// de estado (aprovado/rejeitado/eliminado). Nunca bloqueia nem falha a operação.
+// No Vercel, waitUntil mantém a função viva até o email sair; localmente é no-op.
+function notifyCreator(event, status, { reason, actorId } = {}) {
+  if (!event?.createdBy) return
+  // Não enviar email a quem executou a própria ação sobre o seu evento.
+  if (actorId && event.createdBy === actorId) return
+  const task = (async () => {
+    const creator = await usersRepo.findById(event.createdBy)
+    if (!creator?.email || creator.isActive === false) return
+    await sendEventStatusEmail(creator.email, {
+      name: creator.name,
+      eventTitle: event.title,
+      status,
+      reason,
+      eventDate: event.date,
+      eventTime: event.timeStart,
+    })
+  })().catch((err) => {
+    console.error('[events] Falha ao notificar o criador do evento:', err?.message ?? err)
+  })
+  try {
+    waitUntil(task)
+  } catch {
+    /* fora do runtime Vercel: no-op; o processo persistente conclui a task */
   }
 }
 
@@ -421,9 +452,11 @@ export async function remove(user, id, { scope } = {}) {
   // Âmbito "série": elimina todas as ocorrências da mesma série.
   if (scope === 'series' && existing.seriesId) {
     await repo.removeSeries(existing.seriesId)
+    notifyCreator(existing, 'eliminado', { actorId: user.sub })
     return
   }
   await repo.remove(id)
+  notifyCreator(existing, 'eliminado', { actorId: user.sub })
 }
 
 // ── Fluxo de aprovação (máquina de estados) ─────────────────────
@@ -473,6 +506,7 @@ export async function approve(user, id) {
     toStatus: 'publicado',
     comment: 'Aprovado',
   })
+  notifyCreator(event, 'aprovado', { actorId: user.sub })
   return updated
 }
 
@@ -497,6 +531,7 @@ export async function reject(user, id, reason) {
     toStatus: 'rejeitado',
     comment: trimmed,
   })
+  notifyCreator(event, 'rejeitado', { reason: trimmed, actorId: user.sub })
   return updated
 }
 

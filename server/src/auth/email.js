@@ -58,6 +58,92 @@ export async function sendOtpEmail(email, code) {
   return { mocked: false }
 }
 
+// Escapa HTML para evitar injeção no corpo do email (título/motivo do evento
+// são texto do utilizador).
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Texto por estado do evento (aprovado/rejeitado/eliminado).
+const EVENT_STATUS_COPY = {
+  aprovado: {
+    heading: 'Evento aprovado',
+    color: '#16a34a',
+    intro: 'O seu evento foi aprovado e já está publicado na agenda.',
+  },
+  rejeitado: {
+    heading: 'Evento rejeitado',
+    color: '#dc2626',
+    intro: 'O seu evento foi rejeitado. Pode corrigi-lo e voltar a submeter.',
+  },
+  eliminado: {
+    heading: 'Evento eliminado',
+    color: '#6b7280',
+    intro: 'O seu evento foi eliminado da agenda.',
+  },
+}
+
+/**
+ * Notifica o criador de um evento sobre uma mudança de estado
+ * (aprovado/rejeitado/eliminado). Sem SMTP configurado, imprime na consola (dev).
+ */
+export async function sendEventStatusEmail(to, { name, eventTitle, status, reason, eventDate, eventTime }) {
+  const copy = EVENT_STATUS_COPY[status]
+  if (!copy) return { skipped: true }
+
+  const title = eventTitle || 'Evento'
+  const subject = `Agenda CCLX — ${copy.heading}: ${title}`
+  const greeting = name ? `Olá ${name},` : 'Olá,'
+
+  const whenParts = []
+  if (eventDate) {
+    const [y, m, d] = String(eventDate).split('-')
+    if (y && m && d) whenParts.push(`${d}/${m}/${y}`)
+  }
+  if (eventTime) whenParts.push(eventTime)
+  const whenText = whenParts.join(' às ')
+
+  const text =
+    `${greeting}\n\n${copy.intro}\n\nEvento: ${title}` +
+    (whenText ? `\nData: ${whenText}` : '') +
+    (status === 'rejeitado' && reason ? `\nMotivo: ${reason}` : '') +
+    `\n\nAgenda CCLX`
+
+  const whenHtml = whenText
+    ? `<p style="margin:6px 0;color:#6b7280">${escapeHtml(whenText)}</p>`
+    : ''
+  const reasonHtml =
+    status === 'rejeitado' && reason
+      ? `<p style="margin:10px 0;color:#374151"><strong>Motivo:</strong> ${escapeHtml(reason)}</p>`
+      : ''
+
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#1f2937">Agenda CCLX</h2>
+      <p style="margin:0 0 8px">${escapeHtml(greeting)}</p>
+      <p style="display:inline-block;margin:6px 0;padding:4px 12px;border-radius:6px;background:${copy.color};color:#fff;font-weight:700">${copy.heading}</p>
+      <p style="margin:8px 0;color:#374151">${copy.intro}</p>
+      <p style="margin:14px 0 2px;font-size:18px;font-weight:700;color:#111827">${escapeHtml(title)}</p>
+      ${whenHtml}
+      ${reasonHtml}
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
+      <p style="color:#9ca3af;font-size:12px">Mensagem automática da Agenda CCLX.</p>
+    </div>`
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Para: ${to}\n[email:mock] ${copy.heading}: ${title}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
 /**
  * Verifica a ligação/credenciais SMTP (nodemailer transporter.verify()).
  * O resultado fica em cache curta (60s) para não abrir uma ligação SMTP a cada
