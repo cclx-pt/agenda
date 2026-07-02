@@ -3,6 +3,7 @@ import * as repo from './repository.js'
 import * as usersRepo from '../users/repository.js'
 import * as churchesRepo from '../churches/repository.js'
 import * as categoriesRepo from '../categories/repository.js'
+import * as privacyTagsRepo from '../privacyTags/repository.js'
 
 // Erro de domínio com código HTTP associado.
 export class ApproverScopeError extends Error {
@@ -15,9 +16,10 @@ export class ApproverScopeError extends Error {
 
 const scopeSchema = z.object({
   approverId: z.string().uuid('Aprovador inválido.'),
-  // null/ausente = todas as igrejas / todas as categorias.
+  // null/ausente = todas as igrejas / categorias / etiquetas.
   church: z.string().trim().min(1).optional().nullable(),
   category: z.string().trim().min(1).optional().nullable(),
+  privacyTag: z.string().trim().min(1).optional().nullable(),
 })
 
 async function assertKnownRefs(data) {
@@ -31,6 +33,12 @@ async function assertKnownRefs(data) {
     const slugs = await categoriesRepo.listSlugs()
     if (!slugs.includes(data.category)) {
       throw new ApproverScopeError(400, `Categoria desconhecida: ${data.category}`)
+    }
+  }
+  if (data.privacyTag) {
+    const tags = await privacyTagsRepo.listNames()
+    if (!tags.includes(data.privacyTag)) {
+      throw new ApproverScopeError(400, `Etiqueta desconhecida: ${data.privacyTag}`)
     }
   }
 }
@@ -52,9 +60,9 @@ export function listApprovers() {
 
 export async function create(input) {
   const data = scopeSchema.parse(input)
-  // Uma regra com igreja E categoria vazias equivaleria a "tudo" (sem efeito).
-  if (!data.church && !data.category) {
-    throw new ApproverScopeError(400, 'Indique pelo menos uma igreja ou uma categoria.')
+  // Uma regra sem igreja, categoria e etiqueta equivaleria a "tudo" (sem efeito).
+  if (!data.church && !data.category && !data.privacyTag) {
+    throw new ApproverScopeError(400, 'Indique pelo menos uma igreja, categoria ou etiqueta.')
   }
   await assertIsApprover(data.approverId)
   await assertKnownRefs(data)

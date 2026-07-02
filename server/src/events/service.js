@@ -202,7 +202,8 @@ async function matchesApproverScopes(approverId, event) {
     return scopes.some(
       (s) =>
         (s.church == null || s.church === event.community) &&
-        (s.category == null || s.category === event.category)
+        (s.category == null || s.category === event.category) &&
+        (s.privacyTag == null || s.privacyTag === event.privacyTag)
     )
   } catch (err) {
     console.error('[events] âmbito de aprovador indisponível (migração pendente?):', err?.message ?? err)
@@ -431,7 +432,8 @@ export async function listForApproval(user, { status } = {}) {
     scopes.some(
       (s) =>
         (s.church == null || s.church === e.community) &&
-        (s.category == null || s.category === e.category)
+        (s.category == null || s.category === e.category) &&
+        (s.privacyTag == null || s.privacyTag === e.privacyTag)
     )
   const byDelegation = (e) =>
     delegations.some(

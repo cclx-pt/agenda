@@ -132,8 +132,10 @@ CREATE TABLE IF NOT EXISTS approver_scopes (
   approver_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   church      TEXT,
   category    TEXT,
+  privacy_tag TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE approver_scopes ADD COLUMN IF NOT EXISTS privacy_tag TEXT;
 CREATE INDEX IF NOT EXISTS idx_approver_scopes_approver ON approver_scopes (approver_id);
 
 -- ── Eventos externos (espelho da inChurch / inRadar) ────────────

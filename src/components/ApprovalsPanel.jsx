@@ -34,7 +34,7 @@ const STATUS_BADGE = {
 }
 
 const emptyDelegation = { delegateId: '', church: '', category: '', startDate: '', endDate: '', active: true }
-const emptyScope = { approverId: '', church: '', category: '' }
+const emptyScope = { approverId: '', church: '', category: '', privacyTag: '' }
 
 function csvEscape(v) {
   const s = String(v ?? '')
@@ -78,11 +78,38 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const [scopes, setScopes] = useState([])
   const [scopeApprovers, setScopeApprovers] = useState([])
   const [scopeForm, setScopeForm] = useState(emptyScope)
+  const [scopeSearch, setScopeSearch] = useState('')
+  const [delSearch, setDelSearch] = useState('')
 
   const categoryLabel = useCallback(
     (slug) => categories.find((c) => c.slug === slug)?.label || CATEGORY_META[slug]?.label || slug,
     [categories]
   )
+
+  // Filtros de procura (cliente) das listas de delegações e de regras de aprovador.
+  const filteredDelegations = useMemo(() => {
+    const q = delSearch.trim().toLowerCase()
+    if (!q) return delegations
+    return delegations.filter((d) =>
+      [d.delegateName, d.delegateEmail, d.church, d.category && categoryLabel(d.category)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    )
+  }, [delegations, delSearch, categoryLabel])
+
+  const filteredScopes = useMemo(() => {
+    const q = scopeSearch.trim().toLowerCase()
+    if (!q) return scopes
+    return scopes.filter((s) =>
+      [s.approverName, s.approverEmail, s.church, s.category && categoryLabel(s.category), s.privacyTag]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    )
+  }, [scopes, scopeSearch, categoryLabel])
 
   const loadApprovals = useCallback(async () => {
     setLoading(true)
@@ -312,8 +339,8 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
       toast.error('Selecione um aprovador.')
       return
     }
-    if (!scopeForm.church && !scopeForm.category) {
-      toast.error('Indique pelo menos uma igreja ou uma categoria.')
+    if (!scopeForm.church && !scopeForm.category && !scopeForm.privacyTag) {
+      toast.error('Indique pelo menos uma igreja, categoria ou etiqueta.')
       return
     }
     setBusy(true)
@@ -322,6 +349,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
         approverId: scopeForm.approverId,
         church: scopeForm.church || null,
         category: scopeForm.category || null,
+        privacyTag: scopeForm.privacyTag || null,
       })
       setScopeForm(emptyScope)
       await loadScopes()
@@ -595,12 +623,23 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                 </div>
               </form>
 
-              {/* Delegation list */}
+              {/* Delegation search + list */}
+              {delegations.length > 0 && (
+                <input
+                  type="search"
+                  placeholder="Procurar delegações…"
+                  value={delSearch}
+                  onChange={(e) => setDelSearch(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                />
+              )}
               {delegations.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">Ainda não há delegações.</p>
+              ) : filteredDelegations.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Sem resultados para a procura.</p>
               ) : (
                 <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                  {delegations.map((d) => (
+                  {filteredDelegations.map((d) => (
                     <li key={d.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch">
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <div className="flex flex-wrap items-center gap-2">
@@ -645,9 +684,9 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
               <form onSubmit={handleCreateScope} className="flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5">
                 <p className="m-0 text-[13px] font-semibold text-foreground">Âmbito de aprovação</p>
                 <p className="m-0 text-xs text-muted-foreground">
-                  Sem regras, o aprovador recebe e aprova tudo (dentro das igrejas do seu perfil). Cada regra limita a uma igreja e/ou categoria.
+                  Sem regras, o aprovador recebe e aprova tudo (dentro das igrejas do seu perfil). Cada regra limita a uma igreja, categoria e/ou etiqueta de privacidade.
                 </p>
-                <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-1">
+                <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
                   <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
                     Aprovador *
                     <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.approverId} onChange={setScopeField('approverId')} required>
@@ -675,6 +714,17 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                       ))}
                     </select>
                   </label>
+                  {dbPrivacyTags.length > 0 && (
+                    <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                      Etiqueta de privacidade
+                      <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.privacyTag} onChange={setScopeField('privacyTag')}>
+                        <option value="">Todas as etiquetas</option>
+                        {dbPrivacyTags.map((t) => (
+                          <option key={t.id} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
                 <div className="flex justify-end">
                   <button type="submit" disabled={busy} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3.5 py-[9px] text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
@@ -684,17 +734,28 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                 </div>
               </form>
 
-              {/* Approver scope list */}
+              {/* Approver scope search + list */}
+              {scopes.length > 0 && (
+                <input
+                  type="search"
+                  placeholder="Procurar regras…"
+                  value={scopeSearch}
+                  onChange={(e) => setScopeSearch(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                />
+              )}
               {scopes.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">Sem regras — os aprovadores recebem tudo (dentro das igrejas do perfil).</p>
+              ) : filteredScopes.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Sem resultados para a procura.</p>
               ) : (
                 <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                  {scopes.map((s) => (
+                  {filteredScopes.map((s) => (
                     <li key={s.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch">
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <strong className="text-sm text-foreground">{s.approverName || s.approverEmail}</strong>
                         <span className="text-xs text-muted-foreground">
-                          {s.church || 'Todas as igrejas'} · {s.category ? categoryLabel(s.category) : 'Todas as categorias'}
+                          {s.church || 'Todas as igrejas'} · {s.category ? categoryLabel(s.category) : 'Todas as categorias'} · {s.privacyTag || 'Todas as etiquetas'}
                         </span>
                       </div>
                       <div className="flex flex-shrink-0 gap-1.5 max-[560px]:justify-end">
