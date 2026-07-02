@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays, Church, Clock, Lock, MapPin, Paperclip, Phone, Ticket } from 'lucide-react'
+import { Calendar, CalendarDays, Church, Clock, Lock, MapPin, Paperclip, Ticket, UserCheck } from 'lucide-react'
 
 import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
@@ -9,6 +9,7 @@ export default function EventCard({ event, onClick }) {
   const { colorFor, subColorMap } = useEventColors()
   const vis = colorFor(event)
   const subColor = event.subcategory ? subColorMap[event.subcategory] : null
+  const contact = event.organizerPhone || event.organizerEmail || event.organizerContact
 
   return (
     <div
@@ -85,10 +86,13 @@ export default function EventCard({ event, onClick }) {
             </div>
           )}
           {/* Contacto */}
-          {(event.organizerPhone || event.organizerEmail || event.organizerContact) && (
+          {(event.organizerName || contact) && (
             <div className="flex items-center gap-[7px]">
-              <Phone className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-              <span className="truncate">{event.organizerPhone || event.organizerEmail || event.organizerContact}</span>
+              <UserCheck className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate">
+                {event.organizerName && <span className="font-semibold text-foreground">{event.organizerName}</span>}
+                {contact ? (event.organizerName ? ` (${contact})` : contact) : ''}
+              </span>
             </div>
           )}
           {/* Inscrições */}
@@ -115,11 +119,7 @@ export default function EventCard({ event, onClick }) {
           <div className="flex items-center gap-[7px]">
             <Church className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
             <span className="truncate">
-              Organizado por:{' '}
-              <span className="font-semibold text-foreground">{event.organizerName || event.community || event.responsible}</span>
-              {event.organizerName && (event.community || event.responsible)
-                ? ` (${event.community || event.responsible})`
-                : ''}
+              Organizado por: <span className="font-semibold text-foreground">{event.community || event.responsible}</span>
             </span>
           </div>
         </div>

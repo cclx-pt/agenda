@@ -28,6 +28,7 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
   const { colorFor, subColorMap } = useEventColors()
   const vis = colorFor(event)
   const subColor = event.subcategory ? subColorMap[event.subcategory] : null
+  const contact = event.organizerPhone || event.organizerEmail || event.organizerContact
   const containerRef = useModalA11y(onClose)
 
   return (
@@ -112,35 +113,37 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
           <h2 className="mb-3.5 text-[22px] font-extrabold uppercase leading-[1.15] tracking-wide text-foreground">{event.title}</h2>
 
           <div className="mb-0.5 flex flex-col gap-2.5">
+            {/* Data */}
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-              <Calendar className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
-              <span>{formatDateLabel(event.date)}</span>
+              <Calendar className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span className="capitalize text-foreground">{formatDateLabel(event.date)}</span>
             </div>
-            <div className="flex items-start gap-2.5 text-xs font-bold text-foreground">
-              <Church className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-              <span>{event.responsible}</span>
-            </div>
+            {/* Hora */}
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-              <Clock className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
-              <span>{formatTimeRange(event.timeStart, event.timeEnd)}</span>
+              <Clock className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span>{formatTimeRange(event.timeStart, event.timeEnd) || 'Dia inteiro'}</span>
             </div>
-            <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-              <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
-              <span>{event.location}</span>
-            </div>
-            {(event.organizerName || event.organizerPhone || event.organizerEmail || event.organizerContact) && (
+            {/* Local */}
+            {event.location && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-                <UserCheck className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+                <span>{event.location}</span>
+              </div>
+            )}
+            {/* Contacto */}
+            {(event.organizerName || contact) && (
+              <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <UserCheck className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
                 <span>
-                  {[event.organizerName, event.organizerPhone, event.organizerEmail || event.organizerContact]
-                    .filter(Boolean)
-                    .join(' · ')}
+                  {event.organizerName && <span className="font-semibold text-foreground">{event.organizerName}</span>}
+                  {contact ? (event.organizerName ? ` (${contact})` : contact) : ''}
                 </span>
               </div>
             )}
+            {/* Inscrições */}
             {event.registrationUrl && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-                <Ticket className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <Ticket className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
                 <a
                   href={event.registrationUrl}
                   target="_blank"
@@ -151,9 +154,10 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                 </a>
               </div>
             )}
+            {/* Google Maps */}
             {event.mapUrl && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-                <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <MapPin className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
                 <a
                   href={event.mapUrl}
                   target="_blank"
@@ -164,9 +168,10 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                 </a>
               </div>
             )}
+            {/* Anexo */}
             {event.attachmentUrl && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
-                <Paperclip className="mt-px h-3.5 w-3.5 flex-shrink-0 text-foreground" aria-hidden="true" />
+                <Paperclip className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
                 <a
                   href={event.attachmentUrl}
                   target="_blank"
@@ -177,6 +182,11 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                 </a>
               </div>
             )}
+            {/* Organizado por (comunidade) */}
+            <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+              <Church className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span>Organizado por: <span className="font-semibold text-foreground">{event.community || event.responsible}</span></span>
+            </div>
           </div>
 
           <hr className="my-3.5 border-border" />
