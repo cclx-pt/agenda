@@ -40,8 +40,14 @@ export function isPastDateKey(dateKey) {
   return typeof dateKey === 'string' && dateKey < todayKey()
 }
 
-// Realce subtil (esbatido) para dias/eventos que já passaram — usado em todas as vistas.
-export const PAST_DAY_CLASS = 'opacity-60'
+// Realce (esbatido + dessaturado) para dias/eventos que já passaram — usado em todas as vistas.
+export const PAST_DAY_CLASS = 'opacity-55 grayscale'
+
+// Padrão tracejado diagonal para o fundo das células de dias passados (vista de mês).
+export const PAST_DAY_HATCH = {
+  backgroundImage:
+    'repeating-linear-gradient(135deg, rgba(128,128,128,0.18) 0, rgba(128,128,128,0.18) 1.5px, transparent 1.5px, transparent 7px)',
+}
 
 /** Parse YYYY-MM-DD into { year, month (0-based), day } */
 export function parseDateKey(key) {
