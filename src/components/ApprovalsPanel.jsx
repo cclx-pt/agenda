@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useChurches } from '../hooks/useChurches'
 import { useCategories } from '../hooks/useCategories'
+import { useSubcategories } from '../hooks/useSubcategories'
 import { usePrivacyTags } from '../hooks/usePrivacyTags'
 import * as eventsService from '../services/eventsService'
 import { CATEGORY_META, formatDateNumericValue, formatTimeRange } from '../utils/calendarHelpers'
@@ -33,8 +34,8 @@ const STATUS_BADGE = {
   rascunho: 'bg-muted text-muted-foreground',
 }
 
-const emptyDelegation = { delegateId: '', church: '', category: '', startDate: '', endDate: '', active: true }
-const emptyScope = { approverId: '', church: '', category: '', privacyTag: '' }
+const emptyDelegation = { delegateId: '', church: '', category: '', subcategory: '', startDate: '', endDate: '', active: true }
+const emptyScope = { approverId: '', church: '', category: '', subcategory: '', privacyTag: '' }
 
 function csvEscape(v) {
   const s = String(v ?? '')
@@ -56,6 +57,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const containerRef = useModalA11y(onClose)
   const { churches } = useChurches()
   const { categories } = useCategories()
+  const { subcategories } = useSubcategories()
   const { privacyTags: dbPrivacyTags } = usePrivacyTags()
 
   const canManageDelegations = user?.role === 'admin' || user?.role === 'aprovador'
@@ -91,7 +93,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     const q = delSearch.trim().toLowerCase()
     if (!q) return delegations
     return delegations.filter((d) =>
-      [d.delegateName, d.delegateEmail, d.church, d.category && categoryLabel(d.category)]
+      [d.delegateName, d.delegateEmail, d.church, d.category && categoryLabel(d.category), d.subcategory]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -103,7 +105,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     const q = scopeSearch.trim().toLowerCase()
     if (!q) return scopes
     return scopes.filter((s) =>
-      [s.approverName, s.approverEmail, s.church, s.category && categoryLabel(s.category), s.privacyTag]
+      [s.approverName, s.approverEmail, s.church, s.category && categoryLabel(s.category), s.subcategory, s.privacyTag]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -285,6 +287,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
         delegateId: delForm.delegateId,
         church: delForm.church || null,
         category: delForm.category || null,
+        subcategory: delForm.subcategory || null,
         startDate: delForm.startDate,
         endDate: delForm.endDate,
         active: delForm.active,
@@ -306,6 +309,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
         delegateId: d.delegateId,
         church: d.church,
         category: d.category,
+        subcategory: d.subcategory,
         startDate: d.startDate,
         endDate: d.endDate,
         active: !d.active,
@@ -339,8 +343,8 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
       toast.error('Selecione um aprovador.')
       return
     }
-    if (!scopeForm.church && !scopeForm.category && !scopeForm.privacyTag) {
-      toast.error('Indique pelo menos uma igreja, categoria ou etiqueta.')
+    if (!scopeForm.church && !scopeForm.category && !scopeForm.subcategory && !scopeForm.privacyTag) {
+      toast.error('Indique pelo menos uma igreja, categoria, subcategoria ou etiqueta.')
       return
     }
     setBusy(true)
@@ -349,6 +353,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
         approverId: scopeForm.approverId,
         church: scopeForm.church || null,
         category: scopeForm.category || null,
+        subcategory: scopeForm.subcategory || null,
         privacyTag: scopeForm.privacyTag || null,
       })
       setScopeForm(emptyScope)
@@ -600,6 +605,17 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                       ))}
                     </select>
                   </label>
+                  {subcategories.length > 0 && (
+                    <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                      Subcategoria
+                      <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={delForm.subcategory} onChange={setDelField('subcategory')}>
+                        <option value="">Todas as subcategorias</option>
+                        {subcategories.map((sub) => (
+                          <option key={sub.id} value={sub.name}>{sub.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
                       Início *
@@ -714,6 +730,17 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                       ))}
                     </select>
                   </label>
+                  {subcategories.length > 0 && (
+                    <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                      Subcategoria
+                      <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.subcategory} onChange={setScopeField('subcategory')}>
+                        <option value="">Todas as subcategorias</option>
+                        {subcategories.map((sub) => (
+                          <option key={sub.id} value={sub.name}>{sub.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {dbPrivacyTags.length > 0 && (
                     <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
                       Etiqueta de privacidade
@@ -755,7 +782,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <strong className="text-sm text-foreground">{s.approverName || s.approverEmail}</strong>
                         <span className="text-xs text-muted-foreground">
-                          {s.church || 'Todas as igrejas'} · {s.category ? categoryLabel(s.category) : 'Todas as categorias'} · {s.privacyTag || 'Todas as etiquetas'}
+                          {s.church || 'Todas as igrejas'} · {s.category ? categoryLabel(s.category) : 'Todas as categorias'} · {s.subcategory || 'Todas as subcategorias'} · {s.privacyTag || 'Todas as etiquetas'}
                         </span>
                       </div>
                       <div className="flex flex-shrink-0 gap-1.5 max-[560px]:justify-end">

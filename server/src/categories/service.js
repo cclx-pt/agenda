@@ -44,15 +44,17 @@ export const createSchema = z.object({
   label: z.string().trim().min(1, 'O nome da categoria é obrigatório.').max(80),
   color,
   sortOrder,
+  requiresSubcategory: z.boolean().optional(),
 })
 
 // O slug é o identificador estável (referenciado por events.category) e não é
-// editável; apenas o nome, a cor e a ordem podem ser alterados.
+// editável; apenas o nome, a cor, a ordem e a exigência de subcategoria mudam.
 export const updateSchema = z
   .object({
     label: z.string().trim().min(1, 'O nome da categoria é obrigatório.').max(80).optional(),
     color,
     sortOrder,
+    requiresSubcategory: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'Nada para atualizar.' })
 
@@ -67,6 +69,13 @@ export async function assertKnownCategory(slugValue) {
   if (!known.includes(slugValue)) {
     throw new CategoryError(400, `Categoria desconhecida: ${slugValue}`)
   }
+}
+
+/** Verdadeiro se a categoria exige subcategoria nos seus eventos. */
+export async function requiresSubcategory(slugValue) {
+  if (!slugValue) return false
+  const cat = await repo.findBySlug(slugValue)
+  return !!cat?.requiresSubcategory
 }
 
 export async function create(input) {
@@ -85,6 +94,7 @@ export async function update(id, input) {
   if (data.label !== undefined) fields.label = data.label
   if (data.color !== undefined) fields.color = data.color
   if (data.sortOrder !== undefined) fields.sort_order = data.sortOrder
+  if (data.requiresSubcategory !== undefined) fields.requires_subcategory = data.requiresSubcategory
   return repo.update(id, fields)
 }
 

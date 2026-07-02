@@ -6,6 +6,7 @@ import { useModalA11y } from '../hooks/useModalA11y'
 import * as eventsService from '../services/eventsService'
 import { useChurches, invalidateChurches } from '../hooks/useChurches'
 import { useCategories, invalidateCategories } from '../hooks/useCategories'
+import { useSubcategories, invalidateSubcategories } from '../hooks/useSubcategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
 import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
@@ -132,6 +133,7 @@ const emptyForm = {
   location: '',
   community: DEFAULT_CHURCH,
   category: 'evento',
+  subcategory: '',
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
@@ -175,7 +177,8 @@ function maxRecurrenceDate(startDate) {
 const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, churches: null, privacyTags: null }
 
 const emptyChurch = { name: '', externalId: '', address: '', postalCode: '' }
-const emptyCategory = { slug: '', label: '', color: '#F5A800', sortOrder: '' }
+const emptyCategory = { slug: '', label: '', color: '#F5A800', sortOrder: '', requiresSubcategory: false }
+const emptySubcategory = { name: '', sortOrder: '' }
 const emptyPrivacyTag = { name: '' }
 
 const ROLE_OPTIONS = [
@@ -241,6 +244,7 @@ const SECTION = {
   users: { icon: 'ti-users', title: 'Gestão de utilizadores' },
   churches: { icon: 'ti-building-church', title: 'Gestão de igrejas' },
   categories: { icon: 'ti-tags', title: 'Gestão de categorias' },
+  subcategories: { icon: 'ti-tag', title: 'Gestão de subcategorias' },
   privacyTags: { icon: 'ti-shield-lock', title: 'Etiquetas de privacidade' },
   api: { icon: 'ti-plug-connected', title: 'Configurar API externa' },
   reports: { icon: 'ti-chart-bar', title: 'Relatórios' },
@@ -256,6 +260,7 @@ const SECTION_TKEY = {
   events: 'manageEvents',
   users: 'manageUsers',
   categories: 'manageCategories',
+  subcategories: 'manageSubcategories',
   privacyTags: 'privacyTagsTitle',
   api: 'configApi',
   reports: 'reports',
@@ -276,6 +281,7 @@ function eventToForm(evt) {
     location: evt.location ?? '',
     community: evt.community ?? DEFAULT_CHURCH,
     category: evt.category ?? 'evento',
+    subcategory: evt.subcategory ?? '',
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
@@ -407,6 +413,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const churchNames = churchList.map((c) => c.name)
   // Lista de categorias da BD (partilhada/cacheada).
   const { categories: dbCategories } = useCategories()
+  const { subcategories: dbSubcategories } = useSubcategories()
   // Opções de categoria para o formulário (BD com fallback às fixas).
   const categoryOptions = dbCategories.length
     ? dbCategories.map((c) => ({ value: c.slug, label: c.label }))
@@ -420,6 +427,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [view, setView] = useState(initialView) // 'home'|'events'|'form'|'users'|'api'|'reports'
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  // Se a categoria selecionada no formulário exige subcategoria.
+  const formCategoryRequiresSub =
+    dbCategories.find((c) => c.slug === form.category)?.requiresSubcategory ?? false
   // Upload de imagem do evento.
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
@@ -439,6 +449,9 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   // Gestão de categorias (admin).
   const [categoryForm, setCategoryForm] = useState(emptyCategory)
   const [editingCategoryId, setEditingCategoryId] = useState(null)
+  // Gestão de subcategorias (admin).
+  const [subcategoryForm, setSubcategoryForm] = useState(emptySubcategory)
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState(null)
   // Gestão de etiquetas de privacidade (admin).
   const [privacyTagForm, setPrivacyTagForm] = useState(emptyPrivacyTag)
   // Traduções (admin): { lang: { key: value } } + idioma em edição.
@@ -453,7 +466,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const [overlapPolicy, setOverlapPolicy] = useState({ default: 'off', byCategory: {}, byChurch: {} })
   const [savingOverlapPolicy, setSavingOverlapPolicy] = useState(false)
   // Filtros de gestão (Update 1 e 2).
-  const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
+  const [eventFilters, setEventFilters] = useState({ title: '', community: 'Todas', category: 'Todas', subcategory: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })
   const [userFilters, setUserFilters] = useState({ q: '', role: 'Todos', status: 'Todos' })
 
   const section = SECTION[view] ?? SECTION.home
@@ -465,6 +478,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       if (title && !(e.title ?? '').toLowerCase().includes(title)) return false
       if (eventFilters.community !== 'Todas' && e.community !== eventFilters.community) return false
       if (eventFilters.category !== 'Todas' && e.category !== eventFilters.category) return false
+      if (eventFilters.subcategory !== 'Todas' && e.subcategory !== eventFilters.subcategory) return false
       if (eventFilters.privacyTag !== 'Todas' && e.privacyTag !== eventFilters.privacyTag) return false
       if (eventFilters.status !== 'Todos' && e.status !== eventFilters.status) return false
       if (eventFilters.date && e.date !== eventFilters.date) return false
@@ -802,6 +816,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       label: category.label ?? '',
       color: category.color ?? '#F5A800',
       sortOrder: category.sortOrder ?? '',
+      requiresSubcategory: !!category.requiresSubcategory,
     })
     setEditingCategoryId(category.id)
   }
@@ -828,6 +843,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
           label: categoryForm.label.trim(),
           color: categoryForm.color || null,
           sortOrder: categoryForm.sortOrder,
+          requiresSubcategory: !!categoryForm.requiresSubcategory,
         })
         toast.success('Categoria atualizada.')
       } else {
@@ -836,6 +852,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
           label: categoryForm.label.trim(),
           color: categoryForm.color || null,
           sortOrder: categoryForm.sortOrder,
+          requiresSubcategory: !!categoryForm.requiresSubcategory,
         })
         toast.success('Categoria criada.')
       }
@@ -857,6 +874,70 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
         toast.success('Categoria eliminada.')
         if (editingCategoryId === category.id) cancelCategoryEdit()
         return invalidateCategories()
+      })
+      .catch((err) => toast.error(err.message))
+      .finally(() => setBusy(false))
+  }
+
+  // ── Gestão de subcategorias (admin) ────────────────────────────
+  const openSubcategories = () => {
+    setSubcategoryForm(emptySubcategory)
+    setEditingSubcategoryId(null)
+    setView('subcategories')
+  }
+
+  const setSubcategoryField = (key) => (e) =>
+    setSubcategoryForm((s) => ({ ...s, [key]: e.target.value }))
+
+  const openEditSubcategory = (sub) => {
+    setSubcategoryForm({ name: sub.name ?? '', sortOrder: sub.sortOrder ?? '' })
+    setEditingSubcategoryId(sub.id)
+  }
+
+  const cancelSubcategoryEdit = () => {
+    setSubcategoryForm(emptySubcategory)
+    setEditingSubcategoryId(null)
+  }
+
+  const handleSaveSubcategory = async (e) => {
+    e.preventDefault()
+    if (!subcategoryForm.name.trim()) {
+      toast.error('O nome da subcategoria é obrigatório.')
+      return
+    }
+    setBusy(true)
+    try {
+      if (editingSubcategoryId) {
+        await eventsService.updateSubcategory(editingSubcategoryId, {
+          name: subcategoryForm.name.trim(),
+          sortOrder: subcategoryForm.sortOrder,
+        })
+        toast.success('Subcategoria atualizada.')
+      } else {
+        await eventsService.createSubcategory({
+          name: subcategoryForm.name.trim(),
+          sortOrder: subcategoryForm.sortOrder,
+        })
+        toast.success('Subcategoria criada.')
+      }
+      await invalidateSubcategories()
+      cancelSubcategoryEdit()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteSubcategory = (sub) => {
+    if (!window.confirm(`Eliminar a subcategoria "${sub.name}"?`)) return
+    setBusy(true)
+    eventsService
+      .deleteSubcategory(sub.id)
+      .then(() => {
+        toast.success('Subcategoria eliminada.')
+        if (editingSubcategoryId === sub.id) cancelSubcategoryEdit()
+        return invalidateSubcategories()
       })
       .catch((err) => toast.error(err.message))
       .finally(() => setBusy(false))
@@ -1202,6 +1283,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       location: form.location.trim() || null,
       community: form.community.trim() || DEFAULT_CHURCH,
       category: form.category,
+      subcategory: form.subcategory || null,
       isPrivate: form.isPrivate,
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
@@ -1238,6 +1320,10 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     e.preventDefault()
     if (!form.title.trim() || !form.startDate) {
       toast.error('Título e data de início são obrigatórios.')
+      return
+    }
+    if (formCategoryRequiresSub && !form.subcategory) {
+      toast.error('Esta categoria exige uma subcategoria.')
       return
     }
     const startIso = combineDateTime(form.startDate, form.startTime)
@@ -1431,6 +1517,13 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 </button>
               )}
               {isAdmin && (
+                <button className={styles.menuCard} onClick={openSubcategories} disabled={busy}>
+                  <i className="ti ti-tag" aria-hidden="true" />
+                  <span className={styles.menuTitle}>{t('manageSubcategories')}</span>
+                  <span className={styles.menuDesc}>{t('manageSubcategoriesDesc')}</span>
+                </button>
+              )}
+              {isAdmin && (
                 <button className={styles.menuCard} onClick={openPrivacyTags} disabled={busy}>
                   <i className="ti ti-shield-lock" aria-hidden="true" />
                   <span className={styles.menuTitle}>{t('privacyTagsTitle')}</span>
@@ -1520,6 +1613,21 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   </option>
                 ))}
               </select>
+              {dbSubcategories.length > 0 && (
+                <select
+                  className={styles.filterInput}
+                  value={eventFilters.subcategory}
+                  onChange={(e) => setEventFilters((f) => ({ ...f, subcategory: e.target.value }))}
+                  title={t('subcategory')}
+                >
+                  <option value="Todas">{t('allSubcategories')}</option>
+                  {dbSubcategories.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select
                 className={styles.filterInput}
                 value={eventFilters.status}
@@ -1554,11 +1662,11 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 onChange={(e) => setEventFilters((f) => ({ ...f, date: e.target.value }))}
                 title="Data"
               />
-              {(eventFilters.title || eventFilters.community !== 'Todas' || eventFilters.category !== 'Todas' || eventFilters.privacyTag !== 'Todas' || eventFilters.status !== 'Todos' || eventFilters.date) && (
+              {(eventFilters.title || eventFilters.community !== 'Todas' || eventFilters.category !== 'Todas' || eventFilters.subcategory !== 'Todas' || eventFilters.privacyTag !== 'Todas' || eventFilters.status !== 'Todos' || eventFilters.date) && (
                 <button
                   type="button"
                   className={styles.ghostBtn}
-                  onClick={() => setEventFilters({ title: '', community: 'Todas', category: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })}
+                  onClick={() => setEventFilters({ title: '', community: 'Todas', category: 'Todas', subcategory: 'Todas', privacyTag: 'Todas', status: 'Todos', date: '' })}
                 >
                   <i className="ti ti-x" aria-hidden="true" />
                   <span>Limpar</span>
@@ -2143,6 +2251,20 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   </div>
                 )}
 
+                {report.bySubcategory?.length > 0 && (
+                  <div className={styles.reportSection}>
+                    <h4 className={styles.reportHeading}>{t('bySubcategory')}</h4>
+                    <ul className={styles.barList}>
+                      {report.bySubcategory.map((c) => (
+                        <li key={c.label} className={styles.barRow}>
+                          <span className={styles.barLabel}>{c.label}</span>
+                          <span className={styles.barValue}>{c.n}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {report.upcoming.length > 0 && (
                   <div className={styles.reportSection}>
                     <h4 className={styles.reportHeading}>Próximos eventos</h4>
@@ -2333,6 +2455,16 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   />
                 </label>
               </div>
+              <label className={`${styles.check} ${styles.checkInline}`}>
+                <input
+                  type="checkbox"
+                  checked={!!categoryForm.requiresSubcategory}
+                  onChange={(e) =>
+                    setCategoryForm((c) => ({ ...c, requiresSubcategory: e.target.checked }))
+                  }
+                />
+                {t('requiresSubcategory')}
+              </label>
               <div className={styles.formActions}>
                 {editingCategoryId && (
                   <button
@@ -2371,6 +2503,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                         <span className={styles.itemMeta}>
                           {c.slug}
                           {c.color ? ` · ${c.color}` : ''}
+                          {c.requiresSubcategory ? ` · ${t('requiresSubcategoryShort')}` : ''}
                         </span>
                       </div>
                     </div>
@@ -2386,6 +2519,84 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                       <button
                         className={`${styles.iconBtn} ${styles.danger}`}
                         onClick={() => handleDeleteCategory(c)}
+                        disabled={busy}
+                        title="Eliminar"
+                      >
+                        <i className="ti ti-trash" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : view === 'subcategories' ? (
+          <div className={styles.body}>
+            <form className={styles.userForm} onSubmit={handleSaveSubcategory}>
+              <div className={styles.row}>
+                <label className={styles.label}>
+                  {t('subcategoryName')} *
+                  <input
+                    className={styles.input}
+                    value={subcategoryForm.name}
+                    onChange={setSubcategoryField('name')}
+                    placeholder="ex.: B1, Escola Dominical"
+                    required
+                  />
+                </label>
+                <label className={styles.label}>
+                  Ordem
+                  <input
+                    className={styles.input}
+                    type="number"
+                    value={subcategoryForm.sortOrder}
+                    onChange={setSubcategoryField('sortOrder')}
+                    placeholder="0"
+                  />
+                </label>
+              </div>
+              <div className={styles.formActions}>
+                {editingSubcategoryId && (
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={cancelSubcategoryEdit}
+                    disabled={busy}
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                  <i
+                    className={`ti ${editingSubcategoryId ? 'ti-device-floppy' : 'ti-plus'}`}
+                    aria-hidden="true"
+                  />
+                  <span>{editingSubcategoryId ? t('saveSubcategory') : t('createSubcategory')}</span>
+                </button>
+              </div>
+            </form>
+
+            {dbSubcategories.length === 0 ? (
+              <p className={styles.muted}>{t('noSubcategories')}</p>
+            ) : (
+              <ul className={styles.list}>
+                {dbSubcategories.map((s) => (
+                  <li key={s.id} className={styles.item}>
+                    <div className={styles.itemText}>
+                      <strong className={styles.itemTitle}>{s.name}</strong>
+                    </div>
+                    <div className={styles.actions}>
+                      <button
+                        className={styles.iconBtn}
+                        onClick={() => openEditSubcategory(s)}
+                        disabled={busy}
+                        title="Editar"
+                      >
+                        <i className="ti ti-pencil" aria-hidden="true" />
+                      </button>
+                      <button
+                        className={`${styles.iconBtn} ${styles.danger}`}
+                        onClick={() => handleDeleteSubcategory(s)}
                         disabled={busy}
                         title="Eliminar"
                       >
@@ -2816,6 +3027,29 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 </select>
               </label>
             </div>
+
+            {dbSubcategories.length > 0 && (
+              <div className={styles.row}>
+                <label className={styles.label}>
+                  {t('subcategory')}{formCategoryRequiresSub ? ' *' : ''}
+                  <select
+                    className={styles.input}
+                    value={form.subcategory}
+                    onChange={setField('subcategory')}
+                    required={formCategoryRequiresSub}
+                  >
+                    <option value="">
+                      {formCategoryRequiresSub ? t('selectSubcategory') : t('noSubcategory')}
+                    </option>
+                    {dbSubcategories.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
 
             {overlapInfo.conflicts.length > 0 && (
               <div

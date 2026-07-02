@@ -1,7 +1,7 @@
 import {
   parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE,
 } from '../utils/calendarHelpers'
-import { CalendarPlus, Check, Church, Lock, Plus, X } from 'lucide-react'
+import { CalendarPlus, Check, Church, Lock, Plus, Tag, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../hooks/useI18n'
@@ -42,6 +42,9 @@ export default function CalendarSidebar({
   privacyTag,
   onPrivacyTagChange,
   privacyTags,
+  subcategory,
+  onSubcategoryChange,
+  subcategoriesInUse,
 }) {
   const { t, entity, entities } = useI18n()
   const { year, month, day } = parseDateKey(selectedKey)
@@ -166,6 +169,20 @@ export default function CalendarSidebar({
             allLabel={t('allTags')}
             icon={Lock}
             ariaLabel="Filtrar por etiqueta de privacidade"
+          />
+        </div>
+      )}
+
+      {Array.isArray(subcategoriesInUse) && subcategoriesInUse.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('subcategories')}</div>
+          <MultiSelectDropdown
+            options={subcategoriesInUse}
+            selected={subcategory}
+            onChange={onSubcategoryChange}
+            allLabel={t('allSubcategories')}
+            icon={Tag}
+            ariaLabel={t('subcategory')}
           />
         </div>
       )}

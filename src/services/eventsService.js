@@ -27,6 +27,12 @@ export async function listCategoriesInUse() {
   return categories
 }
 
+/** Subcategorias distintas em uso por eventos — alimenta o filtro da barra lateral. */
+export async function listSubcategoriesInUse() {
+  const { subcategories } = await request('/data/events/subcategories-in-use')
+  return subcategories
+}
+
 /** Histórico de transições de um evento. */
 export async function getHistory(id) {
   const { history } = await request(`/data/events/${id}/history`)
@@ -286,6 +292,28 @@ export async function updateCategory(id, payload) {
 
 export async function deleteCategory(id) {
   await request(`/data/categories/${id}`, { method: 'DELETE' })
+}
+
+// ── Subcategorias de eventos (lista global) ──────────────────
+
+/** Lista as subcategorias geríveis no backoffice (qualquer utilizador autenticado). */
+export async function listSubcategories() {
+  const { subcategories } = await request('/data/subcategories')
+  return subcategories
+}
+
+export async function createSubcategory(payload) {
+  const { subcategory } = await request('/data/subcategories', { method: 'POST', body: payload })
+  return subcategory
+}
+
+export async function updateSubcategory(id, payload) {
+  const { subcategory } = await request(`/data/subcategories/${id}`, { method: 'PUT', body: payload })
+  return subcategory
+}
+
+export async function deleteSubcategory(id) {
+  await request(`/data/subcategories/${id}`, { method: 'DELETE' })
 }
 
 // ── Etiquetas de privacidade ─────────────────────────────────────

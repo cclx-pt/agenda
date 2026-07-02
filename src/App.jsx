@@ -83,6 +83,8 @@ export default function App() {
   const [community,    setCommunity]    = useLocalStorage('cclx-communities', []) // filtro de igrejas (multi)
   const [category,     setCategory]     = useLocalStorage('cclx-category', 'Todos') // event-type filter
   const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
+  const [subcategory,  setSubcategory]  = useLocalStorage('cclx-subcategories', []) // filtro por subcategorias (multi)
+  const [subcategoriesInUse, setSubcategoriesInUse] = useState([]) // subcategorias existentes em eventos (BD)
   const [privacyTag,   setPrivacyTag]   = useState([]) // filtro por etiquetas de privacidade (multi)
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [subscribeOpen, setSubscribeOpen] = useState(false) // modal de subscrição (feed iCal)
@@ -98,6 +100,7 @@ export default function App() {
   // Categorias existentes em eventos (BD, qualquer estado) — filtro dinâmico da sidebar.
   const refreshCategoriesInUse = useCallback(() => {
     eventsService.listCategoriesInUse().then(setCategoriesInUse).catch(() => {})
+    eventsService.listSubcategoriesInUse().then(setSubcategoriesInUse).catch(() => {})
   }, [])
   useEffect(() => {
     refreshCategoriesInUse()
@@ -136,11 +139,12 @@ export default function App() {
     return events.filter(e =>
       (community.length === 0 || community.includes(e.community)) &&
       (category === 'Todos' || e.category === category) &&
+      (subcategory.length === 0 || subcategory.includes(e.subcategory)) &&
       (privacyTag.length === 0 || privacyTag.includes(e.privacyTag)) &&
       (visibility === 'all' ||
         (visibility === 'private' ? e.isPrivate : !e.isPrivate))
     )
-  }, [events, community, category, privacyTag, visibility])
+  }, [events, community, category, subcategory, privacyTag, visibility])
 
   const filteredByDate = useMemo(() => {
     const map = {}
@@ -347,6 +351,9 @@ export default function App() {
           privacyTag={privacyTag}
           onPrivacyTagChange={setPrivacyTag}
           privacyTags={privacyTagsInUse}
+          subcategory={subcategory}
+          onSubcategoryChange={setSubcategory}
+          subcategoriesInUse={subcategoriesInUse}
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">

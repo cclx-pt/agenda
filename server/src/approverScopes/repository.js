@@ -11,13 +11,14 @@ function mapRow(row) {
     approverEmail: row.approver_email ?? null,
     church: row.church ?? null,
     category: row.category ?? null,
+    subcategory: row.subcategory ?? null,
     privacyTag: row.privacy_tag ?? null,
     createdAt: row.created_at,
   }
 }
 
 const SELECT_FULL = `
-  SELECT s.id, s.approver_id, s.church, s.category, s.privacy_tag, s.created_at,
+  SELECT s.id, s.approver_id, s.church, s.category, s.subcategory, s.privacy_tag, s.created_at,
          u.name AS approver_name, u.email AS approver_email
   FROM approver_scopes s
   LEFT JOIN users u ON u.id = s.approver_id
@@ -31,7 +32,7 @@ export async function list() {
 // Regras de um aprovador (usado pela lógica de moderação/notificação).
 export async function listByApprover(approverId) {
   const { rows } = await pool.query(
-    'SELECT id, approver_id, church, category, privacy_tag, created_at FROM approver_scopes WHERE approver_id = $1',
+    'SELECT id, approver_id, church, category, subcategory, privacy_tag, created_at FROM approver_scopes WHERE approver_id = $1',
     [approverId]
   )
   return rows.map(mapRow)
@@ -42,11 +43,11 @@ export async function findById(id) {
   return mapRow(rows[0])
 }
 
-export async function insert({ approverId, church, category, privacyTag }) {
+export async function insert({ approverId, church, category, subcategory, privacyTag }) {
   const id = randomUUID()
   await pool.query(
-    'INSERT INTO approver_scopes (id, approver_id, church, category, privacy_tag) VALUES ($1, $2, $3, $4, $5)',
-    [id, approverId, church ?? null, category ?? null, privacyTag ?? null]
+    'INSERT INTO approver_scopes (id, approver_id, church, category, subcategory, privacy_tag) VALUES ($1, $2, $3, $4, $5, $6)',
+    [id, approverId, church ?? null, category ?? null, subcategory ?? null, privacyTag ?? null]
   )
   return findById(id)
 }

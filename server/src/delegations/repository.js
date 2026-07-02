@@ -14,6 +14,7 @@ function mapRow(row) {
     delegateEmail: row.delegate_email ?? null,
     church: row.church ?? null,
     category: row.category ?? null,
+    subcategory: row.subcategory ?? null,
     startDate: row.start_date,
     endDate: row.end_date,
     active: !!row.active,
@@ -24,7 +25,7 @@ function mapRow(row) {
 
 // SELECT base com os nomes do delegado/delegador para a UI e datas em texto.
 const SELECT_FULL = `
-  SELECT d.id, d.delegator_id, d.delegate_id, d.church, d.category,
+  SELECT d.id, d.delegator_id, d.delegate_id, d.church, d.category, d.subcategory,
          to_char(d.start_date, 'YYYY-MM-DD') AS start_date,
          to_char(d.end_date, 'YYYY-MM-DD') AS end_date,
          d.active, d.created_at, d.updated_at,
@@ -52,7 +53,7 @@ export async function listByDelegator(delegatorId) {
 // o editor pode aprovar/rejeitar um dado evento).
 export async function listActiveForDelegate(delegateId) {
   const { rows } = await pool.query(
-    `SELECT id, delegate_id, church, category,
+    `SELECT id, delegate_id, church, category, subcategory,
             to_char(start_date, 'YYYY-MM-DD') AS start_date,
             to_char(end_date, 'YYYY-MM-DD') AS end_date, active
        FROM approval_delegations
@@ -65,15 +66,16 @@ export async function listActiveForDelegate(delegateId) {
 
 // IDs dos editores com delegação ATIVA que cobre (igreja, categoria) de um
 // evento — para saber quem notificar quando um evento é submetido para aprovação.
-export async function listActiveForEvent(church, category) {
+export async function listActiveForEvent(church, category, subcategory) {
   const { rows } = await pool.query(
     `SELECT delegate_id
        FROM approval_delegations
       WHERE active = TRUE
         AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
         AND (church IS NULL OR church = $1)
-        AND (category IS NULL OR category = $2)`,
-    [church ?? null, category ?? null]
+        AND (category IS NULL OR category = $2)
+        AND (subcategory IS NULL OR subcategory = $3)`,
+    [church ?? null, category ?? null, subcategory ?? null]
   )
   return rows.map((r) => r.delegate_id)
 }
@@ -87,14 +89,15 @@ export async function insert(data, delegatorId) {
   const id = randomUUID()
   await pool.query(
     `INSERT INTO approval_delegations
-      (id, delegator_id, delegate_id, church, category, start_date, end_date, active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      (id, delegator_id, delegate_id, church, category, subcategory, start_date, end_date, active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [
       id,
       delegatorId ?? null,
       data.delegateId,
       data.church ?? null,
       data.category ?? null,
+      data.subcategory ?? null,
       data.startDate,
       data.endDate,
       data.active ?? true,
@@ -109,9 +112,10 @@ export async function update(id, data) {
        delegate_id = $2,
        church = $3,
        category = $4,
-       start_date = $5,
-       end_date = $6,
-       active = $7,
+       subcategory = $5,
+       start_date = $6,
+       end_date = $7,
+       active = $8,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -119,6 +123,7 @@ export async function update(id, data) {
       data.delegateId,
       data.church ?? null,
       data.category ?? null,
+      data.subcategory ?? null,
       data.startDate,
       data.endDate,
       data.active ?? true,

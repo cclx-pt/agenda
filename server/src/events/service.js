@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import * as repo from './repository.js'
 import * as externalRepo from '../external/repository.js'
 import * as categoriesService from '../categories/service.js'
+import * as subcategoriesService from '../subcategories/service.js'
 import * as privacyTagsService from '../privacyTags/service.js'
 import * as settingsService from '../settings/service.js'
 import * as delegationsRepo from '../delegations/repository.js'
@@ -35,6 +36,9 @@ export const eventInputSchema = z
     location: z.string().trim().optional().nullable(),
     community: z.string().trim().optional(),
     category: z.string().trim().min(1).optional(),
+    // Subcategoria (lista global). Obrigatória conforme a categoria (validado no
+    // serviço). '' → null.
+    subcategory: z.string().trim().optional().nullable(),
     isPrivate: z.boolean().optional(),
     // Aceita URL absoluto (http/https, ex.: banners da inChurch) ou caminho
     // relativo de upload servido pelo backend (ex.: /data/uploads/abc.png).
@@ -188,7 +192,8 @@ async function hasActiveDelegation(user, event) {
   return delegations.some(
     (d) =>
       (d.church == null || d.church === event.community) &&
-      (d.category == null || d.category === event.category)
+      (d.category == null || d.category === event.category) &&
+      (d.subcategory == null || d.subcategory === event.subcategory)
   )
 }
 
@@ -203,6 +208,7 @@ async function matchesApproverScopes(approverId, event) {
       (s) =>
         (s.church == null || s.church === event.community) &&
         (s.category == null || s.category === event.category) &&
+        (s.subcategory == null || s.subcategory === event.subcategory) &&
         (s.privacyTag == null || s.privacyTag === event.privacyTag)
     )
   } catch (err) {
@@ -279,7 +285,7 @@ async function listApproversFor(event) {
       }
     }
   }
-  const delegateIds = await delegationsRepo.listActiveForEvent(event.community, event.category)
+  const delegateIds = await delegationsRepo.listActiveForEvent(event.community, event.category, event.subcategory)
   if (delegateIds.length) {
     for (const u of users) {
       if (u.isActive && delegateIds.includes(u.id)) byId.set(u.id, u)
@@ -353,6 +359,11 @@ export async function categoriesInUse() {
     : []
   const sor = await repo.distinctCategories()
   return Array.from(new Set([...sor, ...external]))
+}
+
+/** Subcategorias distintas em uso por eventos do SoR (alimenta filtros). */
+export async function subcategoriesInUse() {
+  return repo.distinctSubcategories()
 }
 
 /**
@@ -433,13 +444,15 @@ export async function listForApproval(user, { status } = {}) {
       (s) =>
         (s.church == null || s.church === e.community) &&
         (s.category == null || s.category === e.category) &&
+        (s.subcategory == null || s.subcategory === e.subcategory) &&
         (s.privacyTag == null || s.privacyTag === e.privacyTag)
     )
   const byDelegation = (e) =>
     delegations.some(
       (d) =>
         (d.church == null || d.church === e.community) &&
-        (d.category == null || d.category === e.category)
+        (d.category == null || d.category === e.category) &&
+        (d.subcategory == null || d.subcategory === e.subcategory)
     )
   return all.filter((e) => {
     if (canAccessChurch(user, e.community)) {
@@ -563,10 +576,22 @@ export async function overlapsPreview(user, { community, category, start, end, a
   return { mode, conflicts: overlaps.map((o) => summarizeConflict(o, user)) }
 }
 
+// Normaliza e valida a subcategoria: '' → null; se indicada tem de existir; se a
+// categoria a exige, é obrigatória. Escreve em `data.subcategory` o valor limpo.
+async function assertSubcategoryOk(data) {
+  const sub = data.subcategory && data.subcategory.trim() ? data.subcategory.trim() : null
+  data.subcategory = sub
+  if (sub) await subcategoriesService.assertKnownSubcategory(sub)
+  if (!sub && (await categoriesService.requiresSubcategory(data.category ?? 'evento'))) {
+    throw new EventError(400, 'Esta categoria exige uma subcategoria.')
+  }
+}
+
 export async function create(user, input) {
   const data = eventInputSchema.parse(input)
   const recurrence = recurrenceSchema.parse(input.recurrence)
   await categoriesService.assertKnownCategory(data.category)
+  await assertSubcategoryOk(data)
   await privacyTagsService.assertKnownPrivacyTag(data.privacyTag)
   if (!canAccessChurch(user, data.community ?? 'Sede')) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
@@ -623,6 +648,7 @@ export async function update(user, id, input, { scope } = {}) {
   ensureCanEdit(user, existing)
   const data = eventInputSchema.parse(input)
   await categoriesService.assertKnownCategory(data.category)
+  await assertSubcategoryOk(data)
   await privacyTagsService.assertKnownPrivacyTag(data.privacyTag)
   // Não permitir mover o evento para uma igreja sem acesso.
   if (!canAccessChurch(user, data.community ?? 'Sede')) {

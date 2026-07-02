@@ -5,7 +5,7 @@ import { Search, SearchX, X } from 'lucide-react'
 import { CATEGORY_META, formatDateLabel } from '../utils/calendarHelpers'
 
 const FUSE_OPTIONS = {
-  keys: ['title', 'description', 'location', 'category'],
+  keys: ['title', 'description', 'location', 'category', 'subcategory'],
   threshold: 0.35,
   minMatchCharLength: 2,
 }

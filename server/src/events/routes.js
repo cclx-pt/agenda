@@ -117,6 +117,14 @@ eventsRouter.get(
   })
 )
 
+// Subcategorias distintas em uso — alimenta o filtro dinâmico da barra lateral.
+eventsRouter.get(
+  '/subcategories-in-use',
+  asyncHandler(async (_req, res) => {
+    res.json({ subcategories: await service.subcategoriesInUse() })
+  })
+)
+
 // A partir daqui, tudo exige autenticação.
 eventsRouter.use(requireAuth)
 

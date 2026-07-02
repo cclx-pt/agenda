@@ -10,12 +10,13 @@ function mapRow(row) {
     label: row.label,
     color: row.color ?? null,
     sortOrder: row.sort_order,
+    requiresSubcategory: !!row.requires_subcategory,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
 
-const COLUMNS = 'id, slug, label, color, sort_order, created_at, updated_at'
+const COLUMNS = 'id, slug, label, color, sort_order, requires_subcategory, created_at, updated_at'
 
 export async function list() {
   const { rows } = await pool.query(
@@ -49,9 +50,9 @@ export async function findBySlug(slug) {
 export async function insert(data) {
   const id = randomUUID()
   await pool.query(
-    `INSERT INTO categories (id, slug, label, color, sort_order)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [id, data.slug, data.label, data.color ?? null, data.sortOrder ?? 0]
+    `INSERT INTO categories (id, slug, label, color, sort_order, requires_subcategory)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, data.slug, data.label, data.color ?? null, data.sortOrder ?? 0, data.requiresSubcategory ?? false]
   )
   return findById(id)
 }

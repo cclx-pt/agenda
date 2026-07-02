@@ -27,6 +27,7 @@ function mapRow(row) {
     location: row.location,
     community: row.community,
     category: row.category,
+    subcategory: row.subcategory ?? null,
     status: row.status,
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
@@ -89,7 +90,7 @@ export async function findOverlaps({ start, end, excludeId, excludeSeriesId, sta
 // `from`/`to` filtram por data de início (YYYY-MM-DD, inclusivo).
 // `allowedPrivacyTags` (só quando `includePrivate`): restringe os eventos
 // privados às etiquetas indicadas (eventos sem etiqueta são sempre visíveis).
-export async function list({ status, createdBy, includePrivate = true, allowedPrivacyTags, communities, from, to } = {}) {
+export async function list({ status, createdBy, includePrivate = true, allowedPrivacyTags, communities, subcategories, from, to } = {}) {
   const where = []
   const params = []
   if (status) {
@@ -106,6 +107,10 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   if (Array.isArray(communities) && communities.length > 0) {
     params.push(communities)
     where.push(`community = ANY($${params.length})`)
+  }
+  if (Array.isArray(subcategories) && subcategories.length > 0) {
+    params.push(subcategories)
+    where.push(`subcategory = ANY($${params.length})`)
   }
   if (from) {
     params.push(from)
@@ -142,6 +147,14 @@ export async function distinctCategories() {
   return rows.map((r) => r.category).filter(Boolean)
 }
 
+// Subcategorias distintas em uso por qualquer evento (independentemente do estado).
+export async function distinctSubcategories() {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT subcategory FROM events WHERE subcategory IS NOT NULL'
+  )
+  return rows.map((r) => r.subcategory).filter(Boolean)
+}
+
 export async function insert(data, actorId) {
   const id = randomUUID()
   await pool.query(
@@ -150,8 +163,8 @@ export async function insert(data, actorId) {
        community, category, is_private, privacy_tag, banner_url,
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
-       series_id, created_by, organizer_phone, organizer_email)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+       series_id, created_by, organizer_phone, organizer_email, subcategory)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
     [
       id,
       data.title,
@@ -177,6 +190,7 @@ export async function insert(data, actorId) {
       actorId ?? null,
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
+      data.subcategory ?? null,
     ]
   )
   return findById(id)
@@ -206,6 +220,7 @@ export async function update(id, data) {
        map_lng = $20,
        organizer_phone = $21,
        organizer_email = $22,
+       subcategory = $23,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -231,6 +246,7 @@ export async function update(id, data) {
       data.mapLng ?? null,
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
+      data.subcategory ?? null,
     ]
   )
   return findById(id)
@@ -285,8 +301,9 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        map_lng = $18,
        organizer_phone = $19,
        organizer_email = $20,
+       subcategory = $21,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $21`,
+     WHERE series_id = $1 AND id <> $22`,
     [
       seriesId,
       data.title,
@@ -308,6 +325,7 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.mapLng ?? null,
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
+      data.subcategory ?? null,
       exceptId,
     ]
   )

@@ -3,6 +3,7 @@ import * as repo from './repository.js'
 import * as usersRepo from '../users/repository.js'
 import * as churchesRepo from '../churches/repository.js'
 import * as categoriesRepo from '../categories/repository.js'
+import * as subcategoriesRepo from '../subcategories/repository.js'
 import { sendDelegationEmail } from '../auth/email.js'
 import { config } from '../config.js'
 import { waitUntil } from '@vercel/functions'
@@ -22,9 +23,10 @@ const dateStr = z.string().regex(DATE_RE, 'Data inválida (use AAAA-MM-DD).')
 const delegationSchema = z
   .object({
     delegateId: z.string().uuid('Editor (delegado) inválido.'),
-    // null/ausente = todas as igrejas / todas as categorias.
+    // null/ausente = todas as igrejas / categorias / subcategorias.
     church: z.string().trim().min(1).optional().nullable(),
     category: z.string().trim().min(1).optional().nullable(),
+    subcategory: z.string().trim().min(1).optional().nullable(),
     startDate: dateStr,
     endDate: dateStr,
     active: z.boolean().optional(),
@@ -63,6 +65,12 @@ async function assertKnownRefs(data) {
     const slugs = await categoriesRepo.listSlugs()
     if (!slugs.includes(data.category)) {
       throw new DelegationError(400, `Categoria desconhecida: ${data.category}`)
+    }
+  }
+  if (data.subcategory) {
+    const names = await subcategoriesRepo.listNames()
+    if (!names.includes(data.subcategory)) {
+      throw new DelegationError(400, `Subcategoria desconhecida: ${data.subcategory}`)
     }
   }
 }

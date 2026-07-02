@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS events (
   location         TEXT,
   community        TEXT NOT NULL DEFAULT 'Sede',
   category         TEXT NOT NULL DEFAULT 'evento',
+  subcategory      TEXT,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'pendente', 'publicado', 'rejeitado')),
   is_private       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -95,6 +96,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_name TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS map_url TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lat DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lng DOUBLE PRECISION;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (
@@ -117,6 +119,7 @@ CREATE TABLE IF NOT EXISTS approval_delegations (
   delegate_id  UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   church       TEXT,
   category     TEXT,
+  subcategory  TEXT,
   start_date   DATE NOT NULL,
   end_date     DATE NOT NULL,
   active       BOOLEAN NOT NULL DEFAULT TRUE,
@@ -125,6 +128,7 @@ CREATE TABLE IF NOT EXISTS approval_delegations (
 );
 CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON approval_delegations (delegate_id);
 CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON approval_delegations (delegator_id);
+ALTER TABLE approval_delegations ADD COLUMN IF NOT EXISTS subcategory TEXT;
 
 -- ── Âmbito dos aprovadores ──────────────────────────
 -- Configuração (complementar ao acesso por igreja do perfil) que limita o que um
@@ -135,10 +139,12 @@ CREATE TABLE IF NOT EXISTS approver_scopes (
   approver_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   church      TEXT,
   category    TEXT,
+  subcategory TEXT,
   privacy_tag TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE approver_scopes ADD COLUMN IF NOT EXISTS privacy_tag TEXT;
+ALTER TABLE approver_scopes ADD COLUMN IF NOT EXISTS subcategory TEXT;
 CREATE INDEX IF NOT EXISTS idx_approver_scopes_approver ON approver_scopes (approver_id);
 
 -- ── Eventos externos (espelho da inChurch / inRadar) ────────────
@@ -220,6 +226,32 @@ INSERT INTO categories (slug, label, color, sort_order) VALUES
   ('formacao', 'Formação', '#5DB87A', 3),
   ('evento', 'Evento', '#B8C0D8', 4)
 ON CONFLICT (slug) DO NOTHING;
+
+-- Flag por categoria: exige subcategoria nos eventos desta categoria.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS requires_subcategory BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ── Subcategorias de eventos (lista global) ─────────────────
+-- Lista única gerível no backoffice, aplicável a qualquer categoria. O evento
+-- guarda o NOME da subcategoria (events.subcategory). A obrigatoriedade é
+-- definida por categoria (categories.requires_subcategory).
+CREATE TABLE IF NOT EXISTS subcategories (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Semeia as subcategorias iniciais (idempotente).
+INSERT INTO subcategories (name, sort_order) VALUES
+  ('B1', 1),
+  ('GLAM', 2),
+  ('Alateia', 3),
+  ('Jump', 4),
+  ('Base', 5),
+  ('Escola Dominical', 6),
+  ('Grupos de Crescimento', 7)
+ON CONFLICT (name) DO NOTHING;
 
 -- ── Etiquetas de privacidade ────────────────────────────────────
 -- Lista gerível no backoffice. Uma etiqueta agrupa eventos privados; cada

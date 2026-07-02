@@ -15,6 +15,7 @@ import { usersRouter } from './users/routes.js'
 import { reportsRouter } from './reports/routes.js'
 import { churchesRouter } from './churches/routes.js'
 import { categoriesRouter } from './categories/routes.js'
+import { subcategoriesRouter } from './subcategories/routes.js'
 import { privacyTagsRouter } from './privacyTags/routes.js'
 import { delegationsRouter } from './delegations/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
@@ -64,6 +65,7 @@ app.use('/data/reports', reportsRouter)
 app.use('/data/events', eventsRouter)
 app.use('/data/churches', churchesRouter)
 app.use('/data/categories', categoriesRouter)
+app.use('/data/subcategories', subcategoriesRouter)
 app.use('/data/privacy-tags', privacyTagsRouter)
 app.use('/data/delegations', delegationsRouter)
 app.use('/data/approver-scopes', approverScopesRouter)

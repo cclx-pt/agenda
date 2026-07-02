@@ -70,6 +70,7 @@ function mapSorEvent(e) {
     id: e.id,
     title: e.title,
     category: e.category || 'evento',
+    subcategory: e.subcategory ?? null,
     community: e.community || DEFAULT_CHURCH,
     date: e.date,
     timeStart: e.timeStart ?? null,
