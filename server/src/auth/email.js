@@ -199,6 +199,53 @@ export async function sendApprovalRequestEmail(to, { name, eventTitle, eventDate
 }
 
 /**
+ * Notifica um editor de que lhe foi atribuída uma delegação de aprovação, com o
+ * âmbito (igreja/categoria/período) e um link para o painel de aprovações.
+ */
+export async function sendDelegationEmail(to, { name, delegatorName, church, category, startDate, endDate, link }) {
+  const fmt = (d) => {
+    const [y, m, day] = String(d ?? '').split('-')
+    return y && m && day ? `${day}/${m}/${y}` : String(d ?? '')
+  }
+  const subject = 'Agenda CCLX — Nova delegação de aprovação'
+  const greeting = name ? `Olá ${name},` : 'Olá,'
+  const scopeChurch = church || 'Todas as igrejas'
+  const scopeCategory = category || 'Todas as categorias'
+  const period = startDate && endDate ? `${fmt(startDate)} a ${fmt(endDate)}` : ''
+  const by = delegatorName ? ` por ${delegatorName}` : ''
+
+  const text =
+    `${greeting}\n\nFoi-lhe atribuída uma delegação de aprovação${by}.` +
+    `\n\nIgreja: ${scopeChurch}\nCategoria: ${scopeCategory}` +
+    (period ? `\nPeríodo: ${period}` : '') +
+    `\n\nPode aprovar/rejeitar eventos no painel de aprovações:\n${link}\n\nAgenda CCLX`
+
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#1f2937">Agenda CCLX</h2>
+      <p style="margin:0 0 8px">${escapeHtml(greeting)}</p>
+      <p style="margin:8px 0;color:#374151">Foi-lhe atribuída uma <strong>delegação de aprovação</strong>${escapeHtml(by)}. Passa a poder aprovar/rejeitar eventos no âmbito:</p>
+      <ul style="margin:8px 0;color:#374151;padding-left:18px">
+        <li>Igreja: <strong>${escapeHtml(scopeChurch)}</strong></li>
+        <li>Categoria: <strong>${escapeHtml(scopeCategory)}</strong></li>
+        ${period ? `<li>Período: <strong>${escapeHtml(period)}</strong></li>` : ''}
+      </ul>
+      <div style="margin:22px 0">
+        <a href="${link}" style="display:inline-block;padding:10px 22px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none">Ir para as aprovações</a>
+      </div>
+      <p style="color:#9ca3af;font-size:12px">Mensagem automática da Agenda CCLX.</p>
+    </div>`
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Para: ${to}\n[email:mock] Nova delegação de aprovação\n${link}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
+/**
  * Verifica a ligação/credenciais SMTP (nodemailer transporter.verify()).
  * O resultado fica em cache curta (60s) para não abrir uma ligação SMTP a cada
  * sondagem do /health/full. Devolve { ok, configured, error }.

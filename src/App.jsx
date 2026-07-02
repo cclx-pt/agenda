@@ -81,7 +81,10 @@ export default function App() {
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
-  const [approvalsOpen, setApprovalsOpen] = useState(false) // painel de aprovacoes
+  // Abre via ?aprovacoes=1 (link do email de delegação); só renderiza se canManage.
+  const [approvalsOpen, setApprovalsOpen] = useState(
+    () => new URLSearchParams(window.location.search).get('aprovacoes') === '1'
+  )
   const [sidebarOpen,  setSidebarOpen]  = useState(false)   // gaveta lateral (telemovel/tablet)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage('cclx-sidebar-collapsed', false) // ocultar sidebar (desktop)
 
@@ -543,7 +546,7 @@ export default function App() {
       </AnimatePresence>
       {/* ── Painel de aprovações ──────────────────── */}
       <AnimatePresence>
-        {approvalsOpen && (
+        {approvalsOpen && canManage && (
           <ApprovalsPanel
             onClose={() => setApprovalsOpen(false)}
             onChanged={() => { clearEventCache(); reload() }}

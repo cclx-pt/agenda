@@ -3,6 +3,9 @@ import * as repo from './repository.js'
 import * as usersRepo from '../users/repository.js'
 import * as churchesRepo from '../churches/repository.js'
 import * as categoriesRepo from '../categories/repository.js'
+import { sendDelegationEmail } from '../auth/email.js'
+import { config } from '../config.js'
+import { waitUntil } from '@vercel/functions'
 
 // Erro de domínio com código HTTP associado.
 export class DelegationError extends Error {
@@ -76,6 +79,29 @@ async function assertDelegateIsEditor(delegateId) {
   }
 }
 
+// Notifica (em segundo plano) o editor de que recebeu uma delegação, com um
+// link que abre o painel de aprovações. Nunca bloqueia nem falha a operação.
+function notifyDelegate(delegation, delegatorName) {
+  if (!delegation?.delegateEmail) return
+  const link = `${config.appUrl.replace(/\/+$/, '')}/?aprovacoes=1`
+  const task = sendDelegationEmail(delegation.delegateEmail, {
+    name: delegation.delegateName,
+    delegatorName,
+    church: delegation.church,
+    category: delegation.category,
+    startDate: delegation.startDate,
+    endDate: delegation.endDate,
+    link,
+  }).catch((err) => {
+    console.error('[delegations] Falha ao notificar o delegado:', err?.message ?? err)
+  })
+  try {
+    waitUntil(task)
+  } catch {
+    /* fora do runtime Vercel: no-op; o processo persistente conclui a task */
+  }
+}
+
 /** Lista para o painel: admin vê todas; aprovador vê as que criou. */
 export function listForUser(user) {
   if (isAdmin(user.role)) return repo.list()
@@ -94,7 +120,9 @@ export async function create(user, input) {
   if (!canDelegateChurch(user, data.church ?? null)) {
     throw new DelegationError(403, 'Sem permissão para delegar esta igreja.')
   }
-  return repo.insert(data, user.sub)
+  const created = await repo.insert(data, user.sub)
+  notifyDelegate(created, user.name ?? null)
+  return created
 }
 
 export async function update(user, id, input) {
