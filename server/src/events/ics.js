@@ -76,8 +76,8 @@ export function buildCalendar(events, { name = 'Agenda CCLX' } = {}) {
     'METHOD:PUBLISH',
     foldLine(`X-WR-CALNAME:${icsEscape(name)}`),
     'X-WR-TIMEZONE:Europe/Lisbon',
-    'REFRESH-INTERVAL;VALUE=DURATION:PT12H',
-    'X-PUBLISHED-TTL:PT12H',
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H',
   ]
   const body = (events || []).map((e) => buildVEvent(e, stamp))
   return `${[...head, ...body, 'END:VCALENDAR'].join('\r\n')}\r\n`

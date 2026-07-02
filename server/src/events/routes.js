@@ -71,7 +71,7 @@ eventsRouter.get('/calendar.ics', async (req, res, next) => {
     const events = await service.listPublic({ from, to })
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
     res.setHeader('Content-Disposition', 'inline; filename="agenda-cclx.ics"')
-    res.setHeader('Cache-Control', 'public, max-age=3600')
+    res.setHeader('Cache-Control', 'public, max-age=600')
     res.send(buildCalendar(events, { name: 'Agenda CCLX' }))
   } catch (err) {
     next(err)
@@ -102,7 +102,7 @@ eventsRouter.get('/calendar/:token.ics', async (req, res, next) => {
     const name = req.query.scope === 'private' ? 'Agenda CCLX (privados)' : 'Agenda CCLX (pessoal)'
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
     res.setHeader('Content-Disposition', 'inline; filename="agenda-cclx.ics"')
-    res.setHeader('Cache-Control', 'private, max-age=3600')
+    res.setHeader('Cache-Control', 'private, max-age=600')
     res.send(buildCalendar(events, { name }))
   } catch (err) {
     next(err)
