@@ -25,11 +25,21 @@ const sortOrder = z
     return n
   })
 
-export const createSchema = z.object({ name, sortOrder })
+// Cor de apresentação no formato #RRGGBB; '' → null.
+const color = z
+  .string()
+  .trim()
+  .optional()
+  .nullable()
+  .transform((v) => (v ? v : null))
+  .refine((v) => v === null || /^#[0-9a-fA-F]{6}$/.test(v), 'Cor inválida (use #RRGGBB).')
+
+export const createSchema = z.object({ name, color, sortOrder })
 
 export const updateSchema = z
   .object({
     name: name.optional(),
+    color,
     sortOrder,
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'Nada para atualizar.' })
@@ -64,6 +74,7 @@ export async function update(id, input) {
   }
   const fields = {}
   if (data.name !== undefined) fields.name = data.name
+  if (data.color !== undefined) fields.color = data.color
   if (data.sortOrder !== undefined) fields.sort_order = data.sortOrder
   const result = await repo.update(id, fields)
   if (data.name && data.name !== target.name) {

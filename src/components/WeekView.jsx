@@ -1,7 +1,9 @@
-import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, CATEGORY_META, STATUS_META, API_BADGE, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
+import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
+import { useEventColors } from '../hooks/useEventColors'
 import { cn } from '@/lib/utils'
 
 export default function WeekView({ year, month, day, eventsByDate, onSelectEvent, onDayClick }) {
+  const { colorFor } = useEventColors()
   const dow = mondayFirstDay(new Date(year, month, day))
   const today = new Date()
 
@@ -36,22 +38,27 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
           </button>
           <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-2">
             {col.events.map((evt) => {
-              const cat = CATEGORY_META[evt.category] || CATEGORY_META.evento
               const st = STATUS_META[evt.status]
+              const vis = colorFor(evt)
               return (
                 <button
                   key={evt.id}
                   className={cn(
                     'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left',
                     st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
+                    evt.featured && 'cclx-featured',
                   )}
-                  style={{ background: st ? st.bg : cat.bgVar, color: cat.colorVar }}
+                  style={{ background: st ? st.bg : vis.bg, color: vis.text }}
                   onClick={() => onSelectEvent(evt)}
                   title={st ? `${evt.title} — ${st.label}` : evt.title}
                 >
-                  {evt.timeStart && <span className="text-[0.65rem] font-bold opacity-85">{evt.timeStart}</span>}
-                  <span className="line-clamp-2 text-[0.75rem] leading-tight">{evt.title}</span>
-                  <span className="text-[0.6rem] opacity-75">{evt.community}</span>
+                  <span className="flex w-full items-center gap-1 text-[0.6rem] font-bold uppercase tracking-wide opacity-85">
+                    {evt.featured && <i className="ti ti-star-filled cclx-blink text-amber-500" aria-hidden="true" />}
+                    <span className="truncate">{vis.catLabel}{evt.subcategory ? ` · ${evt.subcategory}` : ''}</span>
+                    {evt.timeStart && <span className="ml-auto opacity-90">{evt.timeStart}</span>}
+                  </span>
+                  <span className="line-clamp-2 text-[0.75rem] font-semibold leading-tight">{evt.title}</span>
+                  <span className="text-[0.6rem] opacity-75">({evt.community})</span>
                   {st && (
                     <span className="mt-0.5 inline-flex items-center gap-[3px] text-[0.6rem] font-extrabold uppercase tracking-wide opacity-90">
                       <i className={`ti ${st.icon}`} aria-hidden="true" />

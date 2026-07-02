@@ -3,7 +3,6 @@ import { MapPin, Paperclip } from 'lucide-react'
 import {
   MONTHS_PT,
   WEEKDAYS_SHORT,
-  CATEGORY_META,
   STATUS_META,
   API_BADGE,
   formatTimeRange,
@@ -11,6 +10,7 @@ import {
   isPastDateKey,
   PAST_DAY_CLASS,
 } from '../utils/calendarHelpers'
+import { useEventColors } from '../hooks/useEventColors'
 
 // Índice do dia da semana (0=Seg … 6=Dom) a partir de uma chave YYYY-MM-DD.
 function weekdayShort(dateKey) {
@@ -23,6 +23,7 @@ function weekdayShort(dateKey) {
  * agrupados por mês. Cada linha abre o detalhe do evento ao clicar.
  */
 export default function ListView({ year, events, onSelectEvent }) {
+  const { colorFor, subColorMap } = useEventColors()
   const groups = useMemo(() => {
     const sorted = [...events].sort((a, b) =>
       a.startDatetime < b.startDatetime ? -1 : a.startDatetime > b.startDatetime ? 1 : 0
@@ -51,15 +52,18 @@ export default function ListView({ year, events, onSelectEvent }) {
 
           <ul className="flex list-none flex-col gap-1.5 p-0">
             {evs.map((e) => {
-              const cat = CATEGORY_META[e.category] || CATEGORY_META.evento
               const status = STATUS_META[e.status]
+              const vis = colorFor(e)
               const { day } = parseDateKey(e.date)
               return (
                 <li key={e.id} className={isPastDateKey(e.date) ? PAST_DAY_CLASS : undefined}>
                   <button
                     type="button"
                     onClick={() => onSelectEvent(e)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent"
+                    className={
+                      'flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent' +
+                      (e.featured ? ' cclx-featured' : '')
+                    }
                   >
                     <div className="flex w-10 flex-shrink-0 flex-col items-center">
                       <span className="text-lg font-bold leading-none tabular-nums text-foreground">{day}</span>
@@ -68,14 +72,22 @@ export default function ListView({ year, events, onSelectEvent }) {
 
                     <span
                       className="h-9 w-1 flex-shrink-0 rounded"
-                      style={{ background: cat.colorVar }}
+                      style={{ background: vis.dot }}
                       aria-hidden="true"
                     />
 
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-foreground">{e.title}</div>
+                      <div className="flex items-center gap-1.5">
+                        {e.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[11px] text-amber-500" aria-hidden="true" />}
+                        <span className="inline-block flex-shrink-0 rounded-sm px-1.5 py-px text-[9px] font-bold uppercase tracking-wide" style={{ background: vis.bg, color: vis.text }}>{vis.catLabel}</span>
+                        {e.subcategory && (
+                          <span className="inline-block flex-shrink-0 rounded-sm bg-muted px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-muted-foreground" style={subColorMap[e.subcategory] ? { background: subColorMap[e.subcategory], color: '#334155' } : undefined}>{e.subcategory}</span>
+                        )}
+                        <span className="truncate text-sm font-semibold text-foreground">{e.title}</span>
+                      </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                         <span className="tabular-nums">{formatTimeRange(e.timeStart, e.timeEnd) || 'Dia inteiro'}</span>
+                        <span>· ({e.community})</span>
                         {e.responsible ? <span>· {e.responsible}</span> : null}
                         {e.location ? <span className="truncate">· {e.location}</span> : null}
                       </div>
@@ -97,8 +109,8 @@ export default function ListView({ year, events, onSelectEvent }) {
                       )}
                       <span
                         className="hidden h-2 w-2 flex-shrink-0 rounded-full sm:block"
-                        style={{ background: cat.colorVar }}
-                        title={cat.label}
+                        style={{ background: vis.dot }}
+                        title={vis.catLabel}
                         aria-hidden="true"
                       />
                     </div>

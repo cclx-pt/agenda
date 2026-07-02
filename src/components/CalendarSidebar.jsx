@@ -5,6 +5,7 @@ import { CalendarPlus, Check, Church, Lock, Plus, Tag, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../hooks/useI18n'
+import { useEventColors } from '../hooks/useEventColors'
 import MultiSelectDropdown from './MultiSelectDropdown'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
@@ -47,6 +48,7 @@ export default function CalendarSidebar({
   subcategoriesInUse,
 }) {
   const { t, entity, entities } = useI18n()
+  const { colorFor } = useEventColors()
   const { year, month, day } = parseDateKey(selectedKey)
   const date = new Date(year, month, day)
   const weekday = WEEKDAYS_FULL[(date.getDay() + 6) % 7]
@@ -124,12 +126,14 @@ export default function CalendarSidebar({
                   <button type="button" className={cn(
                     'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent',
                     st && 'bg-destructive/15 hover:bg-destructive/25',
+                    evt.featured && 'cclx-featured',
                   )} onClick={() => onSelectEvent(evt)}>
                     <span className="min-w-[38px] text-[11px] font-bold tabular-nums text-muted-foreground">{evt.timeStart || '—'}</span>
                     <span
                       className="h-2 w-2 flex-shrink-0 rounded-full"
-                      style={{ background: CAT_DOT[evt.category] || CAT_DOT.evento }}
+                      style={{ background: colorFor(evt).subHex || CAT_DOT[evt.category] || CAT_DOT.evento }}
                     />
+                    {evt.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[11px] text-amber-500" aria-hidden="true" />}
                     <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold">{evt.title}</span>
                     {st && (
                       <span className="ml-auto inline-flex flex-shrink-0 items-center text-[13px] text-amber-600" title={st.label} aria-label={st.label}>

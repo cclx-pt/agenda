@@ -1,34 +1,54 @@
 import { CalendarDays, Church, Clock, Lock, MapPin, Paperclip } from 'lucide-react'
 
 import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange } from '../utils/calendarHelpers'
+import { useEventColors } from '../hooks/useEventColors'
 import { cn } from '@/lib/utils'
 
 export default function EventCard({ event, onClick }) {
   const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
   const status = STATUS_META[event.status]
+  const { subColorMap } = useEventColors()
+  const subColor = event.subcategory ? subColorMap[event.subcategory] : null
 
   return (
     <div
       className={cn(
         'group cursor-pointer border-b border-border outline-none transition-colors last:border-b-0 hover:bg-accent focus:bg-accent',
         status && 'bg-destructive/5 hover:bg-destructive/10 focus:bg-destructive/10',
+        event.featured && 'cclx-featured',
       )}
       onClick={() => onClick(event)} role="button" tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick(event)}>
 
-      {event.imageUrl
-        ? <img className="block aspect-video w-full object-cover brightness-[0.88] transition-[filter] group-hover:brightness-100" src={event.imageUrl} alt={event.imageLabel || event.title} loading="lazy" />
-        : <div className="flex aspect-video w-full items-center justify-center border-b border-border bg-muted text-muted-foreground">
-            <CalendarDays className="h-6 w-6" aria-hidden="true" />
-          </div>
-      }
-
-      <div className="px-3.5 pb-3.5 pt-2.5">
-        <div className="mb-[7px] flex flex-wrap items-center gap-1.5">
-          <span className="inline-block rounded-sm px-[7px] py-0.5 text-[9px] font-bold uppercase tracking-widest"
+      <div className="relative">
+        {event.imageUrl
+          ? <img className="block aspect-video w-full object-cover brightness-[0.85] transition-[filter] group-hover:brightness-100" src={event.imageUrl} alt={event.imageLabel || event.title} loading="lazy" />
+          : <div className="flex aspect-video w-full items-center justify-center border-b border-border bg-muted text-muted-foreground">
+              <CalendarDays className="h-6 w-6" aria-hidden="true" />
+            </div>
+        }
+        {/* Selos sobre a imagem: [Comunidade] [Categoria] [Subcategoria] */}
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-center gap-1 p-2">
+          {event.featured && <i className="ti ti-star-filled cclx-blink text-[13px] text-amber-400 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.55))]" aria-hidden="true" />}
+          <span className="inline-flex items-center gap-1 rounded-sm bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+            <Church className="h-2.5 w-2.5" aria-hidden="true" />
+            {event.community || event.responsible}
+          </span>
+          <span className="inline-block rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide shadow-sm"
             style={{ background: cat.bgVar, color: cat.colorVar }}>
             {cat.label}
           </span>
+          {event.subcategory && (
+            <span className="inline-block rounded-sm bg-white/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-700 shadow-sm"
+              style={subColor ? { background: subColor, color: '#334155' } : undefined}>
+              {event.subcategory}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="px-3.5 pb-3.5 pt-2.5">
+        <div className="mb-[7px] flex flex-wrap items-center gap-1.5 empty:hidden">
           {event.privacyTag && (
             <span className="inline-flex items-center gap-1 rounded-sm bg-violet-600 px-[7px] py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Privacidade: ${event.privacyTag}`}>
               <Lock className="h-2.5 w-2.5" aria-hidden="true" />

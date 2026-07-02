@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS events (
   community        TEXT NOT NULL DEFAULT 'Sede',
   category         TEXT NOT NULL DEFAULT 'evento',
   subcategory      TEXT,
+  featured         BOOLEAN NOT NULL DEFAULT FALSE,
+  loop             BOOLEAN NOT NULL DEFAULT FALSE,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'pendente', 'publicado', 'rejeitado')),
   is_private       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -97,6 +99,8 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS map_url TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lat DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lng DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS loop BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (
@@ -237,21 +241,36 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS requires_subcategory BOOLEAN NOT
 CREATE TABLE IF NOT EXISTS subcategories (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT NOT NULL UNIQUE,
+  color      TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS color TEXT;
 
--- Semeia as subcategorias iniciais (idempotente).
-INSERT INTO subcategories (name, sort_order) VALUES
-  ('B1', 1),
-  ('GLAM', 2),
-  ('Alateia', 3),
-  ('Jump', 4),
-  ('Base', 5),
-  ('Escola Dominical', 6),
-  ('Grupos de Crescimento', 7)
+-- Semeia as subcategorias iniciais (idempotente) com cores pastel suaves.
+INSERT INTO subcategories (name, sort_order, color) VALUES
+  ('B1', 1, '#FBCFE8'),
+  ('GLAM', 2, '#DDD6FE'),
+  ('Alateia', 3, '#BFDBFE'),
+  ('Jump', 4, '#BBF7D0'),
+  ('Base', 5, '#FED7AA'),
+  ('Escola Dominical', 6, '#FEF08A'),
+  ('Grupos de Crescimento', 7, '#A7F3D0')
 ON CONFLICT (name) DO NOTHING;
+
+-- Preenche as cores das subcategorias já existentes (sem cor definida).
+UPDATE subcategories AS s SET color = v.color
+FROM (VALUES
+  ('B1', '#FBCFE8'),
+  ('GLAM', '#DDD6FE'),
+  ('Alateia', '#BFDBFE'),
+  ('Jump', '#BBF7D0'),
+  ('Base', '#FED7AA'),
+  ('Escola Dominical', '#FEF08A'),
+  ('Grupos de Crescimento', '#A7F3D0')
+) AS v(name, color)
+WHERE s.name = v.name AND s.color IS NULL;
 
 -- ── Etiquetas de privacidade ────────────────────────────────────
 -- Lista gerível no backoffice. Uma etiqueta agrupa eventos privados; cada

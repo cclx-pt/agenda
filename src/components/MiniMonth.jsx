@@ -25,6 +25,7 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
       isPast: isPastDateKey(dateKey),
       hasEvents: events.length > 0,
       hasDraft: events.some(e => STATUS_META[e.status]),
+      hasFeatured: events.some(e => e.featured),
       events,
     })
   }
@@ -49,6 +50,7 @@ export default function MiniMonth({ year, month, eventsByDate, onDayClick, size 
               size === 'xs' && 'min-h-[18px]',
               cell.hasEvents && 'cursor-pointer bg-primary/10 hover:bg-primary/20',
               cell.hasDraft && 'bg-destructive/15 hover:bg-destructive/25',
+              cell.hasFeatured && 'cclx-featured',
               !cell.current && '!bg-muted/40 opacity-35',
               cell.isToday && '!border-primary !bg-primary',
               cell.isPast && !cell.isToday && PAST_DAY_CLASS,

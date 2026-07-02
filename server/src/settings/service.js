@@ -106,25 +106,28 @@ export async function updateTranslations(input, actorId) {
 // Chave da personalização de marca (logótipo) gerida pelo admin.
 const BRANDING_KEY = 'branding'
 
-/** Personalização de marca: { logoUrl: string|null }. Vazio (predefinido) por omissão. */
+/** Personalização de marca: { logoUrl, subcategoryColors }. Vazio (predefinido) por omissão. */
 export async function getBranding() {
   const stored = await repo.get(BRANDING_KEY)
   const logoUrl =
     stored && typeof stored.logoUrl === 'string' && stored.logoUrl.trim()
       ? stored.logoUrl.trim()
       : null
-  return { logoUrl }
+  const subcategoryColors = !!stored?.subcategoryColors
+  return { logoUrl, subcategoryColors }
 }
 
 /**
  * Valida e persiste a personalização de marca (admin). Passar logoUrl vazio/nulo
- * repõe o logótipo predefinido.
+ * repõe o logótipo predefinido. `subcategoryColors` ativa as cores das
+ * subcategorias no calendário.
  */
 export async function updateBranding(input, actorId) {
   const raw = typeof input?.logoUrl === 'string' ? input.logoUrl.trim() : ''
   const logoUrl = raw && raw.length <= 1000 ? raw : null
-  await repo.set(BRANDING_KEY, { logoUrl }, actorId)
-  return { logoUrl }
+  const subcategoryColors = input?.subcategoryColors === true
+  await repo.set(BRANDING_KEY, { logoUrl, subcategoryColors }, actorId)
+  return { logoUrl, subcategoryColors }
 }
 
 // Chave da política de sobreposição de eventos gerida pelo admin.

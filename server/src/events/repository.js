@@ -28,6 +28,8 @@ function mapRow(row) {
     community: row.community,
     category: row.category,
     subcategory: row.subcategory ?? null,
+    featured: !!row.featured,
+    loop: !!row.loop,
     status: row.status,
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
@@ -163,8 +165,8 @@ export async function insert(data, actorId) {
        community, category, is_private, privacy_tag, banner_url,
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
-       series_id, created_by, organizer_phone, organizer_email, subcategory)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+       series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
     [
       id,
       data.title,
@@ -191,6 +193,8 @@ export async function insert(data, actorId) {
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
       data.subcategory ?? null,
+      data.featured ?? false,
+      data.loop ?? false,
     ]
   )
   return findById(id)
@@ -221,6 +225,8 @@ export async function update(id, data) {
        organizer_phone = $21,
        organizer_email = $22,
        subcategory = $23,
+       featured = $24,
+       loop = $25,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -247,6 +253,8 @@ export async function update(id, data) {
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
       data.subcategory ?? null,
+      data.featured ?? false,
+      data.loop ?? false,
     ]
   )
   return findById(id)
@@ -302,8 +310,10 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        organizer_phone = $19,
        organizer_email = $20,
        subcategory = $21,
+       featured = $22,
+       loop = $23,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $22`,
+     WHERE series_id = $1 AND id <> $24`,
     [
       seriesId,
       data.title,
@@ -326,6 +336,8 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.organizerPhone ?? null,
       data.organizerEmail ?? null,
       data.subcategory ?? null,
+      data.featured ?? false,
+      data.loop ?? false,
       exceptId,
     ]
   )

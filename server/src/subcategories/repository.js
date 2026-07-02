@@ -7,13 +7,14 @@ function mapRow(row) {
   return {
     id: row.id,
     name: row.name,
+    color: row.color ?? null,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
 
-const COLUMNS = 'id, name, sort_order, created_at, updated_at'
+const COLUMNS = 'id, name, color, sort_order, created_at, updated_at'
 
 export async function list() {
   const { rows } = await pool.query(
@@ -44,8 +45,8 @@ export async function findByName(name) {
 export async function insert(data) {
   const id = randomUUID()
   await pool.query(
-    `INSERT INTO subcategories (id, name, sort_order) VALUES ($1, $2, $3)`,
-    [id, data.name, data.sortOrder ?? 0]
+    `INSERT INTO subcategories (id, name, color, sort_order) VALUES ($1, $2, $3, $4)`,
+    [id, data.name, data.color ?? null, data.sortOrder ?? 0]
   )
   return findById(id)
 }

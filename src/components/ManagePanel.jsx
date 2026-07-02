@@ -134,6 +134,8 @@ const emptyForm = {
   community: DEFAULT_CHURCH,
   category: 'evento',
   subcategory: '',
+  featured: false,
+  loop: false,
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
@@ -178,7 +180,7 @@ const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, 
 
 const emptyChurch = { name: '', externalId: '', address: '', postalCode: '' }
 const emptyCategory = { slug: '', label: '', color: '#F5A800', sortOrder: '', requiresSubcategory: false }
-const emptySubcategory = { name: '', sortOrder: '' }
+const emptySubcategory = { name: '', color: '#C7D2FE', sortOrder: '' }
 const emptyPrivacyTag = { name: '' }
 
 const ROLE_OPTIONS = [
@@ -282,6 +284,8 @@ function eventToForm(evt) {
     community: evt.community ?? DEFAULT_CHURCH,
     category: evt.category ?? 'evento',
     subcategory: evt.subcategory ?? '',
+    featured: !!evt.featured,
+    loop: !!evt.loop,
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
@@ -394,7 +398,7 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
  */
 export default function ManagePanel({ onClose, initialView = 'home' }) {
   const { user, hasRole } = useAuth()
-  const { t, entity, entities, refreshTranslations, logoUrl, refreshBranding } = useI18n()
+  const { t, entity, entities, refreshTranslations, logoUrl, subcategoryColors, refreshBranding } = useI18n()
   const containerRef = useModalA11y(onClose)
 
   const isAdmin = hasRole('admin')
@@ -649,7 +653,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     setUploadingLogo(true)
     try {
       const url = await eventsService.uploadEventImage(file)
-      await eventsService.updateBranding({ logoUrl: url })
+      await eventsService.updateBranding({ logoUrl: url, subcategoryColors })
       await refreshBranding()
       toast.success('Logótipo atualizado.')
     } catch (err) {
@@ -663,9 +667,21 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   const handleResetLogo = async () => {
     setSavingBranding(true)
     try {
-      await eventsService.updateBranding({ logoUrl: null })
+      await eventsService.updateBranding({ logoUrl: null, subcategoryColors })
       await refreshBranding()
       toast.success('Logótipo predefinido reposto.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSavingBranding(false)
+    }
+  }
+
+  const handleToggleSubcategoryColors = async (next) => {
+    setSavingBranding(true)
+    try {
+      await eventsService.updateBranding({ logoUrl, subcategoryColors: next })
+      await refreshBranding()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -890,7 +906,7 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
     setSubcategoryForm((s) => ({ ...s, [key]: e.target.value }))
 
   const openEditSubcategory = (sub) => {
-    setSubcategoryForm({ name: sub.name ?? '', sortOrder: sub.sortOrder ?? '' })
+    setSubcategoryForm({ name: sub.name ?? '', color: sub.color ?? '#C7D2FE', sortOrder: sub.sortOrder ?? '' })
     setEditingSubcategoryId(sub.id)
   }
 
@@ -910,12 +926,14 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       if (editingSubcategoryId) {
         await eventsService.updateSubcategory(editingSubcategoryId, {
           name: subcategoryForm.name.trim(),
+          color: subcategoryForm.color || null,
           sortOrder: subcategoryForm.sortOrder,
         })
         toast.success('Subcategoria atualizada.')
       } else {
         await eventsService.createSubcategory({
           name: subcategoryForm.name.trim(),
+          color: subcategoryForm.color || null,
           sortOrder: subcategoryForm.sortOrder,
         })
         toast.success('Subcategoria criada.')
@@ -1284,6 +1302,8 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
       community: form.community.trim() || DEFAULT_CHURCH,
       category: form.category,
       subcategory: form.subcategory || null,
+      featured: form.featured === true,
+      loop: form.loop === true,
       isPrivate: form.isPrivate,
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
@@ -2545,6 +2565,15 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   />
                 </label>
                 <label className={styles.label}>
+                  Cor
+                  <input
+                    className={styles.colorInput}
+                    type="color"
+                    value={subcategoryForm.color || '#C7D2FE'}
+                    onChange={setSubcategoryField('color')}
+                  />
+                </label>
+                <label className={styles.label}>
                   Ordem
                   <input
                     className={styles.input}
@@ -2582,8 +2611,15 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
               <ul className={styles.list}>
                 {dbSubcategories.map((s) => (
                   <li key={s.id} className={styles.item}>
-                    <div className={styles.itemText}>
-                      <strong className={styles.itemTitle}>{s.name}</strong>
+                    <div className={styles.itemMain}>
+                      <span
+                        className={styles.colorDot}
+                        style={{ background: s.color || 'hsl(var(--sc-muted-foreground))' }}
+                        aria-hidden="true"
+                      />
+                      <div className={styles.itemText}>
+                        <strong className={styles.itemTitle}>{s.name}</strong>
+                      </div>
                     </div>
                     <div className={styles.actions}>
                       <button
@@ -2717,6 +2753,16 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 {logoUrl ? 'Logótipo personalizado ativo.' : 'A usar o logótipo predefinido.'}
               </span>
             </div>
+            <label className={`${styles.check} ${styles.checkInline}`}>
+              <input
+                type="checkbox"
+                checked={subcategoryColors}
+                disabled={savingBranding}
+                onChange={(e) => handleToggleSubcategoryColors(e.target.checked)}
+              />
+              {t('subcategoryColorsLabel')}
+            </label>
+            <p className={styles.muted}>{t('subcategoryColorsHint')}</p>
             <input
               ref={logoInputRef}
               type="file"
@@ -3050,6 +3096,17 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                 </label>
               </div>
             )}
+
+            <div className={styles.row}>
+              <label className={`${styles.check} ${styles.checkInline}`} title={t('featuredHint')}>
+                <input type="checkbox" checked={form.featured} onChange={setField('featured')} />
+                <i className="ti ti-star-filled text-amber-500" aria-hidden="true" /> {t('featured')}
+              </label>
+              <label className={`${styles.check} ${styles.checkInline}`} title={t('loopHint')}>
+                <input type="checkbox" checked={form.loop} onChange={setField('loop')} />
+                <i className="ti ti-repeat" aria-hidden="true" /> {t('loopField')}
+              </label>
+            </div>
 
             {overlapInfo.conflicts.length > 0 && (
               <div

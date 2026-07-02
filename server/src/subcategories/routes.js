@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole } from '../middleware/auth.js'
+import { requireRole } from '../middleware/auth.js'
 import * as service from './service.js'
 import { SubcategoryError } from './service.js'
 
@@ -30,10 +30,9 @@ subcategoriesRouter.param('id', (req, res, next, id) => {
   next()
 })
 
-// Leitura: qualquer utilizador autenticado (alimenta seletores e filtros).
+// Leitura: pública (alimenta seletores, filtros e as cores do calendário anónimo).
 subcategoriesRouter.get(
   '/',
-  requireAuth,
   asyncHandler(async (_req, res) => {
     res.json({ subcategories: await service.list() })
   })

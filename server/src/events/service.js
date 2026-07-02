@@ -39,6 +39,9 @@ export const eventInputSchema = z
     // Subcategoria (lista global). Obrigatória conforme a categoria (validado no
     // serviço). '' → null.
     subcategory: z.string().trim().optional().nullable(),
+    // Destaque (blink no calendário) e loop (funcionalidade futura).
+    featured: z.boolean().optional(),
+    loop: z.boolean().optional(),
     isPrivate: z.boolean().optional(),
     // Aceita URL absoluto (http/https, ex.: banners da inChurch) ou caminho
     // relativo de upload servido pelo backend (ex.: /data/uploads/abc.png).

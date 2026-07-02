@@ -26,6 +26,7 @@ export function I18nProvider({ children }) {
   )
   const [overrides, setOverrides] = useState({})
   const [logoUrl, setLogoUrl] = useState(null)
+  const [subcategoryColors, setSubcategoryColors] = useState(false)
 
   const refreshTranslations = useCallback(() => {
     return eventsService
@@ -37,7 +38,10 @@ export function I18nProvider({ children }) {
   const refreshBranding = useCallback(() => {
     return eventsService
       .getBranding()
-      .then((b) => setLogoUrl(b?.logoUrl || null))
+      .then((b) => {
+        setLogoUrl(b?.logoUrl || null)
+        setSubcategoryColors(!!b?.subcategoryColors)
+      })
       .catch(() => {})
   }, [])
 
@@ -52,7 +56,10 @@ export function I18nProvider({ children }) {
     eventsService
       .getBranding()
       .then((b) => {
-        if (alive) setLogoUrl(b?.logoUrl || null)
+        if (alive) {
+          setLogoUrl(b?.logoUrl || null)
+          setSubcategoryColors(!!b?.subcategoryColors)
+        }
       })
       .catch(() => {})
     return () => {
@@ -95,9 +102,10 @@ export function I18nProvider({ children }) {
       overrides,
       refreshTranslations,
       logoUrl,
+      subcategoryColors,
       refreshBranding,
     }
-  }, [lang, setLang, t, overrides, refreshTranslations, logoUrl, refreshBranding])
+  }, [lang, setLang, t, overrides, refreshTranslations, logoUrl, subcategoryColors, refreshBranding])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
@@ -116,6 +124,7 @@ export function useI18n() {
       overrides: {},
       refreshTranslations: () => Promise.resolve(),
       logoUrl: null,
+      subcategoryColors: false,
       refreshBranding: () => Promise.resolve(),
     }
   }
