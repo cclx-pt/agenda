@@ -30,7 +30,7 @@ import {
 import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
-  AlertCircle, CalendarPlus, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
+  AlertCircle, CalendarCog, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
   ClipboardCheck, Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -227,16 +227,6 @@ export default function App() {
     })
   }
 
-  // ─── Export current view ─────────────────────────────────────────
-  const exportCurrentView = () => {
-    const filtered = filteredEvents.filter((e) => e.date >= from && e.date <= to)
-    if (filtered.length === 0) {
-      toast.info('Sem eventos para exportar nesta vista')
-      return
-    }
-    setExportData({ events: filtered, filename: `cclx-${view}-${year}.ics` })
-  }
-
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -278,10 +268,12 @@ export default function App() {
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             <span className="max-[980px]:hidden">{t('refresh')}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCurrentView} title={t('export')}>
-            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-            <span className="max-[980px]:hidden">{t('export')}</span>
-          </Button>
+          {canManage && (
+            <Button variant="outline" size="sm" onClick={() => { setManageView('events'); setManageOpen(true) }} title="Gestão de eventos">
+              <CalendarCog className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">Eventos</span>
+            </Button>
+          )}
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => setApprovalsOpen(true)} title={t('approvals')}>
               <ClipboardCheck className="h-4 w-4" aria-hidden="true" />

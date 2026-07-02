@@ -517,8 +517,6 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
   // caso contrário volta à lista de eventos.
   const exitForm = () => setView(initialView === 'form' ? 'home' : 'events')
 
-  const openEvents = () => setView('events')
-
   const openApi = async () => {
     setBusy(true)
     try {
@@ -1383,11 +1381,6 @@ export default function ManagePanel({ onClose, initialView = 'home' }) {
                   </span>
                 </button>
               )}
-              <button className={styles.menuCard} onClick={openEvents} disabled={busy}>
-                <i className="ti ti-calendar-event" aria-hidden="true" />
-                <span className={styles.menuTitle}>Gestão de eventos</span>
-                <span className={styles.menuDesc}>Criar, editar, submeter e aprovar eventos.</span>
-              </button>
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openApi} disabled={busy}>
                   <i className="ti ti-plug-connected" aria-hidden="true" />
