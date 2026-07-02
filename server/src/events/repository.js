@@ -12,6 +12,7 @@ function mapRow(row) {
   const end = row.end_datetime ? new Date(row.end_datetime) : null
   const pad = (n) => String(n).padStart(2, '0')
   const dateKey = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
+  const endDateKey = end ? `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` : null
   const hhmm = (d) => (d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : null)
   const allDay = !!row.all_day
   return {
@@ -19,6 +20,7 @@ function mapRow(row) {
     title: row.title,
     description: row.description,
     date: dateKey,
+    endDate: endDateKey,
     startDatetime: row.start_datetime,
     endDatetime: row.end_datetime,
     timeStart: allDay ? null : hhmm(start),

@@ -46,10 +46,10 @@ function buildVEvent(event, stamp) {
   const allDay = event.allDay || !event.timeStart
   if (allDay) {
     lines.push(`DTSTART;VALUE=DATE:${compact(event.date)}`)
-    lines.push(`DTEND;VALUE=DATE:${nextDay(event.date)}`)
+    lines.push(`DTEND;VALUE=DATE:${nextDay(event.endDate || event.date)}`)
   } else {
     lines.push(`DTSTART:${timed(event.date, event.timeStart)}`)
-    lines.push(`DTEND:${timed(event.date, event.timeEnd || event.timeStart)}`)
+    lines.push(`DTEND:${timed(event.endDate || event.date, event.timeEnd || event.timeStart)}`)
   }
   lines.push(foldLine(`SUMMARY:${icsEscape(event.title)}`))
   if (event.location) lines.push(foldLine(`LOCATION:${icsEscape(event.location)}`))
