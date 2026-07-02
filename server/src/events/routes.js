@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as service from './service.js'
 import { EventError } from './service.js'
+import { buildCalendar } from './ics.js'
 
 export const eventsRouter = Router()
 
@@ -54,7 +55,26 @@ eventsRouter.get(
     res.json({ events: await service.listPublic(dateRange(req.query)) })
   })
 )
-
+// Feed de subscrição (iCalendar) dos eventos públicos — PÚBLICO, sem sessão. Os
+// apps de calendário (Google/Apple/Outlook) leem este URL periodicamente. Janela
+// por omissão: do mês passado até ~14 meses à frente (ajustável por ?from/&to).
+eventsRouter.get('/calendar.ics', async (req, res, next) => {
+  try {
+    const ymd = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const now = new Date()
+    const range = dateRange(req.query)
+    const from = range.from || ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+    const to = range.to || ymd(new Date(now.getFullYear() + 1, now.getMonth() + 2, 0))
+    const events = await service.listPublic({ from, to })
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+    res.setHeader('Content-Disposition', 'inline; filename="agenda-cclx.ics"')
+    res.setHeader('Cache-Control', 'public, max-age=3600')
+    res.send(buildCalendar(events, { name: 'Agenda CCLX' }))
+  } catch (err) {
+    next(err)
+  }
+})
 // Categorias distintas em uso (qualquer estado + externos) — alimenta o filtro
 // dinâmico da barra lateral. Público: o calendário anónimo também o usa.
 eventsRouter.get(

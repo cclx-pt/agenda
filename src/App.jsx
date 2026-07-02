@@ -17,6 +17,7 @@ import CalendarSidebar from './components/CalendarSidebar'
 import EventDetail from './components/EventDetail'
 import DayPopup from './components/DayPopup'
 import ExportModal from './components/ExportModal'
+import SubscribeModal from './components/SubscribeModal'
 import SearchBar from './components/SearchBar'
 import CalendarLoading from './components/CalendarLoading'
 import LoginModal from './components/LoginModal'
@@ -30,7 +31,7 @@ import {
 import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
-  AlertCircle, CalendarCog, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
+  AlertCircle, CalendarCog, CalendarSync, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
   ClipboardCheck, Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -79,6 +80,7 @@ export default function App() {
   const [categoriesInUse, setCategoriesInUse] = useState([]) // categorias existentes em eventos (BD)
   const [privacyTag,   setPrivacyTag]   = useState([]) // filtro por etiquetas de privacidade (multi)
   const [loginOpen,    setLoginOpen]    = useState(false)   // login modal
+  const [subscribeOpen, setSubscribeOpen] = useState(false) // modal de subscrição (feed iCal)
   const [manageOpen,   setManageOpen]   = useState(false)   // backoffice panel
   const [manageView,   setManageView]   = useState('home')  // vista inicial do painel de gestao
   // Abre via ?aprovacoes=1 (link do email de delegação); só renderiza se canManage.
@@ -267,6 +269,9 @@ export default function App() {
           <Button variant="outline" size="sm" onClick={() => { clearEventCache(); reload(); refreshCategoriesInUse() }} title={t('refresh')}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             <span className="max-[980px]:hidden">{t('refresh')}</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSubscribeOpen(true)} title="Subscrever calendário" aria-label="Subscrever calendário">
+            <CalendarSync className="h-4 w-4" aria-hidden="true" />
           </Button>
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => { setManageView('events'); setManageOpen(true) }} title="Gestão de eventos">
@@ -530,6 +535,10 @@ export default function App() {
       {/* ── Login modal ──────────────────────────────────────────── */}
       <AnimatePresence>
         {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {subscribeOpen && <SubscribeModal onClose={() => setSubscribeOpen(false)} />}
       </AnimatePresence>
 
       {/* ── Painel de gestão ────────────────────────────────────── */}
