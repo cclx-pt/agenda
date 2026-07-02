@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
+import { waitUntil } from '@vercel/functions'
 import { pool } from '../db/pool.js'
 import { issueCode, verifyCode } from './otp.js'
 import { sendOtpEmail } from './email.js'
@@ -47,13 +48,17 @@ authRouter.post('/request-code', requestLimiter, async (req, res, next) => {
     const user = await findActiveUser(email)
     if (user) {
       const code = await issueCode(email)
-      try {
-        await sendOtpEmail(email, code)
-      } catch (mailErr) {
-        // O código já foi gravado na BD; uma falha de SMTP não deve bloquear o
-        // login nem revelar estado interno ao cliente (resposta genérica abaixo).
-        // Regista-se para diagnóstico no servidor.
+      // Envia o email em segundo plano: a resposta NÃO espera pelo handshake SMTP
+      // (lento). No Vercel, waitUntil mantém a função viva até o envio concluir;
+      // localmente é no-op e o processo persistente conclui o envio na mesma.
+      const sendPromise = sendOtpEmail(email, code).catch((mailErr) => {
+        // O código já está na BD; uma falha de SMTP não bloqueia nem revela estado.
         console.error('[auth] Falha ao enviar email OTP:', mailErr?.message ?? mailErr)
+      })
+      try {
+        waitUntil(sendPromise)
+      } catch {
+        /* fora do runtime Vercel: no-op; o envio conclui no processo persistente */
       }
     }
 

@@ -16,6 +16,11 @@ function getTransporter() {
     port: config.smtp.port,
     secure: config.smtp.secure,
     auth: config.smtp.user ? { user: config.smtp.user, pass: config.smtp.pass } : undefined,
+    // Pooling: mantém a ligação SMTP aberta e reutiliza-a entre envios (nas
+    // invocações "quentes" da função serverless), poupando o handshake TLS/auth.
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 100,
     // Falha depressa se o servidor SMTP estiver inacessível, em vez de pendurar o pedido.
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
