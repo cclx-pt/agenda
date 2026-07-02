@@ -657,6 +657,13 @@ export async function update(user, id, input, { scope } = {}) {
   if (!canAccessChurch(user, data.community ?? 'Sede')) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
+  // Eventos publicados (aprovados): a data/hora não podem ser alteradas — apenas
+  // rascunhos e pendentes permitem editar tudo. Preserva a data/hora existentes.
+  if (existing.status === 'publicado') {
+    data.startDatetime = existing.startDatetime
+    data.endDatetime = existing.endDatetime
+    data.allDay = existing.allDay
+  }
   const allowOverlap = input.allowOverlap === true
   await assertOverlapOk(user, data, {
     excludeId: id,

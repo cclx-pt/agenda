@@ -430,10 +430,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState(initialEditEvent ? 'form' : initialView) // 'home'|'events'|'form'|'users'|'api'|'reports'
   const [editingId, setEditingId] = useState(initialEditEvent?.id ?? null)
+  const [editingStatus, setEditingStatus] = useState(initialEditEvent?.status ?? null)
   const [form, setForm] = useState(initialEditEvent ? eventToForm(initialEditEvent) : emptyForm)
   // Se a categoria selecionada no formulário exige subcategoria.
   const formCategoryRequiresSub =
     dbCategories.find((c) => c.slug === form.category)?.requiresSubcategory ?? false
+  // Eventos publicados (aprovados): a data/hora ficam bloqueadas na edição.
+  const dateTimeLocked = editingStatus === 'publicado'
   // Upload de imagem do evento.
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
@@ -534,6 +537,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const openNew = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setEditingStatus(null)
     setApplyToSeries(false)
     setView('form')
   }
@@ -541,6 +545,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const openEdit = (evt) => {
     setForm(eventToForm(evt))
     setEditingId(evt.id)
+    setEditingStatus(evt.status ?? null)
     setApplyToSeries(false)
     setView('form')
   }
@@ -2998,6 +3003,12 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               />
             </label>
 
+            {dateTimeLocked && (
+              <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                A data e a hora não podem ser alteradas em eventos publicados. Para as mudar, o evento teria de voltar a rascunho.
+              </p>
+            )}
+
             <div className={styles.row}>
               <label className={styles.label}>
                 Data de início *
@@ -3006,6 +3017,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   className={styles.input}
                   value={form.startDate}
                   onChange={setField('startDate')}
+                  disabled={dateTimeLocked}
                   required
                 />
               </label>
@@ -3016,7 +3028,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   className={styles.input}
                   value={form.startTime}
                   onChange={setField('startTime')}
-                  disabled={form.allDay}
+                  disabled={form.allDay || dateTimeLocked}
                 />
               </label>
             </div>
@@ -3029,6 +3041,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   className={styles.input}
                   value={form.endDate}
                   onChange={setField('endDate')}
+                  disabled={dateTimeLocked}
                 />
               </label>
               <label className={styles.label}>
@@ -3038,7 +3051,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   className={styles.input}
                   value={form.endTime}
                   onChange={setField('endTime')}
-                  disabled={form.allDay}
+                  disabled={form.allDay || dateTimeLocked}
                 />
               </label>
             </div>
@@ -3213,7 +3226,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
             <div className={styles.checks}>
               <label className={styles.check}>
-                <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} />
+                <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} disabled={dateTimeLocked} />
                 Dia inteiro
               </label>
               <label className={styles.check}>
