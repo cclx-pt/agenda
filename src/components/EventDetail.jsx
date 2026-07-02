@@ -28,7 +28,10 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
   const { colorFor, subColorMap } = useEventColors()
   const vis = colorFor(event)
   const subColor = event.subcategory ? subColorMap[event.subcategory] : null
-  const contact = event.organizerPhone || event.organizerEmail || event.organizerContact
+  const contactStr =
+    [event.organizerPhone, event.organizerEmail].filter(Boolean).join(' · ') ||
+    event.organizerContact ||
+    ''
   const containerRef = useModalA11y(onClose)
 
   return (
@@ -131,12 +134,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               </div>
             )}
             {/* Contacto */}
-            {(event.organizerName || contact) && (
+            {(event.organizerName || contactStr) && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
                 <UserCheck className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-                <span>
+                <span className="min-w-0 break-words">
                   {event.organizerName && <span className="font-semibold text-foreground">{event.organizerName}</span>}
-                  {contact ? (event.organizerName ? ` (${contact})` : contact) : ''}
+                  {contactStr ? (event.organizerName ? ` (${contactStr})` : contactStr) : ''}
                 </span>
               </div>
             )}
