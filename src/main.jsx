@@ -6,6 +6,7 @@ import { I18nProvider } from './hooks/useI18n'
 import App from './App.jsx'
 import LogsPage from './components/LogsPage'
 import ApprovalActionPage from './components/ApprovalActionPage'
+import LoopPage from './components/LoopPage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -19,16 +20,23 @@ const queryClient = new QueryClient({
   },
 })
 
-// Rotas simples sem react-router: /logs (estado) e /acao (ação de aprovação).
+// Rotas simples sem react-router: /logs (estado), /acao (ação de aprovação)
+// e /loop/<igreja> (carrossel público para TV).
 const routePath = window.location.pathname.replace(/\/+$/, '')
 const isLogsRoute = routePath === '/logs'
 const isActionRoute = routePath === '/acao'
+const isLoopRoute = routePath.startsWith('/loop/')
+const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       {isActionRoute ? (
         <ApprovalActionPage />
+      ) : isLoopRoute ? (
+        <I18nProvider>
+          <LoopPage church={loopChurch} />
+        </I18nProvider>
       ) : isLogsRoute ? (
         <LogsPage />
       ) : (

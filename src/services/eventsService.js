@@ -316,6 +316,20 @@ export async function deleteSubcategory(id) {
   await request(`/data/subcategories/${id}`, { method: 'DELETE' })
 }
 
+// ── Loop (carrossel público por igreja) ─────────────────
+
+/** Lê a configuração do Loop por comunidade + lista de igrejas (admin). */
+export async function getLoopConfig() {
+  const { config, churches } = await request('/data/loop-config')
+  return { config: config || {}, churches: churches || [] }
+}
+
+/** Guarda a configuração do Loop por comunidade (admin). */
+export async function updateLoopConfig(config) {
+  const { config: saved } = await request('/data/loop-config', { method: 'PUT', body: { config } })
+  return saved
+}
+
 // ── Etiquetas de privacidade ─────────────────────────────────────
 
 /** Lista as etiquetas de privacidade (qualquer utilizador autenticado). */

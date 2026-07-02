@@ -136,6 +136,7 @@ const emptyForm = {
   subcategory: '',
   featured: false,
   loop: false,
+  isGeneral: false,
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
@@ -253,6 +254,7 @@ const SECTION = {
   translations: { icon: 'ti-language', title: 'Traduções' },
   branding: { icon: 'ti-photo', title: 'Aparência' },
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
+  loop: { icon: 'ti-device-tv', title: 'Loop (TV)' },
 }
 
 // view → chave de tradução do título da secção (churches usa manageEntities;
@@ -269,6 +271,7 @@ const SECTION_TKEY = {
   translations: 'translations',
   branding: 'appearance',
   overlaps: 'overlaps',
+  loop: 'manageLoop',
 }
 
 function eventToForm(evt) {
@@ -286,6 +289,7 @@ function eventToForm(evt) {
     subcategory: evt.subcategory ?? '',
     featured: !!evt.featured,
     loop: !!evt.loop,
+    isGeneral: !!evt.isGeneral,
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
@@ -450,6 +454,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [newUser, setNewUser] = useState(emptyUser)
   const [editingUser, setEditingUser] = useState(null) // edição de um utilizador existente (estado local, gravação atómica)
   const [report, setReport] = useState(null)
+  // Configuração do Loop (carrossel TV) por comunidade.
+  const [loopConfig, setLoopConfig] = useState({})
+  const [loopChurches, setLoopChurches] = useState([])
   // Gestão de igrejas (admin).
   const [churchForm, setChurchForm] = useState(emptyChurch)
   const [editingChurchId, setEditingChurchId] = useState(null)
@@ -644,6 +651,41 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
   // ── Aparência / logótipo (admin) ───────────────────
   const openBranding = () => setView('branding')
+
+  // ── Loop (carrossel TV) por comunidade (admin) ─────────────────
+  const openLoop = async () => {
+    setBusy(true)
+    try {
+      const { config, churches } = await eventsService.getLoopConfig()
+      setLoopConfig(config || {})
+      setLoopChurches(churches || [])
+      setView('loop')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setLoopField = (church, key, value) => {
+    setLoopConfig((prev) => ({
+      ...prev,
+      [church]: { active: false, showGeneral: true, weeks: 4, ...(prev[church] || {}), [key]: value },
+    }))
+  }
+
+  const handleSaveLoop = async () => {
+    setBusy(true)
+    try {
+      const saved = await eventsService.updateLoopConfig(loopConfig)
+      setLoopConfig(saved || {})
+      toast.success('Configuração do Loop guardada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const handleLogoFile = async (file) => {
     if (!file) return
@@ -1309,6 +1351,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       subcategory: form.subcategory || null,
       featured: form.featured === true,
       loop: form.loop === true,
+      isGeneral: form.isGeneral === true,
       isPrivate: form.isPrivate,
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
@@ -1588,6 +1631,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <i className="ti ti-calendar-x" aria-hidden="true" />
                   <span className={styles.menuTitle}>{t('overlaps')}</span>
                   <span className={styles.menuDesc}>{t('overlapsDesc')}</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={openLoop} disabled={busy}>
+                  <i className="ti ti-device-tv" aria-hidden="true" />
+                  <span className={styles.menuTitle}>{t('manageLoop')}</span>
+                  <span className={styles.menuDesc}>{t('manageLoopDesc')}</span>
                 </button>
               )}
             </div>
@@ -2807,6 +2857,90 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </button>
             </div>
           </div>
+        ) : view === 'loop' ? (
+          <div className={styles.body}>
+            <p className={styles.muted}>
+              O Loop é uma página pública (para TV) que passa em carrossel, sem parar, os cartazes
+              dos eventos publicados marcados com “Loop”. Configure por comunidade e abra o link na TV.
+            </p>
+            {loopChurches.length === 0 ? (
+              <p className={styles.muted}>Sem igrejas.</p>
+            ) : (
+              <ul className={styles.list}>
+                {loopChurches.map((church) => {
+                  const cfg = { active: false, showGeneral: true, weeks: 4, ...(loopConfig[church] || {}) }
+                  const link = `${window.location.origin}/loop/${encodeURIComponent(church)}`
+                  return (
+                    <li key={church} className={`${styles.item} ${styles.userItemCol}`}>
+                      <div className={styles.userTop}>
+                        <div className={styles.itemText}>
+                          <strong className={styles.itemTitle}>{church}</strong>
+                          <span className={styles.itemMeta}>{link}</span>
+                        </div>
+                        <div className={styles.userControls}>
+                          <label className={styles.check} title="Loop ativo nesta comunidade">
+                            <input
+                              type="checkbox"
+                              checked={cfg.active}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'active', e.target.checked)}
+                            />
+                            Ativo
+                          </label>
+                          <label className={styles.check} title="Incluir eventos gerais">
+                            <input
+                              type="checkbox"
+                              checked={cfg.showGeneral}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'showGeneral', e.target.checked)}
+                            />
+                            Eventos gerais
+                          </label>
+                          <label className={styles.check} title="Nº de semanas a mostrar">
+                            Semanas
+                            <input
+                              type="number"
+                              min="1"
+                              max="52"
+                              className={styles.smallSelect}
+                              value={cfg.weeks}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'weeks', Number(e.target.value) || 1)}
+                            />
+                          </label>
+                          <a
+                            className={styles.iconBtn}
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Abrir Loop"
+                          >
+                            <i className="ti ti-external-link" aria-hidden="true" />
+                          </a>
+                          <button
+                            className={styles.iconBtn}
+                            onClick={() =>
+                              navigator.clipboard?.writeText(link).then(() => toast.success('Link copiado.'))
+                            }
+                            disabled={busy}
+                            title="Copiar link"
+                          >
+                            <i className="ti ti-copy" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <div className={styles.formActions}>
+              <button className={styles.primaryBtn} onClick={handleSaveLoop} disabled={busy}>
+                <i className="ti ti-device-floppy" aria-hidden="true" />
+                <span>Guardar configuração</span>
+              </button>
+            </div>
+          </div>
         ) : view === 'overlaps' ? (
           <div className={styles.body}>
             <p className={styles.muted}>
@@ -3118,6 +3252,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               <label className={`${styles.check} ${styles.checkInline}`} title={t('loopHint')}>
                 <input type="checkbox" checked={form.loop} onChange={setField('loop')} />
                 <i className="ti ti-repeat" aria-hidden="true" /> {t('loopField')}
+              </label>
+              <label className={`${styles.check} ${styles.checkInline}`} title={t('generalHint')}>
+                <input type="checkbox" checked={form.isGeneral} onChange={setField('isGeneral')} />
+                <i className="ti ti-broadcast" aria-hidden="true" /> {t('generalField')}
               </label>
             </div>
 

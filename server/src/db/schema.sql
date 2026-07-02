@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS events (
   subcategory      TEXT,
   featured         BOOLEAN NOT NULL DEFAULT FALSE,
   loop             BOOLEAN NOT NULL DEFAULT FALSE,
+  is_general       BOOLEAN NOT NULL DEFAULT FALSE,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'pendente', 'publicado', 'rejeitado')),
   is_private       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -101,6 +102,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS map_lng DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS loop BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_general BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (

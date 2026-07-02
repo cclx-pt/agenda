@@ -130,6 +130,45 @@ export async function updateBranding(input, actorId) {
   return { logoUrl, subcategoryColors }
 }
 
+// ── Configuração do Loop (carrossel público por igreja, para TV) ──
+// app_settings key 'loop' = { [igreja]: { active, showGeneral, weeks } }.
+const LOOP_KEY = 'loop'
+const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4 }
+
+function normalizeLoopChurch(cfg) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {}
+  const weeks = Number(c.weeks)
+  return {
+    active: !!c.active,
+    showGeneral: c.showGeneral !== false, // por omissão true
+    weeks: Number.isInteger(weeks) && weeks >= 1 && weeks <= 52 ? weeks : LOOP_DEFAULTS.weeks,
+  }
+}
+
+/** Mapa completo { [igreja]: { active, showGeneral, weeks } } (admin). */
+export async function getLoopConfig() {
+  const stored = await repo.get(LOOP_KEY)
+  return stored && typeof stored === 'object' ? stored : {}
+}
+
+/** Configuração efetiva (com omissões) para uma igreja. */
+export async function getLoopConfigForChurch(church) {
+  const all = await getLoopConfig()
+  return normalizeLoopChurch(all[church])
+}
+
+/** Valida e persiste o mapa de configuração do Loop (admin). */
+export async function updateLoopConfig(input, actorId) {
+  const raw = input && typeof input === 'object' ? input : {}
+  const out = {}
+  for (const [church, cfg] of Object.entries(raw)) {
+    if (!church) continue
+    out[church] = normalizeLoopChurch(cfg)
+  }
+  await repo.set(LOOP_KEY, out, actorId)
+  return out
+}
+
 // Chave da política de sobreposição de eventos gerida pelo admin.
 const OVERLAP_KEY = 'overlap_policy'
 const OVERLAP_MODES = ['off', 'warn', 'block']

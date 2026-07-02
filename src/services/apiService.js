@@ -104,6 +104,24 @@ function mapSorEvent(e) {
   }
 }
 
+/** Eventos do Loop (carrossel TV) de uma igreja — mapeados para a app. */
+export async function getLoop(church) {
+  let res
+  try {
+    res = await fetch(`/data/loop/${encodeURIComponent(church)}`, { credentials: 'include' })
+  } catch {
+    throw new ApiError(0, 'Sem ligação ao servidor.')
+  }
+  if (!res.ok) throw new ApiError(res.status, res.statusText)
+  const data = await res.json().catch(() => ({}))
+  return {
+    active: !!data.active,
+    weeks: data.weeks ?? 4,
+    church: data.church ?? church,
+    events: Array.isArray(data.events) ? data.events.map(mapSorEvent) : [],
+  }
+}
+
 // ── Origens individuais ──────────────────────────────────────────
 
 async function loadSor(signal, { includePrivate = false, includeDrafts = false, from, to } = {}) {

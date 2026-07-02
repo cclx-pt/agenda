@@ -32,6 +32,7 @@ function mapRow(row) {
     subcategory: row.subcategory ?? null,
     featured: !!row.featured,
     loop: !!row.loop,
+    isGeneral: !!row.is_general,
     status: row.status,
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
@@ -159,6 +160,32 @@ export async function distinctSubcategories() {
   return rows.map((r) => r.subcategory).filter(Boolean)
 }
 
+// Eventos publicados marcados para o Loop (carrossel TV) de uma igreja: os da
+// própria comunidade + (opcional) os "gerais", dentro do intervalo de datas.
+export async function listForLoop({ church, includeGeneral = true, from, to } = {}) {
+  const where = ["status = 'publicado'", 'loop = TRUE']
+  const params = []
+  if (from) {
+    params.push(from)
+    where.push(`start_datetime >= $${params.length}::date`)
+  }
+  if (to) {
+    params.push(to)
+    where.push(`start_datetime < ($${params.length}::date + INTERVAL '1 day')`)
+  }
+  params.push(church)
+  where.push(
+    includeGeneral
+      ? `(community = $${params.length} OR is_general = TRUE)`
+      : `community = $${params.length}`
+  )
+  const { rows } = await pool.query(
+    `SELECT * FROM events WHERE ${where.join(' AND ')} ORDER BY start_datetime ASC`,
+    params
+  )
+  return rows.map(mapRow)
+}
+
 export async function insert(data, actorId) {
   const id = randomUUID()
   await pool.query(
@@ -167,8 +194,8 @@ export async function insert(data, actorId) {
        community, category, is_private, privacy_tag, banner_url,
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
-       series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
+       series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop, is_general)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
     [
       id,
       data.title,
@@ -197,6 +224,7 @@ export async function insert(data, actorId) {
       data.subcategory ?? null,
       data.featured ?? false,
       data.loop ?? false,
+      data.isGeneral ?? false,
     ]
   )
   return findById(id)
@@ -229,6 +257,7 @@ export async function update(id, data) {
        subcategory = $23,
        featured = $24,
        loop = $25,
+       is_general = $26,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -257,6 +286,7 @@ export async function update(id, data) {
       data.subcategory ?? null,
       data.featured ?? false,
       data.loop ?? false,
+      data.isGeneral ?? false,
     ]
   )
   return findById(id)
@@ -314,8 +344,9 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        subcategory = $21,
        featured = $22,
        loop = $23,
+       is_general = $24,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $24`,
+     WHERE series_id = $1 AND id <> $25`,
     [
       seriesId,
       data.title,
@@ -340,6 +371,7 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.subcategory ?? null,
       data.featured ?? false,
       data.loop ?? false,
+      data.isGeneral ?? false,
       exceptId,
     ]
   )

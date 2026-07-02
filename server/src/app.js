@@ -17,6 +17,7 @@ import { churchesRouter } from './churches/routes.js'
 import { categoriesRouter } from './categories/routes.js'
 import { subcategoriesRouter } from './subcategories/routes.js'
 import { privacyTagsRouter } from './privacyTags/routes.js'
+import { loopRouter, loopConfigRouter } from './loop/routes.js'
 import { delegationsRouter } from './delegations/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
 import { approvalActionRouter } from './approvals/routes.js'
@@ -63,6 +64,8 @@ app.use('/data/overlap-policy', overlapPolicyRouter)
 app.use('/data/users', usersRouter)
 app.use('/data/reports', reportsRouter)
 app.use('/data/events', eventsRouter)
+app.use('/data/loop', loopRouter)
+app.use('/data/loop-config', loopConfigRouter)
 app.use('/data/churches', churchesRouter)
 app.use('/data/categories', categoriesRouter)
 app.use('/data/subcategories', subcategoriesRouter)
