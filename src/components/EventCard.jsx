@@ -1,13 +1,13 @@
-import { CalendarDays, Church, Clock, Lock, MapPin, Paperclip } from 'lucide-react'
+import { Calendar, CalendarDays, Church, Clock, Lock, MapPin, Paperclip, Phone, Ticket } from 'lucide-react'
 
-import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange } from '../utils/calendarHelpers'
+import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
 import { cn } from '@/lib/utils'
 
 export default function EventCard({ event, onClick }) {
-  const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
   const status = STATUS_META[event.status]
-  const { subColorMap } = useEventColors()
+  const { colorFor, subColorMap } = useEventColors()
+  const vis = colorFor(event)
   const subColor = event.subcategory ? subColorMap[event.subcategory] : null
 
   return (
@@ -35,8 +35,8 @@ export default function EventCard({ event, onClick }) {
             {event.community || event.responsible}
           </span>
           <span className="inline-block rounded-sm px-[7px] py-0.5 text-[9px] font-bold uppercase tracking-widest"
-            style={{ background: cat.bgVar, color: cat.colorVar }}>
-            {cat.label}
+            style={{ background: vis.catBg, color: vis.catText }}>
+            {vis.catLabel}
           </span>
           {event.subcategory && (
             <span className="inline-block rounded-sm bg-muted px-[7px] py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
@@ -66,35 +66,70 @@ export default function EventCard({ event, onClick }) {
 
         <div className="mb-2 text-sm font-bold leading-tight tracking-wide text-foreground">{event.title}</div>
 
-        <div className="mb-2 flex flex-col gap-1">
-          <div className="flex items-center gap-[7px] text-xs font-bold text-foreground">
+        <div className="mb-2 flex flex-col gap-1.5 text-[11px] text-muted-foreground">
+          {/* Data */}
+          <div className="flex items-center gap-[7px]">
+            <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+            <span className="font-semibold capitalize text-foreground">{formatDateLabel(event.date)}</span>
+          </div>
+          {/* Hora */}
+          <div className="flex items-center gap-[7px]">
+            <Clock className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+            {formatTimeRange(event.timeStart, event.timeEnd) || 'Dia inteiro'}
+          </div>
+          {/* Local */}
+          {event.location && (
+            <div className="flex items-center gap-[7px]">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate">{event.location}</span>
+            </div>
+          )}
+          {/* Contacto */}
+          {(event.organizerPhone || event.organizerEmail || event.organizerContact) && (
+            <div className="flex items-center gap-[7px]">
+              <Phone className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate">{event.organizerPhone || event.organizerEmail || event.organizerContact}</span>
+            </div>
+          )}
+          {/* Inscrições */}
+          {event.registrationUrl && (
+            <div className="flex items-center gap-[7px]">
+              <Ticket className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                className="font-semibold text-primary underline underline-offset-2 hover:opacity-80">
+                Inscrições
+              </a>
+            </div>
+          )}
+          {/* Google Maps */}
+          {event.mapUrl && (
+            <div className="flex items-center gap-[7px]">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+              <a href={event.mapUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                className="font-semibold text-primary underline underline-offset-2 hover:opacity-80">
+                Ver no Google Maps
+              </a>
+            </div>
+          )}
+          {/* Organizado por (comunidade) */}
+          <div className="flex items-center gap-[7px]">
             <Church className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-            {event.responsible}
-          </div>
-          <div className="flex items-center gap-[7px] text-[11px] text-muted-foreground">
-            <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            {formatTimeRange(event.timeStart, event.timeEnd)}
-          </div>
-          <div className="flex items-center gap-[7px] text-[11px] text-muted-foreground">
-            <MapPin className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            {event.location}
+            <span className="truncate">
+              Organizado por:{' '}
+              <span className="font-semibold text-foreground">{event.organizerName || event.community || event.responsible}</span>
+              {event.organizerName && (event.community || event.responsible)
+                ? ` (${event.community || event.responsible})`
+                : ''}
+            </span>
           </div>
         </div>
 
-        {(event.mapUrl || event.attachmentUrl) && (
+        {event.attachmentUrl && (
           <div className="mb-2 flex flex-wrap gap-1.5">
-            {event.mapUrl && (
-              <a href={event.mapUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-accent">
-                <MapPin className="h-3 w-3" aria-hidden="true" /> Mapa
-              </a>
-            )}
-            {event.attachmentUrl && (
-              <a href={event.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-accent">
-                <Paperclip className="h-3 w-3" aria-hidden="true" /> Anexo
-              </a>
-            )}
+            <a href={event.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-accent">
+              <Paperclip className="h-3 w-3" aria-hidden="true" /> {event.attachmentName || 'Anexo'}
+            </a>
           </div>
         )}
 

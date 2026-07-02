@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react'
 import { useSubcategories } from './useSubcategories'
+import { useCategories } from './useCategories'
 import { useI18n } from './useI18n'
 import { CATEGORY_META } from '../utils/calendarHelpers'
 
@@ -17,6 +18,7 @@ const PASTEL_TEXT = '#334155'
  */
 export function useEventColors() {
   const { subcategories } = useSubcategories()
+  const { categories } = useCategories()
   const { subcategoryColors } = useI18n()
 
   const subColorMap = useMemo(() => {
@@ -25,20 +27,35 @@ export function useEventColors() {
     return m
   }, [subcategories])
 
+  const catMap = useMemo(() => {
+    const m = {}
+    for (const c of categories || []) if (c?.slug) m[c.slug] = c
+    return m
+  }, [categories])
+
   const colorFor = useCallback(
     (evt) => {
-      const cat = CATEGORY_META[evt?.category] || CATEGORY_META.evento
+      const meta = CATEGORY_META[evt?.category] // uma das fixas (cores do tema)
+      const dbCat = catMap[evt?.category] // categoria da BD (rótulo/cor personalizados)
+      const catLabel = dbCat?.label || meta?.label || evt?.category || CATEGORY_META.evento.label
+      // Cor da CATEGORIA (para o selo de categoria — independente do toggle).
+      const catBg = meta ? meta.bgVar : dbCat?.color || CATEGORY_META.evento.bgVar
+      const catText = meta ? meta.colorVar : dbCat?.color ? PASTEL_TEXT : CATEGORY_META.evento.colorVar
+      const catDot = meta ? meta.colorVar : dbCat?.color || CATEGORY_META.evento.colorVar
+      // Cor DOMINANTE do evento (chip/bloco/barra/ponto — respeita o toggle).
       const subHex =
         subcategoryColors && evt?.subcategory ? subColorMap[evt.subcategory] || null : null
       return {
         subHex,
-        bg: subHex || cat.bgVar,
-        text: subHex ? PASTEL_TEXT : cat.colorVar,
-        dot: subHex || cat.colorVar,
-        catLabel: cat.label,
+        catLabel,
+        catBg,
+        catText,
+        bg: subHex || catBg,
+        text: subHex ? PASTEL_TEXT : catText,
+        dot: subHex || catDot,
       }
     },
-    [subColorMap, subcategoryColors]
+    [catMap, subColorMap, subcategoryColors]
   )
 
   return { colorFor, subcategoryColors, subColorMap }

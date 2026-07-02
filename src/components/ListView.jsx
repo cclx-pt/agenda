@@ -79,7 +79,7 @@ export default function ListView({ year, events, onSelectEvent }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         {e.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[11px] text-amber-500" aria-hidden="true" />}
-                        <span className="inline-block flex-shrink-0 rounded-sm px-1.5 py-px text-[9px] font-bold uppercase tracking-wide" style={{ background: vis.bg, color: vis.text }}>{vis.catLabel}</span>
+                        <span className="inline-block flex-shrink-0 rounded-sm px-1.5 py-px text-[9px] font-bold uppercase tracking-wide" style={{ background: vis.catBg, color: vis.catText }}>{vis.catLabel}</span>
                         {e.subcategory && (
                           <span className="inline-block flex-shrink-0 rounded-sm bg-muted px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-muted-foreground" style={subColorMap[e.subcategory] ? { background: subColorMap[e.subcategory], color: '#334155' } : undefined}>{e.subcategory}</span>
                         )}

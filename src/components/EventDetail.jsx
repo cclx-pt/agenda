@@ -17,16 +17,16 @@ import {
   X,
 } from 'lucide-react'
 
-import { CATEGORY_META, STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useEventColors } from '../hooks/useEventColors'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export default function EventDetail({ event, onClose, onBack, onExport, onDelete, onEdit }) {
-  const cat = CATEGORY_META[event.category] || CATEGORY_META.evento
   const status = STATUS_META[event.status]
-  const { subColorMap } = useEventColors()
+  const { colorFor, subColorMap } = useEventColors()
+  const vis = colorFor(event)
   const subColor = event.subcategory ? subColorMap[event.subcategory] : null
   const containerRef = useModalA11y(onClose)
 
@@ -80,8 +80,8 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               {event.community || event.responsible}
             </span>
             <span className="inline-block rounded-sm px-2 py-[3px] text-[9px] font-bold uppercase tracking-widest"
-              style={{ background: cat.bgVar, color: cat.colorVar }}>
-              {cat.label}
+              style={{ background: vis.catBg, color: vis.catText }}>
+              {vis.catLabel}
             </span>
             {event.subcategory && (
               <span className="inline-block rounded-sm bg-muted px-2 py-[3px] text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
