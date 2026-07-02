@@ -123,6 +123,19 @@ CREATE TABLE IF NOT EXISTS approval_delegations (
 CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON approval_delegations (delegate_id);
 CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON approval_delegations (delegator_id);
 
+-- ── Âmbito dos aprovadores ──────────────────────────
+-- Configuração (complementar ao acesso por igreja do perfil) que limita o que um
+-- aprovador pode aprovar/receber, por igreja e/ou categoria. Sem linhas para um
+-- aprovador = tudo (dentro das igrejas do seu perfil).
+CREATE TABLE IF NOT EXISTS approver_scopes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  approver_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  church      TEXT,
+  category    TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_approver_scopes_approver ON approver_scopes (approver_id);
+
 -- ── Eventos externos (espelho da inChurch / inRadar) ────────────
 -- Preenchido pela sincronização periódica (server/src/integrations/inchurchSync.js).
 -- O calendário lê SÓ da base de dados; a sincronização faz upsert (INSERT/UPDATE)

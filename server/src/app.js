@@ -19,6 +19,7 @@ import { privacyTagsRouter } from './privacyTags/routes.js'
 import { delegationsRouter } from './delegations/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
 import { approvalActionRouter } from './approvals/routes.js'
+import { approverScopesRouter } from './approverScopes/routes.js'
 import { healthRouter } from './health/routes.js'
 
 /**
@@ -64,6 +65,7 @@ app.use('/data/churches', churchesRouter)
 app.use('/data/categories', categoriesRouter)
 app.use('/data/privacy-tags', privacyTagsRouter)
 app.use('/data/delegations', delegationsRouter)
+app.use('/data/approver-scopes', approverScopesRouter)
 // Imagens de eventos: carregadas (POST) para o Supabase Storage, que serve os
 // URLs públicos diretamente — já não há ficheiros locais a servir.
 app.use('/data/uploads', uploadsRouter)

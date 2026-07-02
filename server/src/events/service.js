@@ -6,6 +6,7 @@ import * as categoriesService from '../categories/service.js'
 import * as privacyTagsService from '../privacyTags/service.js'
 import * as settingsService from '../settings/service.js'
 import * as delegationsRepo from '../delegations/repository.js'
+import * as approverScopesRepo from '../approverScopes/repository.js'
 import * as usersRepo from '../users/repository.js'
 import { sendEventStatusEmail, sendApprovalRequestEmail } from '../auth/email.js'
 import { signApprovalToken } from '../approvals/token.js'
@@ -191,11 +192,33 @@ async function hasActiveDelegation(user, event) {
   )
 }
 
+// Âmbito do aprovador (complementar ao acesso por igreja): sem regras = tudo;
+// com regras, o evento tem de casar (igreja e categoria) com pelo menos uma.
+// Fail-open se a tabela ainda não existir (migração pendente).
+async function matchesApproverScopes(approverId, event) {
+  try {
+    const scopes = await approverScopesRepo.listByApprover(approverId)
+    if (scopes.length === 0) return true
+    return scopes.some(
+      (s) =>
+        (s.church == null || s.church === event.community) &&
+        (s.category == null || s.category === event.category)
+    )
+  } catch (err) {
+    console.error('[events] âmbito de aprovador indisponível (migração pendente?):', err?.message ?? err)
+    return true
+  }
+}
+
 // Verdadeiro se o utilizador pode moderar (aprovar/rejeitar) o evento: gere
-// eventos E (tem acesso à igreja OU há uma delegação ativa que a cobre).
+// eventos E (tem acesso à igreja OU há uma delegação ativa que a cobre). Os
+// aprovadores respeitam ainda o âmbito configurado (igreja/categoria).
 async function canModerate(user, event) {
   if (!canManageEvents(user.role)) return false
-  if (canAccessChurch(user, event.community)) return true
+  if (canAccessChurch(user, event.community)) {
+    if (user.role === 'aprovador') return matchesApproverScopes(user.sub, event)
+    return true
+  }
   return hasActiveDelegation(user, event)
 }
 
@@ -250,7 +273,9 @@ async function listApproversFor(event) {
       byId.set(u.id, u)
     } else if (u.role === 'aprovador') {
       const ch = Array.isArray(u.churches) && u.churches.length ? u.churches : null
-      if (ch === null || ch.includes(event.community)) byId.set(u.id, u)
+      if ((ch === null || ch.includes(event.community)) && (await matchesApproverScopes(u.id, event))) {
+        byId.set(u.id, u)
+      }
     }
   }
   const delegateIds = await delegationsRepo.listActiveForEvent(event.community, event.category)
@@ -393,15 +418,33 @@ export async function listForApproval(user, { status } = {}) {
   const all = await repo.list({ status: statuses })
   if (isAdmin(user.role)) return all
   const delegations = await delegationsRepo.listActiveForDelegate(user.sub)
-  return all.filter(
-    (e) =>
-      canAccessChurch(user, e.community) ||
-      delegations.some(
-        (d) =>
-          (d.church == null || d.church === e.community) &&
-          (d.category == null || d.category === e.category)
-      )
-  )
+  let scopes = []
+  if (user.role === 'aprovador') {
+    try {
+      scopes = await approverScopesRepo.listByApprover(user.sub)
+    } catch {
+      scopes = []
+    }
+  }
+  const inScope = (e) =>
+    scopes.length === 0 ||
+    scopes.some(
+      (s) =>
+        (s.church == null || s.church === e.community) &&
+        (s.category == null || s.category === e.category)
+    )
+  const byDelegation = (e) =>
+    delegations.some(
+      (d) =>
+        (d.church == null || d.church === e.community) &&
+        (d.category == null || d.category === e.category)
+    )
+  return all.filter((e) => {
+    if (canAccessChurch(user, e.community)) {
+      return user.role === 'aprovador' ? inScope(e) : true
+    }
+    return byDelegation(e)
+  })
 }
 
 export async function getForUser(user, id) {

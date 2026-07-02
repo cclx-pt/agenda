@@ -127,6 +127,29 @@ export async function deleteDelegation(id) {
   await request(`/data/delegations/${id}`, { method: 'DELETE' })
 }
 
+// ── Âmbito dos aprovadores (admin) ──────────────────
+
+/** Lista as regras de âmbito de todos os aprovadores. */
+export async function listApproverScopes() {
+  const { scopes } = await request('/data/approver-scopes')
+  return scopes
+}
+
+/** Lista os aprovadores ativos (candidatos a configurar). */
+export async function listApproverScopeApprovers() {
+  const { approvers } = await request('/data/approver-scopes/approvers')
+  return approvers
+}
+
+export async function createApproverScope(payload) {
+  const { scope } = await request('/data/approver-scopes', { method: 'POST', body: payload })
+  return scope
+}
+
+export async function deleteApproverScope(id) {
+  await request(`/data/approver-scopes/${id}`, { method: 'DELETE' })
+}
+
 // ── Traduções (i18n) ────────────────────────────
 
 /** Lê as sobreposições de tradução (público). */

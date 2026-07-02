@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import {
-  X, Check, Ban, Download, Plus, Trash2, ShieldCheck, ClipboardCheck, Filter,
+  X, Check, Ban, Download, Plus, Trash2, ShieldCheck, ClipboardCheck, Filter, UserCheck,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -34,6 +34,7 @@ const STATUS_BADGE = {
 }
 
 const emptyDelegation = { delegateId: '', church: '', category: '', startDate: '', endDate: '', active: true }
+const emptyScope = { approverId: '', church: '', category: '' }
 
 function csvEscape(v) {
   const s = String(v ?? '')
@@ -58,6 +59,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const { privacyTags: dbPrivacyTags } = usePrivacyTags()
 
   const canManageDelegations = user?.role === 'admin' || user?.role === 'aprovador'
+  const isAdmin = user?.role === 'admin'
 
   const [tab, setTab] = useState('approvals')
   const [status, setStatus] = useState('pendente')
@@ -72,6 +74,10 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const [delegations, setDelegations] = useState([])
   const [editors, setEditors] = useState([])
   const [delForm, setDelForm] = useState(emptyDelegation)
+
+  const [scopes, setScopes] = useState([])
+  const [scopeApprovers, setScopeApprovers] = useState([])
+  const [scopeForm, setScopeForm] = useState(emptyScope)
 
   const categoryLabel = useCallback(
     (slug) => categories.find((c) => c.slug === slug)?.label || CATEGORY_META[slug]?.label || slug,
@@ -112,6 +118,25 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDelegations()
   }, [loadDelegations])
+
+  const loadScopes = useCallback(async () => {
+    if (!isAdmin) return
+    try {
+      const [sc, ap] = await Promise.all([
+        eventsService.listApproverScopes(),
+        eventsService.listApproverScopeApprovers(),
+      ])
+      setScopes(sc)
+      setScopeApprovers(ap)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadScopes()
+  }, [loadScopes])
 
   const churchesInEvents = useMemo(() => {
     const set = new Set(events.map((e) => e.community).filter(Boolean))
@@ -279,6 +304,49 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     }
   }
 
+  const setScopeField = (key) => (e) => setScopeForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const handleCreateScope = async (e) => {
+    e.preventDefault()
+    if (!scopeForm.approverId) {
+      toast.error('Selecione um aprovador.')
+      return
+    }
+    if (!scopeForm.church && !scopeForm.category) {
+      toast.error('Indique pelo menos uma igreja ou uma categoria.')
+      return
+    }
+    setBusy(true)
+    try {
+      await eventsService.createApproverScope({
+        approverId: scopeForm.approverId,
+        church: scopeForm.church || null,
+        category: scopeForm.category || null,
+      })
+      setScopeForm(emptyScope)
+      await loadScopes()
+      toast.success('Regra adicionada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteScope = async (s) => {
+    if (!window.confirm('Remover esta regra?')) return
+    setBusy(true)
+    try {
+      await eventsService.deleteApproverScope(s.id)
+      await loadScopes()
+      toast.success('Regra removida.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const tabBtn = (id, label, icon) => (
     <button
       type="button"
@@ -315,6 +383,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
           <div className="flex items-center gap-2">
             {tabBtn('approvals', 'Aprovações', <ClipboardCheck className="h-4 w-4" aria-hidden="true" />)}
             {canManageDelegations && tabBtn('delegations', 'Delegações', <ShieldCheck className="h-4 w-4" aria-hidden="true" />)}
+            {isAdmin && tabBtn('approvers', 'Aprovadores', <UserCheck className="h-4 w-4" aria-hidden="true" />)}
             <button
               type="button"
               className="cursor-pointer rounded p-1 text-lg text-muted-foreground transition-colors hover:bg-accent"
@@ -470,7 +539,7 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                 </ul>
               )}
             </>
-          ) : (
+          ) : tab === 'delegations' ? (
             <>
               {/* Delegation create form */}
               <form onSubmit={handleCreateDelegation} className="flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5">
@@ -561,6 +630,81 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                           className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-transparent text-foreground transition-colors hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                           aria-label="Eliminar delegação"
                           title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Approver scope create form */}
+              <form onSubmit={handleCreateScope} className="flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5">
+                <p className="m-0 text-[13px] font-semibold text-foreground">Âmbito de aprovação</p>
+                <p className="m-0 text-xs text-muted-foreground">
+                  Sem regras, o aprovador recebe e aprova tudo (dentro das igrejas do seu perfil). Cada regra limita a uma igreja e/ou categoria.
+                </p>
+                <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-1">
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                    Aprovador *
+                    <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.approverId} onChange={setScopeField('approverId')} required>
+                      <option value="">— Selecione —</option>
+                      {scopeApprovers.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name || a.email}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                    Igreja
+                    <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.church} onChange={setScopeField('church')}>
+                      <option value="">Todas as igrejas</option>
+                      {churches.map((c) => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
+                    Categoria
+                    <select className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={scopeForm.category} onChange={setScopeField('category')}>
+                      <option value="">Todas as categorias</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.slug}>{c.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex justify-end">
+                  <button type="submit" disabled={busy} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3.5 py-[9px] text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Adicionar regra
+                  </button>
+                </div>
+              </form>
+
+              {/* Approver scope list */}
+              {scopes.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Sem regras — os aprovadores recebem tudo (dentro das igrejas do perfil).</p>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                  {scopes.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <strong className="text-sm text-foreground">{s.approverName || s.approverEmail}</strong>
+                        <span className="text-xs text-muted-foreground">
+                          {s.church || 'Todas as igrejas'} · {s.category ? categoryLabel(s.category) : 'Todas as categorias'}
+                        </span>
+                      </div>
+                      <div className="flex flex-shrink-0 gap-1.5 max-[560px]:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteScope(s)}
+                          disabled={busy}
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-transparent text-foreground transition-colors hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                          aria-label="Remover regra"
+                          title="Remover"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
