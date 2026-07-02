@@ -17,9 +17,12 @@ CREATE TABLE IF NOT EXISTS users (
   churches         TEXT[],
   -- Etiquetas de privacidade visíveis: NULL = todas; array = lista permitida.
   privacy_tags     TEXT[],
+  -- Token secreto do feed pessoal de subscrição (iCal com eventos privados).
+  calendar_token   TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at    TIMESTAMPTZ
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_token TEXT;
 
 CREATE TABLE IF NOT EXISTS otp_codes (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -45,6 +45,27 @@ export async function findByEmail(email) {
   return mapRow(rows[0])
 }
 
+/** Token do feed pessoal de subscrição (ou null). */
+export async function getCalendarToken(id) {
+  const { rows } = await pool.query('SELECT calendar_token FROM users WHERE id = $1', [id])
+  return rows[0]?.calendar_token ?? null
+}
+
+export async function setCalendarToken(id, token) {
+  await pool.query('UPDATE users SET calendar_token = $2 WHERE id = $1', [id, token])
+}
+
+/** Utilizador (ativo) dono de um token de subscrição, ou null. */
+export async function findByCalendarToken(token) {
+  if (!token) return null
+  const { rows } = await pool.query(
+    `SELECT id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at
+     FROM users WHERE calendar_token = $1 AND is_active = TRUE`,
+    [token]
+  )
+  return mapRow(rows[0])
+}
+
 export async function insert(data) {
   const id = randomUUID()
   await pool.query(

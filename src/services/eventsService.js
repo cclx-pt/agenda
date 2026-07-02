@@ -210,6 +210,12 @@ export async function previewOverlaps({ community, category, start, end, allDay,
   return request(`/data/events/overlaps?${qs.toString()}`)
 }
 
+/** Obtém (criando se preciso) o token do feed pessoal de subscrição. */
+export async function getCalendarToken() {
+  const { token } = await request('/data/events/calendar-token')
+  return token
+}
+
 // ── Gestão de utilizadores (apenas admin) ────────────────────────
 
 export async function listUsers() {

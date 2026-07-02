@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { randomBytes } from 'node:crypto'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as service from './service.js'
 import { EventError } from './service.js'
 import { buildCalendar } from './ics.js'
+import * as usersRepo from '../users/repository.js'
 
 export const eventsRouter = Router()
 
@@ -75,6 +77,37 @@ eventsRouter.get('/calendar.ics', async (req, res, next) => {
     next(err)
   }
 })
+
+// Feed PESSOAL (com privados) — autenticado pelo token secreto no URL. `scope`:
+// 'all' (públicos + privados que o utilizador pode ver) ou 'private' (só privados).
+eventsRouter.get('/calendar/:token.ics', async (req, res, next) => {
+  try {
+    const dbUser = await usersRepo.findByCalendarToken(req.params.token)
+    if (!dbUser) return res.status(404).json({ error: 'Ligação inválida ou revogada.' })
+    const user = {
+      sub: dbUser.id,
+      role: dbUser.role,
+      canViewPrivate: dbUser.canViewPrivate,
+      churches: dbUser.churches ?? null,
+      privacyTags: dbUser.privacyTags ?? null,
+    }
+    const ymd = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const now = new Date()
+    const range = dateRange(req.query)
+    const from = range.from || ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+    const to = range.to || ymd(new Date(now.getFullYear() + 1, now.getMonth() + 2, 0))
+    let events = await service.listCalendar(user, { includeDrafts: false, from, to })
+    if (req.query.scope === 'private') events = events.filter((e) => e.isPrivate)
+    const name = req.query.scope === 'private' ? 'Agenda CCLX (privados)' : 'Agenda CCLX (pessoal)'
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+    res.setHeader('Content-Disposition', 'inline; filename="agenda-cclx.ics"')
+    res.setHeader('Cache-Control', 'private, max-age=3600')
+    res.send(buildCalendar(events, { name }))
+  } catch (err) {
+    next(err)
+  }
+})
 // Categorias distintas em uso (qualquer estado + externos) — alimenta o filtro
 // dinâmico da barra lateral. Público: o calendário anónimo também o usa.
 eventsRouter.get(
@@ -86,6 +119,20 @@ eventsRouter.get(
 
 // A partir daqui, tudo exige autenticação.
 eventsRouter.use(requireAuth)
+
+// Token do feed pessoal de subscrição (cria na 1.ª vez). Só o próprio o obtém.
+eventsRouter.get('/calendar-token', async (req, res, next) => {
+  try {
+    let token = await usersRepo.getCalendarToken(req.user.sub)
+    if (!token) {
+      token = randomBytes(24).toString('hex')
+      await usersRepo.setCalendarToken(req.user.sub, token)
+    }
+    res.json({ token })
+  } catch (err) {
+    next(err)
+  }
+})
 
 // ── Calendário autenticado: publicados, incluindo privados se autorizado ──
 eventsRouter.get(
