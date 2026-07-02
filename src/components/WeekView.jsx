@@ -1,4 +1,4 @@
-import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
+import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, isMultiDay, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
 import { cn } from '@/lib/utils'
 
@@ -55,7 +55,9 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                   <span className="flex w-full items-center gap-1 text-[0.6rem] font-bold uppercase tracking-wide opacity-85">
                     {evt.featured && <i className="ti ti-star-filled cclx-blink text-amber-500" aria-hidden="true" />}
                     <span className="truncate">{vis.catLabel}{evt.subcategory ? ` · ${evt.subcategory}` : ''}</span>
-                    {evt.timeStart && <span className="ml-auto opacity-90">{evt.timeStart}</span>}
+                    {isMultiDay(evt)
+                      ? <i className="ti ti-arrows-horizontal ml-auto opacity-90" title="Vários dias" aria-hidden="true" />
+                      : evt.timeStart && <span className="ml-auto opacity-90">{evt.timeStart}</span>}
                   </span>
                   <span className="line-clamp-2 text-[0.75rem] font-semibold leading-tight">{evt.title}</span>
                   <span className="text-[0.6rem] opacity-75">({evt.community})</span>

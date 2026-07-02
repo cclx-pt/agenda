@@ -1,6 +1,6 @@
 import { Calendar, CalendarDays, Church, Clock, Lock, MapPin, Paperclip, Ticket, UserCheck } from 'lucide-react'
 
-import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel, formatDateRangeLabel, isMultiDay } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
 import { cn } from '@/lib/utils'
 
@@ -74,7 +74,7 @@ export default function EventCard({ event, onClick }) {
           {/* Data */}
           <div className="flex items-center gap-[7px]">
             <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-            <span className="font-semibold capitalize text-foreground">{formatDateLabel(event.date)}</span>
+            <span className="font-semibold capitalize text-foreground">{isMultiDay(event) ? formatDateRangeLabel(event.date, event.endDate) : formatDateLabel(event.date)}</span>
           </div>
           {/* Hora */}
           <div className="flex items-center gap-[7px]">

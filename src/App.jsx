@@ -26,7 +26,7 @@ import ApprovalsPanel from './components/ApprovalsPanel'
 import * as eventsService from './services/eventsService'
 import { clearEventCache } from './services/apiService'
 import {
-  MONTHS_PT, MONTHS_SHORT, rangeForView, formatDateLabel, toDateKey, parseDateKey,
+  MONTHS_PT, MONTHS_SHORT, rangeForView, formatDateLabel, toDateKey, parseDateKey, eventDayKeys,
 } from './utils/calendarHelpers'
 import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
@@ -160,7 +160,10 @@ export default function App() {
   const filteredByDate = useMemo(() => {
     const map = {}
     for (const e of filteredEvents) {
-      ;(map[e.date] ??= []).push(e)
+      // Eventos de vários dias aparecem em todos os dias que abrangem.
+      for (const key of eventDayKeys(e)) {
+        ;(map[key] ??= []).push(e)
+      }
     }
     return map
   }, [filteredEvents])

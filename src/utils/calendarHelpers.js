@@ -64,6 +64,34 @@ export function groupByDate(events) {
   }, {})
 }
 
+/** Soma `days` dias a uma chave YYYY-MM-DD, devolvendo nova chave. */
+export function addDaysKey(key, days) {
+  const { year, month, day } = parseDateKey(key)
+  return toDateKey(year, month, day + days)
+}
+
+/** Verdadeiro se o evento se estende por mais do que um dia de calendário. */
+export function isMultiDay(evt) {
+  return !!(evt && evt.endDate && evt.endDate > evt.date)
+}
+
+/**
+ * Todas as chaves de dia (YYYY-MM-DD, inclusivo) cobertas por um evento, do dia
+ * de início ao de fim. Eventos de um só dia devolvem apenas [date].
+ */
+export function eventDayKeys(evt) {
+  if (!evt || !evt.date) return []
+  const start = evt.date
+  const end = evt.endDate && evt.endDate > start ? evt.endDate : start
+  const keys = []
+  let k = start
+  for (let i = 0; i < 400 && k <= end; i++) {
+    keys.push(k)
+    k = addDaysKey(k, 1)
+  }
+  return keys
+}
+
 /**
  * Intervalo de datas (YYYY-MM-DD, inclusivo) coberto por uma vista do calendário.
  * `day` é o dia âncora (1..31) usado pelas vistas diária e semanal.
@@ -106,6 +134,24 @@ export function formatDateLabel(dateKey) {
   const cap = weekday.charAt(0).toUpperCase() + weekday.slice(1)
   const day = d.getDate()
   return `${cap}, ${day} de ${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/**
+ * Etiqueta compacta para um intervalo de datas (início..fim, inclusivo). Um só
+ * dia usa `formatDateLabel`. Ex.: "10 – 12 de Julho 2026", "30 Jun – 2 Jul 2026"
+ * ou "28 Dez 2026 – 2 Jan 2027".
+ */
+export function formatDateRangeLabel(startKey, endKey) {
+  if (!endKey || endKey <= startKey) return formatDateLabel(startKey)
+  const s = parseDateKey(startKey)
+  const e = parseDateKey(endKey)
+  if (s.year === e.year && s.month === e.month) {
+    return `${s.day} – ${e.day} de ${MONTHS_PT[s.month]} ${s.year}`
+  }
+  if (s.year === e.year) {
+    return `${s.day} ${MONTHS_SHORT[s.month]} – ${e.day} ${MONTHS_SHORT[e.month]} ${s.year}`
+  }
+  return `${s.day} ${MONTHS_SHORT[s.month]} ${s.year} – ${e.day} ${MONTHS_SHORT[e.month]} ${e.year}`
 }
 
 /** Numeric date "dd/mm/aaaa" from a yyyy-MM-dd key. */

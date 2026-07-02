@@ -92,7 +92,9 @@ export async function findOverlaps({ start, end, excludeId, excludeSeriesId, sta
 
 // Lista com filtros opcionais. `status` aceita string ou array de estados.
 // `communities` restringe às igrejas indicadas (acesso por igreja).
-// `from`/`to` filtram por data de início (YYYY-MM-DD, inclusivo).
+// `from`/`to` (YYYY-MM-DD) devolvem eventos cujo intervalo se cruza com o
+// período visível — inclui eventos de vários dias que começam antes de `from`
+// mas ainda decorrem.
 // `allowedPrivacyTags` (só quando `includePrivate`): restringe os eventos
 // privados às etiquetas indicadas (eventos sem etiqueta são sempre visíveis).
 export async function list({ status, createdBy, includePrivate = true, allowedPrivacyTags, communities, subcategories, from, to } = {}) {
@@ -117,9 +119,11 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
     params.push(subcategories)
     where.push(`subcategory = ANY($${params.length})`)
   }
+  // Interseção com o intervalo visível: inclui eventos de vários dias que
+  // começam antes de `from` mas ainda decorrem, e que começam até `to`.
   if (from) {
     params.push(from)
-    where.push(`start_datetime >= $${params.length}::date`)
+    where.push(`COALESCE(end_datetime, start_datetime) >= $${params.length}::date`)
   }
   if (to) {
     params.push(to)

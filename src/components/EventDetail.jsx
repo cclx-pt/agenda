@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel } from '../utils/calendarHelpers'
+import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel, formatDateRangeLabel, isMultiDay } from '../utils/calendarHelpers'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useEventColors } from '../hooks/useEventColors'
 import { Button } from '@/components/ui/button'
@@ -119,7 +119,7 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
             {/* Data */}
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
               <Calendar className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-              <span className="capitalize text-foreground">{formatDateLabel(event.date)}</span>
+              <span className="capitalize text-foreground">{isMultiDay(event) ? formatDateRangeLabel(event.date, event.endDate) : formatDateLabel(event.date)}</span>
             </div>
             {/* Hora */}
             <div className="flex items-start gap-2.5 text-xs text-muted-foreground">

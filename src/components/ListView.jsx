@@ -6,7 +6,9 @@ import {
   STATUS_META,
   API_BADGE,
   formatTimeRange,
+  formatDateNumeric,
   parseDateKey,
+  isMultiDay,
   isPastDateKey,
   PAST_DAY_CLASS,
 } from '../utils/calendarHelpers'
@@ -87,6 +89,7 @@ export default function ListView({ year, events, onSelectEvent }) {
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                         <span className="tabular-nums">{formatTimeRange(e.timeStart, e.timeEnd) || 'Dia inteiro'}</span>
+                        {isMultiDay(e) && <span className="tabular-nums">· até {formatDateNumeric(e.endDate)}</span>}
                         <span>· ({e.community})</span>
                         {e.responsible ? <span>· {e.responsible}</span> : null}
                         {e.location ? <span className="truncate">· {e.location}</span> : null}

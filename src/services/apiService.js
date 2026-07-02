@@ -19,6 +19,7 @@
  *   category:    'culto' | 'evento' | 'formacao' | 'jovens'
  *   community:   string
  *   date:        'YYYY-MM-DD'
+ *   endDate:     'YYYY-MM-DD' | null   (último dia; eventos de vários dias)
  *   timeStart:   'HH:MM' | null
  *   timeEnd:     'HH:MM' | null
  *   location:    string
@@ -73,6 +74,7 @@ function mapSorEvent(e) {
     subcategory: e.subcategory ?? null,
     community: e.community || DEFAULT_CHURCH,
     date: e.date,
+    endDate: e.endDate ?? null,
     timeStart: e.timeStart ?? null,
     timeEnd: e.timeEnd ?? null,
     startDatetime: e.startDatetime ?? null,
