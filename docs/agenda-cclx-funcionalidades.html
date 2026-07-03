@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agenda CCLX — Documentação de Funcionalidades</title>
+<style>
+  :root {
+    --navy: #1e2a48;
+    --navy2: #18233d;
+    --gold: #f5a800;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --soft: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    color: var(--ink);
+    margin: 0;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { color: var(--navy); line-height: 1.25; }
+  h2 {
+    font-size: 17pt;
+    margin: 26px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--gold);
+  }
+  h3 { font-size: 13pt; margin: 18px 0 4px; }
+  h4 { font-size: 11.5pt; margin: 14px 0 2px; color: var(--navy2); }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  code {
+    font-family: "Cascadia Code", Consolas, monospace;
+    background: var(--soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    color: #b21f5b;
+  }
+  a { color: #0b5bd3; text-decoration: none; }
+
+  /* ---- Cover ---- */
+  .cover {
+    background: linear-gradient(160deg, var(--navy) 0%, var(--navy2) 100%);
+    color: #eef2fb;
+    height: 100vh;
+    padding: 64px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+  }
+  .cover .brandmark { font-size: 15pt; letter-spacing: 4px; font-weight: 700; color: #fff; }
+  .cover .brandmark span { color: var(--gold); }
+  .cover .title { font-size: 40pt; font-weight: 800; color: #fff; line-height: 1.05; margin: 0; }
+  .cover .subtitle { font-size: 16pt; color: var(--gold); font-weight: 600; margin-top: 10px; }
+  .cover .lead { color: #c4cde3; max-width: 78%; margin-top: 18px; font-size: 12pt; }
+  .cover .meta { border-top: 1px solid rgba(255,255,255,.18); padding-top: 18px; display: flex; gap: 40px; font-size: 10.5pt; color: #c4cde3; }
+  .cover .meta b { color: #fff; display: block; font-size: 11pt; }
+  .cover .rule { width: 90px; height: 5px; background: var(--gold); border-radius: 3px; margin: 22px 0; }
+
+  /* ---- TOC ---- */
+  .toc { padding: 48px 56px; page-break-after: always; }
+  .toc h2 { border: none; margin-top: 0; }
+  .toc ol { list-style: none; padding: 0; counter-reset: toc; }
+  .toc > ol > li { counter-increment: toc; display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px dotted var(--line); }
+  .toc > ol > li::before { content: counter(toc); color: var(--gold); font-weight: 700; min-width: 26px; }
+  .toc .t { color: var(--navy); font-weight: 600; }
+
+  /* ---- Content ---- */
+  .content { padding: 0 56px 56px; }
+  section { margin-top: 8px; }
+  .intro-lead { font-size: 12pt; color: #374151; }
+
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--navy); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--soft); }
+
+  .callout {
+    border-left: 4px solid var(--gold);
+    background: #fff9ec;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    break-inside: avoid;
+  }
+  .callout.info { border-left-color: #3b82f6; background: #eff6ff; }
+  .callout b { color: var(--navy); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    break-inside: avoid;
+  }
+  .card h4 { margin-top: 0; }
+  .card p { font-size: 10pt; color: #374151; margin: 4px 0 0; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 8.5pt; font-weight: 700; color: #fff; }
+  .b-culto { background: #E2A32C; } .b-jovens { background: #4FA3D1; }
+  .b-formacao { background: #3E8E5A; } .b-evento { background: #64748b; }
+  .b-draft { background: #d97706; } .b-pend { background: #b45309; }
+  .b-pub { background: #15803d; } .b-rej { background: #b91c1c; }
+
+  .role-pill { display:inline-block; padding:1px 8px; border-radius:6px; font-size:9pt; font-weight:700; background:var(--navy); color:#fff; }
+
+  section { break-inside: auto; }
+  h2, h3 { break-after: avoid; }
+  .foot { text-align:center; color:var(--muted); font-size:9pt; margin-top:34px; padding-top:12px; border-top:1px solid var(--line); }
+  @page { size: A4; margin: 16mm 0; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="brandmark">CCLX<span>™</span></div>
+  <div>
+    <p class="title">Agenda CCLX</p>
+    <p class="subtitle">Documentação de Funcionalidades</p>
+    <div class="rule"></div>
+    <p class="lead">Descrição funcional completa da aplicação de agenda e calendário
+      da Comunidade Cristã de Lisboa — a plataforma de gestão e publicação de
+      eventos das suas comunidades locais.</p>
+  </div>
+  <div class="meta">
+    <div><b>Versão</b> 1.0.0</div>
+    <div><b>Data</b> 3 de julho de 2026</div>
+    <div><b>Estado</b> Documento de referência</div>
+    <div><b>Âmbito</b> Todas as funcionalidades</div>
+  </div>
+</div>
+
+<!-- ============ TOC ============ -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><span class="t">Introdução e visão geral</span></li>
+    <li><span class="t">Papéis e permissões</span></li>
+    <li><span class="t">Agenda pública e vistas de calendário</span></li>
+    <li><span class="t">Pesquisa e filtros</span></li>
+    <li><span class="t">Cartão e detalhe de evento</span></li>
+    <li><span class="t">Gestão de eventos (backoffice)</span></li>
+    <li><span class="t">Fluxo de aprovação</span></li>
+    <li><span class="t">Aprovações, delegações e âmbitos</span></li>
+    <li><span class="t">Eventos privados e etiquetas de privacidade</span></li>
+    <li><span class="t">Loop — carrossel para TV</span></li>
+    <li><span class="t">Subscrição de calendário (iCal)</span></li>
+    <li><span class="t">Exportação e relatórios</span></li>
+    <li><span class="t">Integração inChurch / inRadar</span></li>
+    <li><span class="t">Configuração e personalização</span></li>
+    <li><span class="t">Autenticação, sessão e utilizadores</span></li>
+    <li><span class="t">Experiência, acessibilidade e estado do sistema</span></li>
+    <li><span class="t">Arquitetura e ambientes (resumo técnico)</span></li>
+    <li><span class="t">Anexo — glossário e estados</span></li>
+  </ol>
+</div>
+
+<div class="content">
+
+<!-- 1 -->
+<section>
+  <h2>1. Introdução e visão geral</h2>
+  <p class="intro-lead">A <b>Agenda CCLX</b> é uma aplicação web para a organização
+    gerir e publicar a agenda de eventos das suas <b>8 comunidades locais</b>
+    (Sede, Açores, Almada, Barreiro, Caldas da Rainha, Coruche, Moita e Porto).</p>
+  <p>A solução tem três pilares:</p>
+  <table>
+    <tr><th style="width:22%">Pilar</th><th>Descrição</th></tr>
+    <tr><td><b>Gestão / Administração</b></td><td>Backoffice para gerir utilizadores, papéis, acessos, comunidades e todo o ciclo de vida dos eventos (criação, aprovação, publicação).</td></tr>
+    <tr><td><b>Agenda pública</b></td><td>Vista aberta a todos, apenas de leitura, com pesquisa e filtros. Só mostra eventos publicados.</td></tr>
+    <tr><td><b>Agenda privada</b></td><td>Eventos visíveis apenas a utilizadores autorizados, controlados por etiquetas de privacidade e por comunidade.</td></tr>
+  </table>
+  <div class="callout info">
+    <b>Fonte da verdade (System of Record).</b> A aplicação é o registo oficial de
+    todos os eventos. Adicionalmente, integra a API externa <b>inChurch / inRadar</b>,
+    importando eventos em modo de leitura para o calendário público. Em caso de
+    conflito, prevalecem sempre os dados desta aplicação.
+  </div>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2>2. Papéis e permissões</h2>
+  <p>Existem quatro papéis. Apenas o <b>Administrador</b> ignora o âmbito por
+    comunidade; os restantes gestores estão limitados às comunidades que lhes
+    forem atribuídas.</p>
+  <table>
+    <tr><th style="width:16%">Papel</th><th>O que pode fazer</th></tr>
+    <tr><td><span class="role-pill">Administrador</span></td><td>Acesso total a todas as comunidades. Gere utilizadores, integração, relatórios e o ciclo completo dos eventos. Único papel sem restrição por comunidade.</td></tr>
+    <tr><td><span class="role-pill">Aprovador</span></td><td>Cria, edita, elimina, submete <b>e aprova/rejeita</b> eventos das suas comunidades. Vê relatórios. Não gere utilizadores nem integração.</td></tr>
+    <tr><td><span class="role-pill">Editor</span></td><td>Mesmas capacidades sobre eventos que o Aprovador, limitado às suas comunidades. Vê relatórios.</td></tr>
+    <tr><td><span class="role-pill">Visitante</span></td><td>Apenas consulta a agenda, mas com "ver tudo" — pode ver eventos privados. Sem qualquer gestão.</td></tr>
+  </table>
+  <div class="callout">
+    <b>Separação de funções.</b> Um aprovador não pode aprovar o próprio evento
+    (exceto administradores). Alterações de papel ou de comunidade só produzem
+    efeito no próximo início de sessão.
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2>3. Agenda pública e vistas de calendário</h2>
+  <p>O calendário oferece <b>sete vistas</b>, selecionáveis na barra superior, com
+    navegação anterior/seguinte e botão "Hoje":</p>
+  <table>
+    <tr><th style="width:20%">Vista</th><th>Descrição</th></tr>
+    <tr><td><b>Diária</b></td><td>Lista vertical dos eventos do dia selecionado.</td></tr>
+    <tr><td><b>Semanal</b></td><td>Grelha de 7 colunas (segunda a domingo) com blocos de evento.</td></tr>
+    <tr><td><b>Mês</b></td><td>Calendário mensal com os eventos de cada dia; fins de semana e dia selecionado destacados.</td></tr>
+    <tr><td><b>Trimestre / Semestre / Ano</b></td><td>Vários mini-meses; ao clicar num dia abre a lista de eventos desse dia.</td></tr>
+    <tr><td><b>Lista</b></td><td>Agenda contínua agrupada por mês, com cabeçalhos fixos.</td></tr>
+  </table>
+  <h3>Elementos de apoio</h3>
+  <ul>
+    <li><b>Barra lateral</b> com o dia selecionado, os seus eventos, filtros e botão "Novo evento" (para gestores).</li>
+    <li><b>Eventos de vários dias</b> (ex.: acampamentos) aparecem em <b>todos os dias</b> que abrangem, em todas as vistas.</li>
+    <li><b>Dias passados</b> são subtilmente esbatidos em todas as vistas.</li>
+    <li><b>Selos de estado</b> — eventos em Rascunho/Pendente aparecem marcados (a vermelho claro) apenas para gestores; nunca para o público.</li>
+    <li><b>Selo APP</b> — eventos importados da inChurch são identificados com um selo próprio.</li>
+  </ul>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2>4. Pesquisa e filtros</h2>
+  <ul>
+    <li><b>Pesquisa por texto livre</b> (motor difuso) sobre título, descrição, categoria, subcategoria e comunidade.</li>
+    <li><b>Filtros de seleção múltipla</b> na barra lateral, por esta ordem:
+      <b>Comunidade</b> → <b>Categoria</b> → <b>Subcategoria</b> → <b>Privacidade</b>.</li>
+    <li>A lista de <b>categorias é dinâmica</b> — mostra apenas as que existem em eventos reais.</li>
+    <li>As preferências de filtro e de vista são <b>guardadas no navegador</b> entre sessões.</li>
+  </ul>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2>5. Cartão e detalhe de evento</h2>
+  <p>Cada evento é apresentado num cartão com imagem <b>16:9</b> e um conjunto de
+    selos (Comunidade, Categoria, Subcategoria e ⭐ destaque). O detalhe completo
+    mostra:</p>
+  <div class="grid">
+    <div class="card"><h4>Identificação</h4><p>Título, comunidade responsável, categoria e subcategoria.</p></div>
+    <div class="card"><h4>Data e hora</h4><p>Intervalo de datas (eventos de vários dias) ou "Dia inteiro".</p></div>
+    <div class="card"><h4>Local e mapa</h4><p>Morada e ligação "Ver no Google Maps" quando há localização.</p></div>
+    <div class="card"><h4>Contacto</h4><p>Responsável, telefone e email de contacto.</p></div>
+    <div class="card"><h4>Inscrições</h4><p>Ligação externa de inscrição, quando aplicável.</p></div>
+    <div class="card"><h4>Anexo</h4><p>Ficheiro PDF ou imagem associado ao evento.</p></div>
+  </div>
+  <p>Gestores com acesso à comunidade dispõem, no detalhe, dos botões
+    <b>Editar</b> e <b>Eliminar</b>, e de exportação do evento para o calendário.</p>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2>6. Gestão de eventos (backoffice)</h2>
+  <p>O painel de gestão permite o <b>ciclo completo</b> de criação e edição de
+    eventos, com o acesso por comunidade validado no servidor. Campos do
+    formulário:</p>
+  <table>
+    <tr><th style="width:26%">Campo</th><th>Notas</th></tr>
+    <tr><td>Título, Descrição</td><td>Título obrigatório.</td></tr>
+    <tr><td>Início / Fim (data e hora)</td><td>Fim ≥ início; suporte a "Dia inteiro". Em eventos publicados, a data/hora fica bloqueada.</td></tr>
+    <tr><td>Local, Mapa</td><td>Seletor de mapa (Leaflet + OpenStreetMap) com pesquisa de morada e coordenadas.</td></tr>
+    <tr><td>Comunidade (igreja)</td><td>Limitada às comunidades do utilizador (exceto administrador).</td></tr>
+    <tr><td>Categoria / Subcategoria</td><td>Geridas em base de dados; a subcategoria pode ser obrigatória conforme a categoria.</td></tr>
+    <tr><td>Imagem (banner)</td><td>PNG/JPG, até 5&nbsp;MB, 16:9, por clique ou arrastar. Guardada no armazenamento (Supabase Storage).</td></tr>
+    <tr><td>Responsável e inscrições</td><td>Nome, telefone, email e ligação de inscrição.</td></tr>
+    <tr><td>Anexo</td><td>PDF/PNG/JPG até 5&nbsp;MB.</td></tr>
+    <tr><td>Marcadores</td><td>⭐ Destaque, ⟳ Loop (TV) e Evento geral.</td></tr>
+    <tr><td>Privado + etiqueta</td><td>Ao marcar privado, é obrigatória uma etiqueta de privacidade.</td></tr>
+    <tr><td>Recorrência</td><td>Diária, semanal ou mensal, com fim por nº de ocorrências ou por data. As ocorrências são materializadas como uma série.</td></tr>
+  </table>
+  <div class="callout">
+    <b>Sobreposição de horários.</b> A aplicação pode <b>avisar</b> ou <b>bloquear</b>
+    eventos com horários sobrepostos. A política é configurável (por omissão,
+    por categoria e por comunidade).
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2>7. Fluxo de aprovação</h2>
+  <p>Todos os eventos seguem um ciclo de estados com registo de auditoria:</p>
+  <p style="font-size:12pt; margin:10px 0;">
+    <span class="badge b-draft">Rascunho</span> →
+    <span class="badge b-pend">Pendente</span> →
+    <span class="badge b-pub">Publicado</span>
+    &nbsp;&nbsp;·&nbsp;&nbsp;
+    <span class="badge b-pend">Pendente</span> →
+    <span class="badge b-rej">Rejeitado</span> →
+    <span class="badge b-draft">Rascunho</span>
+  </p>
+  <ul>
+    <li>Toda a entrada nova começa em <b>Rascunho</b>; o editor <b>submete</b> e passa a <b>Pendente</b>.</li>
+    <li>O aprovador <b>aprova</b> (passa a Publicado) ou <b>rejeita</b> com um motivo obrigatório.</li>
+    <li>Apenas eventos <b>Publicados</b> aparecem na agenda pública.</li>
+    <li>Cada transição regista <b>autor, data/hora e comentário</b> (histórico/auditoria).</li>
+    <li>O <b>criador é notificado por email</b> quando o evento é aprovado, rejeitado ou eliminado.</li>
+  </ul>
+</section>
+
+<!-- 8 -->
+<section>
+  <h2>8. Aprovações, delegações e âmbitos</h2>
+  <h3>Painel de aprovações</h3>
+  <ul>
+    <li>Lista de eventos por estado (pendente, publicado, rejeitado), com filtros por comunidade.</li>
+    <li>Aprovar ou rejeitar (com motivo) e ação <b>"Aprovar tudo"</b> sobre os pendentes visíveis.</li>
+    <li>Exportação para <b>Excel/CSV</b>.</li>
+  </ul>
+  <h3>Notificações e ação por email</h3>
+  <ul>
+    <li>Ao submeter, os <b>aprovadores com acesso</b> são notificados por email.</li>
+    <li>O email inclui ligações de <b>aprovação/rejeição num clique</b>, através de uma página de confirmação segura.</li>
+  </ul>
+  <h3>Delegações e âmbitos de aprovador</h3>
+  <ul>
+    <li><b>Delegações temporárias</b> — um aprovador delega, por período e com âmbito (comunidade/categoria), a capacidade de aprovar. O delegado é notificado por email.</li>
+    <li><b>Âmbitos de aprovador</b> — regras que definem o que cada aprovador pode aprovar (comunidade, categoria e etiqueta de privacidade), complementando as comunidades do seu perfil.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section>
+  <h2>9. Eventos privados e etiquetas de privacidade</h2>
+  <ul>
+    <li>Um evento pode ser marcado como <b>privado</b> e receber uma <b>etiqueta de privacidade</b>.</li>
+    <li>Cada utilizador vê "todas as etiquetas" ou apenas um subconjunto; só vê um evento privado se a etiqueta desse evento estiver no seu subconjunto.</li>
+    <li>Administradores e visitantes têm sempre acesso de leitura aos eventos privados.</li>
+    <li>Um seletor na barra superior permite alternar entre "Ver tudo", "Só privados" e "Só públicos" (para quem tem acesso).</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section>
+  <h2>10. Loop — carrossel para TV</h2>
+  <p>O <b>Loop</b> é uma página pública, em ecrã inteiro, pensada para <b>televisões</b>
+    nas comunidades. Passa em carrossel, sem parar, os cartazes dos eventos
+    publicados marcados com "Loop".</p>
+  <ul>
+    <li>Página por comunidade, acessível por ligação própria (ex.: <code>/loop/&lt;comunidade&gt;</code>).</li>
+    <li><b>Eventos gerais</b> aparecem no Loop de todas as comunidades.</li>
+    <li>Os eventos em <b>destaque</b> permanecem mais tempo no ecrã.</li>
+    <li>Recarrega periodicamente para apanhar novidades.</li>
+  </ul>
+  <h3>Configuração por comunidade</h3>
+  <table>
+    <tr><th style="width:24%">Definição</th><th>Descrição</th></tr>
+    <tr><td>Ativo</td><td>Liga/desliga o Loop da comunidade.</td></tr>
+    <tr><td>Eventos gerais</td><td>Incluir (ou não) os eventos marcados como gerais.</td></tr>
+    <tr><td>Semanas</td><td>Horizonte de eventos a mostrar (1 a 52 semanas).</td></tr>
+    <tr><td>Formato</td><td><b>16:9 (1920×1080)</b> ou <b>32:9 (3840×1080, ultrawide)</b> — define qual o cartaz mostrado.</td></tr>
+  </table>
+  <div class="callout">
+    <b>Cartazes por formato.</b> Cada evento pode ter dois cartazes dedicados —
+    um a <b>1920×1080</b> e outro a <b>3840×1080</b>. Na TV, é mostrado em ecrã
+    inteiro o cartaz correspondente ao formato escolhido para essa comunidade.
+  </div>
+</section>
+
+<!-- 11 -->
+<section>
+  <h2>11. Subscrição de calendário (iCal)</h2>
+  <ul>
+    <li><b>Feed público</b> — um endereço <code>.ics</code> com todos os eventos públicos, subscritível em Google Calendar, Apple e Outlook.</li>
+    <li><b>Feed pessoal</b> — através de um <i>token</i> individual, permite subscrever também os eventos privados a que o utilizador tem acesso.</li>
+    <li>Janela "Subscrever" com ligações <code>webcal://</code> e Google Calendar e botão de copiar.</li>
+    <li>Eventos de vários dias são exportados corretamente (data de fim real).</li>
+  </ul>
+</section>
+
+<!-- 12 -->
+<section>
+  <h2>12. Exportação e relatórios</h2>
+  <h3>Exportação</h3>
+  <ul>
+    <li>Exportar para <code>.ics</code> a partir do detalhe de um evento ou de uma vista/dia.</li>
+    <li>Exportar as aprovações para <b>Excel/CSV</b>.</li>
+  </ul>
+  <h3>Relatórios</h3>
+  <p>Disponíveis a gestores, com resumos por:</p>
+  <ul>
+    <li>Estado, comunidade, categoria, subcategoria e privacidade.</li>
+    <li>Próximos eventos e atividade recente (datas no formato dd/mm/aaaa).</li>
+  </ul>
+</section>
+
+<!-- 13 -->
+<section>
+  <h2>13. Integração inChurch / inRadar</h2>
+  <ul>
+    <li><b>Sincronização em segundo plano</b> — a aplicação vai buscar os eventos à inChurch e grava-os na base de dados; a agenda lê sempre da base de dados.</li>
+    <li>Intervalo de sincronização <b>configurável</b> e execução agendada (cron).</li>
+    <li>Botão <b>"Sincronizar agora"</b> e indicação do estado da última sincronização.</li>
+    <li><b>Purga</b> — o administrador pode remover todos os eventos importados.</li>
+    <li>Interruptor único liga/desliga a presença dos eventos da inChurch no calendário público.</li>
+  </ul>
+</section>
+
+<!-- 14 -->
+<section>
+  <h2>14. Configuração e personalização</h2>
+  <div class="grid">
+    <div class="card"><h4>Comunidades (igrejas)</h4><p>Gestão em base de dados: nome, ID externo, morada e código postal.</p></div>
+    <div class="card"><h4>Categorias</h4><p>Nome, identificador, cor, ordem e obrigatoriedade de subcategoria.</p></div>
+    <div class="card"><h4>Subcategorias</h4><p>Lista global com nome e cor próprios.</p></div>
+    <div class="card"><h4>Etiquetas de privacidade</h4><p>Criação e remoção; controlam a visibilidade dos eventos privados.</p></div>
+    <div class="card"><h4>Marca e aparência</h4><p>Logótipo, título da aplicação e termo configurável para "igreja/comunidade".</p></div>
+    <div class="card"><h4>Idiomas</h4><p>Português, Inglês, Francês e Espanhol, com editor de traduções no backoffice.</p></div>
+  </div>
+  <ul>
+    <li><b>Política de sobreposição</b> — por omissão, por categoria e por comunidade (desligado / avisar / bloquear).</li>
+    <li><b>Cores de subcategoria</b> — interruptor para usar as cores das subcategorias no calendário.</li>
+    <li><b>Tema</b> claro/escuro com preferência persistida.</li>
+  </ul>
+</section>
+
+<!-- 15 -->
+<section>
+  <h2>15. Autenticação, sessão e utilizadores</h2>
+  <ul>
+    <li><b>Início de sessão sem palavra-passe</b> — código de uso único (OTP) enviado por email; a sessão é um <i>token</i> JWT em cookie seguro.</li>
+    <li>Proteções do OTP: código aleatório, uso único, validade limitada e limite de tentativas.</li>
+    <li><b>Gestão de utilizadores</b> (administrador): criar, editar, suspender e eliminar; atribuição de comunidades e de etiquetas de privacidade por utilizador.</li>
+    <li><b>Importação de utilizadores</b> por CSV, com modelo descarregável.</li>
+    <li>Proteção do último administrador (não pode ser removido/despromovido).</li>
+  </ul>
+</section>
+
+<!-- 16 -->
+<section>
+  <h2>16. Experiência, acessibilidade e estado do sistema</h2>
+  <ul>
+    <li><b>Totalmente responsiva</b> — no telemóvel, a barra lateral transforma-se numa gaveta; botões e vistas compactam-se.</li>
+    <li><b>Acessibilidade</b> — contraste, navegação por teclado e atributos ARIA nas janelas modais.</li>
+    <li><b>Ecrã de carregamento</b> com mensagem e versículo (Tiago 5:7) ao abrir/atualizar.</li>
+    <li><b>Semáforos de estado</b> no canto inferior — Frontend, Servidor, Base de dados e Email (SMTP) — com página de <i>logs</i>.</li>
+    <li>Rodapé com versão e data de <i>build</i>.</li>
+  </ul>
+</section>
+
+<!-- 17 -->
+<section>
+  <h2>17. Arquitetura e ambientes (resumo técnico)</h2>
+  <table>
+    <tr><th style="width:24%">Camada</th><th>Tecnologia</th></tr>
+    <tr><td>Frontend</td><td>React 18 + Vite, TanStack Query, framer-motion, Fuse.js, Tailwind/shadcn UI.</td></tr>
+    <tr><td>Backend</td><td>Node.js + Express, como função <i>serverless</i>.</td></tr>
+    <tr><td>Base de dados + ficheiros</td><td>Supabase (PostgreSQL + Storage).</td></tr>
+    <tr><td>Alojamento</td><td>Vercel (CDN para o frontend; função <i>serverless</i> para a API).</td></tr>
+    <tr><td>Integração externa</td><td>API inChurch / inRadar (leitura, sincronizada para a base de dados).</td></tr>
+  </table>
+  <p>A plataforma tem dois ambientes: <b>Produção</b> (agenda.cclx.pt) e
+    <b>Staging/QA</b> (pré-produção), com bases de dados separadas. O fluxo de
+    trabalho é <code>funcionalidade → staging → produção</code>.</p>
+</section>
+
+<!-- 18 -->
+<section>
+  <h2>18. Anexo — glossário e estados</h2>
+  <table>
+    <tr><th style="width:26%">Termo</th><th>Significado</th></tr>
+    <tr><td>Comunidade / Igreja</td><td>Congregação local (dimensão principal de organização e filtragem).</td></tr>
+    <tr><td>Evento geral</td><td>Evento que aparece no Loop de todas as comunidades.</td></tr>
+    <tr><td>Destaque</td><td>Evento realçado (pisca no calendário; mais tempo no Loop).</td></tr>
+    <tr><td>Loop</td><td>Carrossel público de cartazes para TV, por comunidade.</td></tr>
+    <tr><td>Etiqueta de privacidade</td><td>Marca que controla quem vê um evento privado.</td></tr>
+    <tr><td>System of Record</td><td>Registo oficial/fonte da verdade dos eventos.</td></tr>
+    <tr><td>OTP</td><td>Código de uso único enviado por email para autenticação.</td></tr>
+  </table>
+  <table>
+    <tr><th style="width:26%">Estado</th><th>Descrição</th></tr>
+    <tr><td><span class="badge b-draft">Rascunho</span></td><td>Entrada criada, ainda não submetida.</td></tr>
+    <tr><td><span class="badge b-pend">Pendente</span></td><td>Submetida, a aguardar aprovação.</td></tr>
+    <tr><td><span class="badge b-pub">Publicado</span></td><td>Aprovada e visível na agenda pública.</td></tr>
+    <tr><td><span class="badge b-rej">Rejeitado</span></td><td>Recusada com motivo; pode ser corrigida e resubmetida.</td></tr>
+  </table>
+
+  <p class="foot">Agenda CCLX — Documentação de Funcionalidades · Versão 1.0.0 ·
+    © 2026 Comunidade Cristã de Lisboa (CCLX™). Documento gerado para referência interna.</p>
+</section>
+
+</div>
+</body>
+</html>

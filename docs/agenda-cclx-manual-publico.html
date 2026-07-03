@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<title>Agenda CCLX — Manual do Público</title>
+<style>
+  :root { --navy:#1e2a48; --navy2:#18233d; --gold:#f5a800; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --soft:#f6f7fb; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; color:var(--ink); margin:0; font-size:11pt; line-height:1.55; }
+  h1,h2,h3 { color:var(--navy); line-height:1.25; }
+  h2 { font-size:17pt; margin:24px 0 8px; padding-bottom:6px; border-bottom:2px solid var(--gold); }
+  h3 { font-size:12.5pt; margin:16px 0 4px; }
+  p { margin:6px 0; }
+  ul { margin:6px 0; padding-left:20px; } li { margin:4px 0; }
+  code { font-family:"Cascadia Code",Consolas,monospace; background:var(--soft); padding:1px 5px; border-radius:4px; font-size:9.5pt; color:#b21f5b; }
+  b { color:var(--navy2); }
+
+  .cover { background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%); color:#eef2fb; height:100vh; padding:64px 56px; display:flex; flex-direction:column; justify-content:space-between; page-break-after:always; }
+  .cover .brandmark { font-size:15pt; letter-spacing:4px; font-weight:700; color:#fff; } .cover .brandmark span { color:var(--gold); }
+  .cover .kicker { color:var(--gold); font-weight:700; letter-spacing:2px; text-transform:uppercase; font-size:12pt; }
+  .cover .title { font-size:40pt; font-weight:800; color:#fff; line-height:1.05; margin:6px 0 0; }
+  .cover .lead { color:#c4cde3; max-width:80%; margin-top:18px; font-size:12.5pt; }
+  .cover .rule { width:90px; height:5px; background:var(--gold); border-radius:3px; margin:22px 0; }
+  .cover .meta { border-top:1px solid rgba(255,255,255,.18); padding-top:18px; display:flex; gap:40px; font-size:10.5pt; color:#c4cde3; }
+  .cover .meta b { color:#fff; display:block; }
+
+  .content { padding:0 56px 56px; }
+  .intro-lead { font-size:12pt; color:#374151; }
+
+  figure { margin:12px 0 4px; break-inside:avoid; }
+  .shot { width:100%; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(15,23,42,.10); display:block; }
+  figcaption { font-size:9pt; color:var(--muted); margin-top:5px; text-align:center; }
+
+  ol.steps { counter-reset:s; list-style:none; padding-left:0; margin:10px 0; }
+  ol.steps > li { counter-increment:s; position:relative; padding:6px 0 6px 40px; break-inside:avoid; }
+  ol.steps > li::before { content:counter(s); position:absolute; left:0; top:5px; width:26px; height:26px; background:var(--navy); color:#fff; border-radius:50%; text-align:center; line-height:26px; font-weight:700; font-size:10pt; }
+
+  .callout { border-left:4px solid var(--gold); background:#fff9ec; padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; break-inside:avoid; }
+  .callout.info { border-left-color:#3b82f6; background:#eff6ff; }
+  .callout b { color:var(--navy); }
+
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:10pt; break-inside:avoid; }
+  th,td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--navy); color:#fff; } tr:nth-child(even) td { background:var(--soft); }
+
+  h2 { break-after:avoid; } h2 + p, h2 + figure { break-before:avoid; }
+  .foot { text-align:center; color:var(--muted); font-size:9pt; margin-top:34px; padding-top:12px; border-top:1px solid var(--line); }
+  @page { size:A4; margin:15mm 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="brandmark">CCLX<span>™</span></div>
+  <div>
+    <div class="kicker">Manual do Público</div>
+    <p class="title">A Nossa Agenda</p>
+    <div class="rule"></div>
+    <p class="lead">Como consultar a agenda de eventos da Comunidade Cristã de
+      Lisboa — encontrar, filtrar, ver detalhes, exportar e subscrever eventos.
+      Sem necessidade de conta.</p>
+  </div>
+  <div class="meta">
+    <div><b>Para</b> Todos os visitantes</div>
+    <div><b>Versão</b> 1.0.0</div>
+    <div><b>Data</b> Julho de 2026</div>
+  </div>
+</div>
+
+<div class="content">
+
+<h2>1. Bem-vindo</h2>
+<p class="intro-lead">A <b>Agenda CCLX</b> mostra, num só sítio, todos os eventos
+  públicos das comunidades da CCLX. Pode consultá-la livremente, sem iniciar
+  sessão. Este manual mostra, passo a passo, como tirar o máximo partido dela.</p>
+<p>Aceda em <code>https://agenda.cclx.pt</code> a partir de qualquer telemóvel,
+  tablet ou computador.</p>
+
+<h2>2. O ecrã principal</h2>
+<p>Ao abrir a agenda vê o calendário do mês, com os eventos assinalados nos
+  respetivos dias. À esquerda está a barra lateral com o dia selecionado e os
+  filtros; no topo, a pesquisa e as opções gerais.</p>
+<figure>
+  <img class="shot" src="manual-img/pub-01-calendario-mes.png" alt="Ecrã principal da agenda" />
+  <figcaption>Ecrã principal — calendário do mês, barra lateral de filtros e barra superior.</figcaption>
+</figure>
+<ul>
+  <li>Os eventos que <b>ocupam vários dias</b> (ex.: acampamentos) aparecem em todos os dias que abrangem.</li>
+  <li>Use <b>Anterior</b> / <b>Seguinte</b> (‹ ›) para mudar de período e <b>Hoje</b> para voltar ao dia atual.</li>
+</ul>
+
+<h2>3. Mudar de vista</h2>
+<p>No canto superior direito pode escolher como quer ver a agenda:</p>
+<table>
+  <tr><th style="width:24%">Vista</th><th>Quando é útil</th></tr>
+  <tr><td>Diária</td><td>Ver ao pormenor os eventos de um único dia.</td></tr>
+  <tr><td>Semanal</td><td>Planear a semana, com os eventos por dia.</td></tr>
+  <tr><td>Mensal</td><td>Visão geral do mês (vista por omissão).</td></tr>
+  <tr><td>Trimestral / Semestral / Anual</td><td>Visão de longo prazo; clique num dia para ver os seus eventos.</td></tr>
+  <tr><td>Lista</td><td>Uma lista contínua de eventos, agrupada por mês.</td></tr>
+</table>
+
+<h2>4. Filtrar e pesquisar</h2>
+<p>Para encontrar rapidamente o que procura:</p>
+<ol class="steps">
+  <li><b>Pesquisa</b> — escreva no campo <i>“Pesquisar eventos…”</i> no topo (por título, descrição, categoria ou comunidade).</li>
+  <li><b>Filtro por Comunidade</b> — na barra lateral, escolha uma ou mais igrejas.</li>
+  <li><b>Filtro por Categoria e Subcategoria</b> — restrinja por tipo de evento (ex.: culto, jovens, formação).</li>
+</ol>
+<div class="callout info"><b>Dica.</b> Pode combinar vários filtros ao mesmo
+  tempo. As suas escolhas ficam guardadas no navegador para a próxima visita.</div>
+
+<h2>5. Ver os detalhes de um evento</h2>
+<p>Clique em qualquer evento (no calendário ou na barra lateral) para abrir o seu
+  cartão com toda a informação: imagem, data, hora, local, contacto, inscrições e
+  descrição.</p>
+<figure>
+  <img class="shot" src="manual-img/pub-02-detalhe-evento.png" alt="Detalhe de um evento" />
+  <figcaption>Cartão de detalhe — imagem, data/hora, local, contacto e descrição.</figcaption>
+</figure>
+<ul>
+  <li><b>Ver no Google Maps</b> — abre a localização do evento no mapa.</li>
+  <li><b>Guardar no calendário</b> — adiciona <i>este</i> evento ao seu calendário pessoal (ficheiro <code>.ics</code>).</li>
+</ul>
+
+<h2>6. Subscrever a agenda no seu calendário</h2>
+<p>Em vez de guardar evento a evento, pode <b>subscrever</b> a agenda inteira: os
+  eventos passam a aparecer no seu Google Calendar, Apple ou Outlook e
+  <b>atualizam-se sozinhos</b>.</p>
+<figure>
+  <img class="shot" src="manual-img/pub-04-subscrever.png" alt="Janela de subscrição do calendário" />
+  <figcaption>Subscrever calendário — endereço de subscrição e botões para Apple/Outlook e Google.</figcaption>
+</figure>
+<ol class="steps">
+  <li>Clique no ícone de <b>subscrever calendário</b> no topo.</li>
+  <li>Escolha <b>“Só públicos”</b>.</li>
+  <li>Use <b>Adicionar ao Google</b> / <b>Adicionar (Apple / Outlook)</b>, ou copie o endereço e adicione-o manualmente na sua aplicação de calendário.</li>
+</ol>
+
+<h2>7. O Loop na televisão</h2>
+<p>Cada comunidade pode ter uma página <b>Loop</b> — um carrossel de cartazes,
+  em ecrã inteiro, ideal para mostrar numa televisão à entrada. Passa
+  automaticamente pelos eventos em destaque, sem parar.</p>
+<figure>
+  <img class="shot" src="manual-img/pub-03-loop.png" alt="Página Loop para TV" />
+  <figcaption>Loop — cartaz do evento em ecrã inteiro, para exibição em TV.</figcaption>
+</figure>
+<p>Peça à sua comunidade o endereço do Loop (por exemplo
+  <code>agenda.cclx.pt/loop/Sede</code>) e abra-o no navegador da TV em ecrã inteiro.</p>
+
+<h2>8. Idioma e aspeto</h2>
+<ul>
+  <li><b>Idioma</b> — no topo pode mudar entre Português, Inglês, Francês e Espanhol.</li>
+  <li><b>Tema</b> — alterne entre modo claro e modo noite no botão junto ao idioma.</li>
+  <li><b>Telemóvel</b> — no telemóvel, toque no ícone de menu para abrir a barra lateral de filtros.</li>
+</ul>
+
+<h2>9. Perguntas frequentes</h2>
+<table>
+  <tr><th style="width:38%">Pergunta</th><th>Resposta</th></tr>
+  <tr><td>Preciso de conta para ver a agenda?</td><td>Não. A agenda pública é aberta a todos.</td></tr>
+  <tr><td>Porque não vejo um evento?</td><td>Só aparecem eventos já publicados. Alguns eventos podem ser privados e visíveis apenas a pessoas autorizadas.</td></tr>
+  <tr><td>Os eventos subscritos atualizam-se?</td><td>Sim — a subscrição sincroniza periodicamente. A exportação de um evento é uma cópia fixa.</td></tr>
+  <tr><td>Como vejo um evento no mapa?</td><td>Abra o detalhe do evento e clique em “Ver no Google Maps”.</td></tr>
+</table>
+
+<p class="foot">Agenda CCLX — Manual do Público · Versão 1.0.0 · © 2026 Comunidade Cristã de Lisboa (CCLX™).</p>
+
+</div>
+</body>
+</html>
