@@ -4,10 +4,10 @@
 //   3) corre o seed (utilizador admin).
 //
 // Uso (a partir de server/):
-//   node scripts/setup-supabase-env.mjs .env.qa
-//   node scripts/setup-supabase-env.mjs .env.dev
+//   npm run setup:staging
+//   node scripts/setup-supabase-env.mjs .env.staging
 //
-// O ficheiro de ambiente indicado (ex.: server/.env.qa) tem de conter, no
+// O ficheiro de ambiente indicado (ex.: server/.env.staging) tem de conter, no
 // mínimo, DATABASE_URL (pooler de sessão :5432), SUPABASE_URL e
 // SUPABASE_SERVICE_ROLE_KEY do projeto-alvo. Esses ficheiros estão gitignored
 // (.env.*), por isso os segredos nunca vão para o repositório.
@@ -26,7 +26,7 @@ const serverRoot = resolve(__dirname, '..')
 
 const fileArg = process.argv[2]
 if (!fileArg) {
-  console.error('Uso: node scripts/setup-supabase-env.mjs <ficheiro-env>   (ex.: .env.qa)')
+  console.error('Uso: node scripts/setup-supabase-env.mjs <ficheiro-env>   (ex.: .env.staging)')
   process.exit(1)
 }
 

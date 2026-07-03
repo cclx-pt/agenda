@@ -61,7 +61,6 @@ const ENV_BADGE = (() => {
   if (APP_ENV === 'production') return null
   const b = (GIT_BRANCH || '').toLowerCase()
   if (b === 'staging') return { label: 'STAGING · QA', cls: 'bg-amber-500 text-black' }
-  if (b === 'development') return { label: 'DEV', cls: 'bg-sky-500 text-white' }
   if (APP_ENV === 'local') return { label: 'LOCAL', cls: 'bg-emerald-500 text-white' }
   return { label: (GIT_BRANCH || 'PREVIEW').toUpperCase(), cls: 'bg-violet-500 text-white' }
 })()

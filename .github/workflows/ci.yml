@@ -5,9 +5,9 @@ name: CI
 # aqui porque escrevem numa base de dados Supabase real (precisam de segredos).
 on:
   push:
-    branches: [development, staging, production]
+    branches: [staging, production]
   pull_request:
-    branches: [development, staging, production]
+    branches: [staging, production]
 
 # Cancela execuções antigas do mesmo branch/PR quando chega um novo commit.
 concurrency:

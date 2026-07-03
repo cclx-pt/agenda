@@ -1,6 +1,6 @@
 <!--
   Modelo de Pull Request — Agenda CCLX.
-  Fluxo: feature/fix  →  development  →  staging (QA)  →  production
+  Fluxo: feature/fix  →  staging (QA)  →  production
   Ver BRANCHING.md para o detalhe da estratégia.
 -->
 
@@ -16,8 +16,7 @@
 
 ## Branch de destino
 
-- [ ] `development` (integração de trabalho novo)
-- [ ] `staging` (promoção para QA)
+- [ ] `staging` (integração + QA)
 - [ ] `production` (release — só a partir de `staging`)
 
 ## Checklist
