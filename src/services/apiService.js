@@ -86,6 +86,8 @@ function mapSorEvent(e) {
     imageUrl: e.bannerUrl || null,
     bannerUrl: e.bannerUrl || null,
     imageLabel: e.bannerUrl ? 'imagem do evento' : null,
+    loopImage16x9: e.loopImage16x9 ?? null,
+    loopImage32x9: e.loopImage32x9 ?? null,
     isPrivate: !!e.isPrivate,
     privacyTag: e.privacyTag ?? null,
     featured: !!e.featured,
@@ -119,6 +121,7 @@ export async function getLoop(church) {
   return {
     active: !!data.active,
     weeks: data.weeks ?? 4,
+    format: data.format === '32:9' ? '32:9' : '16:9',
     church: data.church ?? church,
     events: Array.isArray(data.events) ? data.events.map(mapSorEvent) : [],
   }

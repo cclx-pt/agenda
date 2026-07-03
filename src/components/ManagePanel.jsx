@@ -140,6 +140,8 @@ const emptyForm = {
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
+  loopImage16x9: '',
+  loopImage32x9: '',
   organizerName: '',
   organizerPhone: '',
   organizerEmail: '',
@@ -293,6 +295,8 @@ function eventToForm(evt) {
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
+    loopImage16x9: evt.loopImage16x9 ?? '',
+    loopImage32x9: evt.loopImage32x9 ?? '',
     organizerName: evt.organizerName ?? '',
     organizerPhone: evt.organizerPhone ?? '',
     organizerEmail: evt.organizerEmail ?? '',
@@ -442,7 +446,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Eventos publicados (aprovados): a data/hora ficam bloqueadas na edição.
   const dateTimeLocked = editingStatus === 'publicado'
   // Upload de imagem do evento.
-  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingKey, setUploadingKey] = useState(null)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   // Ao editar uma ocorrência de uma série, aplicar a toda a série.
@@ -670,7 +674,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const setLoopField = (church, key, value) => {
     setLoopConfig((prev) => ({
       ...prev,
-      [church]: { active: false, showGeneral: true, weeks: 4, ...(prev[church] || {}), [key]: value },
+      [church]: { active: false, showGeneral: true, weeks: 4, format: '16:9', ...(prev[church] || {}), [key]: value },
     }))
   }
 
@@ -1085,11 +1089,14 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
   const importInputRef = useRef(null)
   const imageInputRef = useRef(null)
+  const loop16InputRef = useRef(null)
+  const loop32InputRef = useRef(null)
   const attachmentInputRef = useRef(null)
   const logoInputRef = useRef(null)
 
-  // Valida e carrega uma imagem (PNG/JPG, ≤5MB) para o backend; guarda a URL.
-  const handleImageFile = async (file) => {
+  // Valida e carrega uma imagem (PNG/JPG, ≤5MB) para o backend; guarda a URL no
+  // campo indicado do formulário (`bannerUrl` por omissão, ou os cartazes do Loop).
+  const handleImageFile = async (file, field = 'bannerUrl') => {
     if (!file) return
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error('Formato inválido. Apenas PNG ou JPG.')
@@ -1099,16 +1106,16 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       toast.error('Imagem demasiado grande (máx. 5MB).')
       return
     }
-    setUploadingImage(true)
+    setUploadingKey(field)
     try {
       const url = await eventsService.uploadEventImage(file)
-      setForm((f) => ({ ...f, bannerUrl: url }))
+      setForm((f) => ({ ...f, [field]: url }))
       toast.success('Imagem carregada.')
     } catch (err) {
       console.error('[upload] imagem falhou:', err)
       toast.error(err.message)
     } finally {
-      setUploadingImage(false)
+      setUploadingKey(null)
     }
   }
 
@@ -1356,6 +1363,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
       bannerUrl: form.bannerUrl.trim() || null,
+      loopImage16x9: form.loopImage16x9.trim() || null,
+      loopImage32x9: form.loopImage32x9.trim() || null,
       organizerName: form.organizerName.trim() || null,
       organizerPhone: form.organizerPhone.trim() || null,
       organizerEmail: form.organizerEmail.trim() || null,
@@ -2868,7 +2877,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             ) : (
               <ul className={styles.list}>
                 {loopChurches.map((church) => {
-                  const cfg = { active: false, showGeneral: true, weeks: 4, ...(loopConfig[church] || {}) }
+                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', ...(loopConfig[church] || {}) }
                   const link = `${window.location.origin}/loop/${encodeURIComponent(church)}`
                   return (
                     <li key={church} className={`${styles.item} ${styles.userItemCol}`}>
@@ -2907,6 +2916,18 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                               disabled={busy}
                               onChange={(e) => setLoopField(church, 'weeks', Number(e.target.value) || 1)}
                             />
+                          </label>
+                          <label className={styles.check} title="Formato do ecrã da TV">
+                            Formato
+                            <select
+                              className={styles.smallSelect}
+                              value={cfg.format}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'format', e.target.value)}
+                            >
+                              <option value="16:9">16:9 (1920×1080)</option>
+                              <option value="32:9">32:9 (3840×1080)</option>
+                            </select>
                           </label>
                           <a
                             className={styles.iconBtn}
@@ -3053,7 +3074,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <div className={styles.dropzoneHint}>
                     <i className="ti ti-photo-up" />
                     <span>
-                      {uploadingImage
+                      {uploadingKey === 'bannerUrl'
                         ? 'A carregar…'
                         : 'Clique ou arraste uma imagem (PNG ou JPG, até 5MB, 16:9)'}
                     </span>
@@ -3258,6 +3279,138 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 <i className="ti ti-broadcast" aria-hidden="true" /> {t('generalField')}
               </label>
             </div>
+
+            {form.loop && (
+              <div className={styles.label}>
+                Cartazes do Loop (TV) — opcional
+                <span className={styles.fieldHint}>
+                  Imagens dedicadas ao carrossel da TV, por formato. Cada igreja escolhe o formato
+                  na configuração do Loop; na TV, o cartaz correspondente é mostrado em ecrã inteiro.
+                </span>
+                <div className={styles.row}>
+                  <div className={styles.label}>
+                    16:9 — 1920×1080
+                    <div
+                      className={styles.dropzone}
+                      onClick={() => loop16InputRef.current?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        handleImageFile(e.dataTransfer.files?.[0], 'loopImage16x9')
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          loop16InputRef.current?.click()
+                        }
+                      }}
+                    >
+                      {form.loopImage16x9 ? (
+                        <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
+                          <img
+                            src={form.loopImage16x9}
+                            alt=""
+                            className="block h-full w-full rounded-[9px] bg-muted object-contain"
+                          />
+                          <button
+                            type="button"
+                            className={styles.imageRemove}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setForm((f) => ({ ...f, loopImage16x9: '' }))
+                            }}
+                            aria-label="Remover imagem"
+                          >
+                            <i className="ti ti-x" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={styles.dropzoneHint}>
+                          <i className="ti ti-photo-up" />
+                          <span>
+                            {uploadingKey === 'loopImage16x9'
+                              ? 'A carregar…'
+                              : 'Clique ou arraste (PNG/JPG, 1920×1080)'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={loop16InputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      hidden
+                      onChange={(e) => {
+                        handleImageFile(e.target.files?.[0], 'loopImage16x9')
+                        e.target.value = ''
+                      }}
+                    />
+                  </div>
+                  <div className={styles.label}>
+                    32:9 — 3840×1080
+                    <div
+                      className={styles.dropzone}
+                      onClick={() => loop32InputRef.current?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        handleImageFile(e.dataTransfer.files?.[0], 'loopImage32x9')
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          loop32InputRef.current?.click()
+                        }
+                      }}
+                    >
+                      {form.loopImage32x9 ? (
+                        <div className="relative w-full" style={{ aspectRatio: '32 / 9' }}>
+                          <img
+                            src={form.loopImage32x9}
+                            alt=""
+                            className="block h-full w-full rounded-[9px] bg-muted object-contain"
+                          />
+                          <button
+                            type="button"
+                            className={styles.imageRemove}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setForm((f) => ({ ...f, loopImage32x9: '' }))
+                            }}
+                            aria-label="Remover imagem"
+                          >
+                            <i className="ti ti-x" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={styles.dropzoneHint} style={{ aspectRatio: '32 / 9' }}>
+                          <i className="ti ti-photo-up" />
+                          <span>
+                            {uploadingKey === 'loopImage32x9'
+                              ? 'A carregar…'
+                              : 'Clique ou arraste (PNG/JPG, 3840×1080)'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={loop32InputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      hidden
+                      onChange={(e) => {
+                        handleImageFile(e.target.files?.[0], 'loopImage32x9')
+                        e.target.value = ''
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {overlapInfo.conflicts.length > 0 && (
               <div

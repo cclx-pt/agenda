@@ -37,6 +37,8 @@ function mapRow(row) {
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
     bannerUrl: row.banner_url,
+    loopImage16x9: row.loop_image_16x9 ?? null,
+    loopImage32x9: row.loop_image_32x9 ?? null,
     organizerName: row.organizer_name ?? null,
     organizerContact: row.organizer_contact ?? null,
     organizerPhone: row.organizer_phone ?? null,
@@ -198,8 +200,9 @@ export async function insert(data, actorId) {
        community, category, is_private, privacy_tag, banner_url,
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
-       series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop, is_general)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+       series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop, is_general,
+       loop_image_16x9, loop_image_32x9)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
     [
       id,
       data.title,
@@ -229,6 +232,8 @@ export async function insert(data, actorId) {
       data.featured ?? false,
       data.loop ?? false,
       data.isGeneral ?? false,
+      data.loopImage16x9 ?? null,
+      data.loopImage32x9 ?? null,
     ]
   )
   return findById(id)
@@ -262,6 +267,8 @@ export async function update(id, data) {
        featured = $24,
        loop = $25,
        is_general = $26,
+       loop_image_16x9 = $27,
+       loop_image_32x9 = $28,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -291,6 +298,8 @@ export async function update(id, data) {
       data.featured ?? false,
       data.loop ?? false,
       data.isGeneral ?? false,
+      data.loopImage16x9 ?? null,
+      data.loopImage32x9 ?? null,
     ]
   )
   return findById(id)
@@ -349,8 +358,10 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        featured = $22,
        loop = $23,
        is_general = $24,
+       loop_image_16x9 = $25,
+       loop_image_32x9 = $26,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $25`,
+     WHERE series_id = $1 AND id <> $27`,
     [
       seriesId,
       data.title,
@@ -376,6 +387,8 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.featured ?? false,
       data.loop ?? false,
       data.isGeneral ?? false,
+      data.loopImage16x9 ?? null,
+      data.loopImage32x9 ?? null,
       exceptId,
     ]
   )

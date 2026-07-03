@@ -131,9 +131,10 @@ export async function updateBranding(input, actorId) {
 }
 
 // ── Configuração do Loop (carrossel público por igreja, para TV) ──
-// app_settings key 'loop' = { [igreja]: { active, showGeneral, weeks } }.
+// app_settings key 'loop' = { [igreja]: { active, showGeneral, weeks, format } }.
 const LOOP_KEY = 'loop'
-const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4 }
+const LOOP_FORMATS = ['16:9', '32:9']
+const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4, format: '16:9' }
 
 function normalizeLoopChurch(cfg) {
   const c = cfg && typeof cfg === 'object' ? cfg : {}
@@ -142,6 +143,8 @@ function normalizeLoopChurch(cfg) {
     active: !!c.active,
     showGeneral: c.showGeneral !== false, // por omissão true
     weeks: Number.isInteger(weeks) && weeks >= 1 && weeks <= 52 ? weeks : LOOP_DEFAULTS.weeks,
+    // Formato do ecrã da TV: 16:9 (1920x1080) ou 32:9 (3840x1080, ultrawide).
+    format: LOOP_FORMATS.includes(c.format) ? c.format : LOOP_DEFAULTS.format,
   }
 }
 

@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS events (
   -- Etiqueta de privacidade (obrigatória só quando is_private, validada na app).
   privacy_tag      TEXT,
   banner_url       TEXT,
+  -- Cartazes dedicados ao Loop (TV) por formato: 16:9 (1920x1080) e 32:9 (3840x1080).
+  loop_image_16x9  TEXT,
+  loop_image_32x9  TEXT,
   -- Responsável do evento e inscrições (opcionais).
   organizer_name    TEXT,
   organizer_contact TEXT,
@@ -103,6 +106,9 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS loop BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS is_general BOOLEAN NOT NULL DEFAULT FALSE;
+-- Cartazes dedicados ao Loop (TV) por formato (idempotente para BD existentes).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS loop_image_16x9 TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS loop_image_32x9 TEXT;
 
 -- Histórico/auditoria das transições de estado (RA-07).
 CREATE TABLE IF NOT EXISTS event_history (

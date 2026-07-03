@@ -15,14 +15,14 @@ const REFETCH_MS = 5 * 60 * 1000 // recarrega os eventos a cada 5 min
  * destaque ficam mais tempo. Recarrega periodicamente para apanhar novidades.
  */
 export default function LoopPage({ church }) {
-  const [state, setState] = useState({ loading: true, active: false, events: [], error: null })
+  const [state, setState] = useState({ loading: true, active: false, events: [], error: null, format: '16:9' })
   const [index, setIndex] = useState(0)
   const { colorFor, subColorMap } = useEventColors()
 
   const load = useCallback(async () => {
     try {
       const data = await getLoop(church)
-      setState({ loading: false, active: data.active, events: data.events, error: null })
+      setState({ loading: false, active: data.active, events: data.events, error: null, format: data.format })
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }))
     }
@@ -72,6 +72,12 @@ export default function LoopPage({ church }) {
   const evt = events[index % count]
   const vis = colorFor(evt)
   const subColor = evt.subcategory ? subColorMap[evt.subcategory] : null
+  // Formato do ecrã da TV (definido na configuração do Loop da igreja): escolhe
+  // o cartaz dedicado desse formato, com recurso ao outro formato se faltar.
+  const isWide = state.format === '32:9'
+  const loopPoster = isWide
+    ? evt.loopImage32x9 || evt.loopImage16x9
+    : evt.loopImage16x9 || evt.loopImage32x9
   const contactStr =
     [evt.organizerPhone, evt.organizerEmail].filter(Boolean).join(' · ') || evt.organizerContact || ''
   const durSec = (evt.featured ? FEATURED_MS : BASE_MS) / 1000
@@ -87,6 +93,17 @@ export default function LoopPage({ church }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
         >
+          {loopPoster ? (
+            // Cartaz dedicado ao formato do ecrã, em ecrã inteiro.
+            <div className="flex h-full w-full items-center justify-center bg-black">
+              <img
+                src={loopPoster}
+                alt={evt.title}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : (
+            <>
           {/* Cartaz / imagem */}
           {evt.imageUrl ? (
             <div className="flex h-full w-3/5 items-center justify-center bg-black p-6 max-[820px]:h-3/5 max-[820px]:w-full">
@@ -166,6 +183,8 @@ export default function LoopPage({ church }) {
               )}
             </div>
           </div>
+            </>
+          )}
         </motion.div>
       </AnimatePresence>
 

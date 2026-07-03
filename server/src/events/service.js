@@ -53,6 +53,20 @@ export const eventInputSchema = z
       .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), 'URL de banner inválido.')
       .optional()
       .nullable(),
+    // Cartazes dedicados ao Loop (TV) por formato: 16:9 (1920x1080) e 32:9
+    // (3840x1080). Mesma validação do banner (upload relativo ou URL absoluto).
+    loopImage16x9: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), 'URL de cartaz do Loop inválido.')
+      .optional()
+      .nullable(),
+    loopImage32x9: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), 'URL de cartaz do Loop inválido.')
+      .optional()
+      .nullable(),
     // Etiqueta de privacidade. Obrigatória no formulário quando o evento é
     // privado (validado no frontend); aqui é apenas validada contra a BD se
     // fornecida, para não quebrar dados/legados sem etiqueta.
