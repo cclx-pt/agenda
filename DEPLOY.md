@@ -26,6 +26,10 @@ O encaminhamento está em [`vercel.json`](./vercel.json): os prefixos `/api`,
 (SPA). O front-end usa caminhos relativos, por isso funciona em same-origin sem
 configurar URLs.
 
+> **Vários ambientes?** Para a estratégia de branches development → staging →
+> production e a configuração por ambiente (Vercel + Supabase), ver
+> [`BRANCHING.md`](./BRANCHING.md).
+
 ---
 
 ## 1. Pré-requisitos

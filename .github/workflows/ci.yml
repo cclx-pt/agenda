@@ -1,0 +1,41 @@
+name: CI
+
+# Corre em pushes e Pull Requests para os três branches de ambiente.
+# Valida o frontend (lint + testes + build). Os testes de backend NÃO correm
+# aqui porque escrevem numa base de dados Supabase real (precisam de segredos).
+on:
+  push:
+    branches: [development, staging, production]
+  pull_request:
+    branches: [development, staging, production]
+
+# Cancela execuções antigas do mesmo branch/PR quando chega um novo commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Lint · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

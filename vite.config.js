@@ -12,6 +12,12 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+      // Ambiente de deploy (Vercel injeta estas no build):
+      //   VERCEL_ENV = production | preview | development
+      //   VERCEL_GIT_COMMIT_REF = nome do branch
+      // Localmente ficam 'local' / '' → o crachá de ambiente aparece exceto em produção.
+      __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV || 'local'),
+      __GIT_BRANCH__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_REF || ''),
     },
     plugins: [react()],
     resolve: {

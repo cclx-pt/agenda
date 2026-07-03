@@ -53,6 +53,19 @@ const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '
 const BUILD_TIME = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : ''
 const BUILD_LABEL = BUILD_TIME ? BUILD_TIME.slice(0, 16).replace('T', ' ') : ''
 
+// Ambiente de deploy (injetado pelo Vite). O crachá é visível em todos os
+// ambientes EXCETO produção, para os testers saberem sempre onde estão.
+const APP_ENV = typeof __APP_ENV__ !== 'undefined' ? __APP_ENV__ : 'local'
+const GIT_BRANCH = typeof __GIT_BRANCH__ !== 'undefined' ? __GIT_BRANCH__ : ''
+const ENV_BADGE = (() => {
+  if (APP_ENV === 'production') return null
+  const b = (GIT_BRANCH || '').toLowerCase()
+  if (b === 'staging') return { label: 'STAGING · QA', cls: 'bg-amber-500 text-black' }
+  if (b === 'development') return { label: 'DEV', cls: 'bg-sky-500 text-white' }
+  if (APP_ENV === 'local') return { label: 'LOCAL', cls: 'bg-emerald-500 text-white' }
+  return { label: (GIT_BRANCH || 'PREVIEW').toUpperCase(), cls: 'bg-violet-500 text-white' }
+})()
+
 export default function App() {
   const { toggle, isDark } = useTheme()
   const { t, lang, setLang, languages, logoUrl: customLogoUrl } = useI18n()
@@ -531,6 +544,15 @@ export default function App() {
           </>
         )}
       </footer>
+      {/* ── Crachá de ambiente (escondido em produção) ─────────────── */}
+      {ENV_BADGE && (
+        <div
+          className={`pointer-events-none fixed bottom-8 right-2 z-50 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider shadow-lg ${ENV_BADGE.cls}`}
+          title={`Ambiente: ${APP_ENV}${GIT_BRANCH ? ` (${GIT_BRANCH})` : ''}`}
+        >
+          {ENV_BADGE.label}
+        </div>
+      )}
       {/* ── Event detail modal ───────────────────────────────────── */}
       <AnimatePresence>
         {detailEvent && (
