@@ -32,9 +32,14 @@ import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
   AlertCircle, CalendarCog, CalendarSync, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
-  ClipboardCheck, Eye, Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings,
+  ClipboardCheck, Eye, Lock, LogOut, Menu, Moon, MoreVertical, PanelLeftClose, PanelLeftOpen,
+  RefreshCw, Settings, Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 const VIEWS = ['day', 'week', 'month', 'quarter', 'semester', 'year', 'list']
@@ -282,6 +287,9 @@ export default function App() {
 
         <div className="flex flex-shrink-0 items-center gap-3.5 max-[980px]:gap-2">
           <SearchBar events={filteredEvents} onSelect={(evt) => setDetailEvent(evt)} />
+
+          {/* Ações inline — visíveis no ecrã largo; escondidas no telemóvel/tablet (≤980px) */}
+          <div className="flex items-center gap-3.5 max-[980px]:hidden">
           {canViewPrivate && (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Eye className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
@@ -349,6 +357,80 @@ export default function App() {
             ))}
           </select>
           <ThemeToggle isDark={isDark} onToggle={toggle} />
+          </div>
+
+          {/* Menu de ações compacto — só no telemóvel/tablet (≤980px), onde os botões inline não cabem */}
+          <div className="hidden max-[980px]:flex">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8" aria-label={t('menu')} title={t('menu')}>
+                  <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {canManage && (
+                  <>
+                    <DropdownMenuItem onClick={() => { setManageView('events'); setManageOpen(true) }}>
+                      <CalendarCog className="h-4 w-4" aria-hidden="true" />
+                      {t('events')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setApprovalsOpen(true)}>
+                      <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+                      {t('approvals')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setManageView('home'); setManageOpen(true) }}>
+                      <Settings className="h-4 w-4" aria-hidden="true" />
+                      {t('admin')}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {isAuthenticated ? (
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    {t('signOut')}
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => setLoginOpen(true)}>
+                    <Lock className="h-4 w-4" aria-hidden="true" />
+                    {t('signIn')}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { clearEventCache(); reload(); refreshCategoriesInUse() }}>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  {t('refresh')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSubscribeOpen(true)}>
+                  <CalendarSync className="h-4 w-4" aria-hidden="true" />
+                  {t('subscribe')}
+                </DropdownMenuItem>
+                {canViewPrivate && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{t('visibility')}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={visibility} onValueChange={setVisibility}>
+                      <DropdownMenuRadioItem value="all">{t('seeAll')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="private">{t('onlyPrivate')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="public">{t('onlyPublic')}</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>{t('language')}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={lang} onValueChange={setLang}>
+                  {languages.map((l) => (
+                    <DropdownMenuRadioItem key={l.code} value={l.code}>{l.label}</DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={toggle}>
+                  {isDark ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+                  {isDark ? 'Modo dia' : 'Modo noite'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
@@ -424,6 +506,8 @@ export default function App() {
                   className={cn(
                     'flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors max-[980px]:px-2.5',
                     view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    // No telemóvel/tablet escondemos as vistas Semestral e Anual (grelhas demasiado largas).
+                    (v === 'semester' || v === 'year') && 'max-[980px]:hidden',
                   )}
                   onClick={() => setView(v)}
                   aria-current={view === v ? 'page' : undefined}
