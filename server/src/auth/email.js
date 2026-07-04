@@ -145,6 +145,57 @@ export async function sendEventStatusEmail(to, { name, eventTitle, status, reaso
 }
 
 /**
+ * Constrói o assunto e o corpo (texto + HTML) do email de boas-vindas.
+ * Separado do envio para permitir pré-visualização e testes.
+ */
+export function renderWelcomeEmail({ name, link } = {}) {
+  const subject = 'Bem-vindo(a) à Agenda CCLX'
+  const greeting = name ? `Olá ${name},` : 'Olá,'
+  const url = link || 'https://agenda.cclx.pt'
+
+  const text =
+    `${greeting}\n\nFoi criada uma conta para si na Agenda CCLX. Seja bem-vindo(a)!` +
+    `\n\nJá pode consultar e acompanhar a agenda da igreja em:\n${url}` +
+    `\n\nPara entrar, use o seu email — receberá um código de acesso temporário.` +
+    `\n\nAgenda CCLX`
+
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#1f2937">Agenda CCLX</h2>
+      <p style="margin:0 0 8px">${escapeHtml(greeting)}</p>
+      <p style="margin:8px 0;color:#374151">Foi criada uma conta para si na <strong>Agenda CCLX</strong>. Seja bem-vindo(a)!</p>
+      <p style="margin:8px 0;color:#374151">Já pode consultar e acompanhar a agenda da igreja:</p>
+      <div style="margin:22px 0">
+        <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 22px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none">Abrir a agenda</a>
+      </div>
+      <p style="margin:8px 0;color:#6b7280">Ou copie esta ligação: <a href="${escapeHtml(url)}" style="color:#2563eb">${escapeHtml(url)}</a></p>
+      <p style="margin:8px 0;color:#6b7280">Para entrar, use o seu email — receberá um código de acesso temporário.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
+      <p style="color:#9ca3af;font-size:12px">Mensagem automática da Agenda CCLX.</p>
+    </div>`
+
+  return { subject, text, html }
+}
+
+/**
+ * Envia um email de boas-vindas a um utilizador recém-criado, com uma ligação
+ * para a agenda. Sem SMTP configurado, imprime na consola (dev).
+ */
+export async function sendWelcomeEmail(to, { name, link } = {}) {
+  const { subject, text, html } = renderWelcomeEmail({ name, link })
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(
+      `\n[email:mock] Para: ${to}\n[email:mock] Boas-vindas à Agenda CCLX\n${link || 'https://agenda.cclx.pt'}\n`
+    )
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
+/**
  * Pede a um aprovador que aprove/rejeite um evento submetido. Inclui dois botões
  * (Aprovar/Rejeitar) que abrem a página de confirmação /acao com o token.
  */

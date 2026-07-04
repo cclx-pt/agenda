@@ -1,7 +1,10 @@
 import { z } from 'zod'
+import { waitUntil } from '@vercel/functions'
 import * as repo from './repository.js'
 import * as churchesRepo from '../churches/repository.js'
 import * as privacyTagsRepo from '../privacyTags/repository.js'
+import { config } from '../config.js'
+import { sendWelcomeEmail } from '../auth/email.js'
 
 // Erro de domínio com código HTTP associado.
 export class UserError extends Error {
@@ -91,6 +94,22 @@ export function list() {
   return repo.list()
 }
 
+// Envia (em segundo plano) um email de boas-vindas ao novo utilizador, com a
+// ligação para a agenda. Nunca bloqueia nem falha a criação da conta.
+// No Vercel, waitUntil mantém a função viva até o email sair; localmente é no-op.
+function notifyWelcome(user) {
+  if (!user?.email) return
+  const link = config.appUrl.replace(/\/+$/, '')
+  const task = sendWelcomeEmail(user.email, { name: user.name, link }).catch((err) => {
+    console.error('[users] Falha ao enviar email de boas-vindas:', err?.message ?? err)
+  })
+  try {
+    waitUntil(task)
+  } catch {
+    /* fora do runtime Vercel: no-op; o processo persistente conclui a task */
+  }
+}
+
 export async function create(input) {
   const data = createSchema.parse(input)
   const existing = await repo.findByEmail(data.email)
@@ -105,7 +124,9 @@ export async function create(input) {
   const privacyTags = normalizePrivacyTags(data.privacyTags) ?? null
   await assertKnownPrivacyTags(privacyTags)
   data.privacyTags = privacyTags
-  return repo.insert(data)
+  const user = await repo.insert(data)
+  notifyWelcome(user)
+  return user
 }
 
 export async function update(actor, id, input) {
