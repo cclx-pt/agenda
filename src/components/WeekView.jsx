@@ -1,5 +1,6 @@
 import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, isMultiDay, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
+import EventHoverCard from './EventHoverCard'
 import { cn } from '@/lib/utils'
 
 export default function WeekView({ year, month, day, eventsByDate, onSelectEvent, onDayClick }) {
@@ -41,8 +42,8 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
               const st = STATUS_META[evt.status]
               const vis = colorFor(evt)
               return (
+                <EventHoverCard key={evt.id} event={evt}>
                 <button
-                  key={evt.id}
                   className={cn(
                     'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left',
                     st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
@@ -50,7 +51,6 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                   )}
                   style={{ background: st ? st.bg : vis.bg, color: vis.text }}
                   onClick={() => onSelectEvent(evt)}
-                  title={st ? `${evt.title} — ${st.label}` : evt.title}
                 >
                   <span className="flex w-full items-center gap-1 text-[0.6rem] font-bold uppercase tracking-wide opacity-85">
                     {evt.featured && <i className="ti ti-star-filled cclx-blink text-amber-500" aria-hidden="true" />}
@@ -74,6 +74,7 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                     </span>
                   )}
                 </button>
+                </EventHoverCard>
               )
             })}
           </div>

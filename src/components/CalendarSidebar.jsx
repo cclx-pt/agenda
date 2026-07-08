@@ -8,6 +8,7 @@ import { useI18n } from '../hooks/useI18n'
 import { useEventColors } from '../hooks/useEventColors'
 import { useCategories } from '../hooks/useCategories'
 import MultiSelectDropdown from './MultiSelectDropdown'
+import EventHoverCard from './EventHoverCard'
 
 // Categorias pela ordem de apresentação na lista "Calendários".
 const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento', 'aplicacao']
@@ -127,6 +128,7 @@ export default function CalendarSidebar({
               const st = STATUS_META[evt.status]
               return (
                 <li key={evt.id}>
+                  <EventHoverCard event={evt} side="right" align="start">
                   <button type="button" className={cn(
                     'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent',
                     st && 'bg-destructive/15 hover:bg-destructive/25',
@@ -148,6 +150,7 @@ export default function CalendarSidebar({
                       <span className="ml-auto flex-shrink-0 rounded bg-blue-500 px-1.5 py-px text-[9px] font-extrabold tracking-wide text-white" title={API_BADGE.title}>{API_BADGE.label}</span>
                     )}
                   </button>
+                  </EventHoverCard>
                 </li>
               )
             })}

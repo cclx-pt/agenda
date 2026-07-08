@@ -4,6 +4,7 @@ import {
   isPastDateKey, PAST_DAY_HATCH
 } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
+import EventHoverCard from './EventHoverCard'
 import { cn } from '@/lib/utils'
 
 export default function MonthView({ year, month, eventsByDate, selectedKey, onDayClick, onSelectEvent }) {
@@ -87,25 +88,26 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                 const st = STATUS_META[evt.status]
                 const vis = colorFor(evt)
                 return (
-                  <div key={evt.id}
-                    className={cn(
-                      'mb-0.5 flex cursor-pointer items-center gap-[3px] overflow-hidden whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide hover:brightness-95 max-[600px]:gap-0.5 max-[600px]:px-[3px] max-[600px]:py-px max-[600px]:text-[8px]',
-                      st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
-                      evt.featured && 'cclx-featured',
-                    )}
-                    style={{ background: st ? st.bg : vis.bg, color: vis.text }}
-                    title={`${evt.subcategory ? evt.subcategory + ' · ' : ''}${evt.title} (${evt.community})${st ? ` — ${st.label}` : ''}`}
-                    onClick={(e) => { e.stopPropagation(); onSelectEvent?.(evt) }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onSelectEvent?.(evt) } }}>
-                    {evt.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[9px] text-amber-500" aria-hidden="true" />}
-                    {evt.imageUrl && <span className="h-[5px] w-[5px] flex-shrink-0 rounded-[1px] bg-current opacity-80" />}
-                    <span className="h-1 w-1 flex-shrink-0 rounded-full opacity-70" style={{ background: vis.dot }} />
-                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title} <span className="opacity-70">({evt.community})</span></span>
-                    {st && <i className={`ti ${st.icon} ml-auto flex-shrink-0 text-[9px] opacity-85`} aria-hidden="true" />}
-                    {evt.isApi && <span className="ml-auto flex-shrink-0 rounded-sm bg-blue-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={API_BADGE.title}>{API_BADGE.label}</span>}
-                  </div>
+                  <EventHoverCard key={evt.id} event={evt}>
+                    <div
+                      className={cn(
+                        'mb-0.5 flex cursor-pointer items-center gap-[3px] overflow-hidden whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide hover:brightness-95 max-[600px]:gap-0.5 max-[600px]:px-[3px] max-[600px]:py-px max-[600px]:text-[8px]',
+                        st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
+                        evt.featured && 'cclx-featured',
+                      )}
+                      style={{ background: st ? st.bg : vis.bg, color: vis.text }}
+                      onClick={(e) => { e.stopPropagation(); onSelectEvent?.(evt) }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onSelectEvent?.(evt) } }}>
+                      {evt.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[9px] text-amber-500" aria-hidden="true" />}
+                      {evt.imageUrl && <span className="h-[5px] w-[5px] flex-shrink-0 rounded-[1px] bg-current opacity-80" />}
+                      <span className="h-1 w-1 flex-shrink-0 rounded-full opacity-70" style={{ background: vis.dot }} />
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title} <span className="opacity-70">({evt.community})</span></span>
+                      {st && <i className={`ti ${st.icon} ml-auto flex-shrink-0 text-[9px] opacity-85`} aria-hidden="true" />}
+                      {evt.isApi && <span className="ml-auto flex-shrink-0 rounded-sm bg-blue-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={API_BADGE.title}>{API_BADGE.label}</span>}
+                    </div>
+                  </EventHoverCard>
                 )
               })}
 
