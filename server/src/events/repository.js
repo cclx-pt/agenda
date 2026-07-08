@@ -5,26 +5,50 @@ import { pool } from '../db/pool.js'
 // grava em colunas TIMESTAMPTZ (instante normalizado em UTC).
 const toDb = (v) => (v == null ? null : new Date(v))
 
+// Fuso horário da igreja. As datas/horas dos eventos são "de parede" neste fuso
+// (Lisboa), independentemente do fuso do servidor. O Vercel corre em UTC, pelo
+// que extrair a hora com getHours() mostrava menos 1h no verão (WEST) do que a
+// hora introduzida no formulário (que corre no browser, em horário de Lisboa).
+// O Intl trata do horário de verão automaticamente.
+const EVENT_TIME_ZONE = 'Europe/Lisbon'
+const zonedPartsFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: EVENT_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+// Devolve { dateKey: 'YYYY-MM-DD', time: 'HH:MM' } no fuso da igreja, ou null.
+function zonedParts(value) {
+  if (value == null) return null
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  const parts = {}
+  for (const part of zonedPartsFormatter.formatToParts(d)) {
+    if (part.type !== 'literal') parts[part.type] = part.value
+  }
+  return { dateKey: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+}
+
 // Mapeia a linha da BD para a forma usada pela aplicação (alinhada com apiService).
 function mapRow(row) {
   if (!row) return null
-  const start = new Date(row.start_datetime)
-  const end = row.end_datetime ? new Date(row.end_datetime) : null
-  const pad = (n) => String(n).padStart(2, '0')
-  const dateKey = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
-  const endDateKey = end ? `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` : null
-  const hhmm = (d) => (d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : null)
+  const startParts = zonedParts(row.start_datetime)
+  const endParts = zonedParts(row.end_datetime)
   const allDay = !!row.all_day
   return {
     id: row.id,
     title: row.title,
     description: row.description,
-    date: dateKey,
-    endDate: endDateKey,
+    date: startParts?.dateKey ?? null,
+    endDate: endParts?.dateKey ?? null,
     startDatetime: row.start_datetime,
     endDatetime: row.end_datetime,
-    timeStart: allDay ? null : hhmm(start),
-    timeEnd: allDay ? null : hhmm(end),
+    timeStart: allDay ? null : (startParts?.time ?? null),
+    timeEnd: allDay ? null : (endParts?.time ?? null),
     allDay,
     location: row.location,
     community: row.community,
