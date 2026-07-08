@@ -477,6 +477,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Traduções (admin): { lang: { key: value } } + idioma em edição.
   const [translationsForm, setTranslationsForm] = useState({})
   const [translationsLang, setTranslationsLang] = useState('pt')
+  const [translationsSearch, setTranslationsSearch] = useState('')
   const [savingTranslations, setSavingTranslations] = useState(false)
   // Aparência (admin): estado de upload/reposição do logótipo.
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -626,6 +627,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       const overrides = await eventsService.getTranslations()
       setTranslationsForm(overrides && typeof overrides === 'object' ? overrides : {})
       setTranslationsLang('pt')
+      setTranslationsSearch('')
       setView('translations')
     } catch (err) {
       toast.error(err.message)
@@ -654,6 +656,17 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       setSavingTranslations(false)
     }
   }
+
+  // Filtro da vista de traduções: procura no CONTEÚDO (valor atual e valor por
+  // omissão do idioma ativo) e também na chave.
+  const translationsQuery = translationsSearch.trim().toLowerCase()
+  const visibleTranslationKeys = translationsQuery
+    ? TRANSLATION_KEYS.filter((key) => {
+        const val = (translationsForm[translationsLang]?.[key] ?? '').toLowerCase()
+        const def = (DEFAULT_TRANSLATIONS[translationsLang]?.[key] ?? '').toLowerCase()
+        return key.toLowerCase().includes(translationsQuery) || val.includes(translationsQuery) || def.includes(translationsQuery)
+      })
+    : TRANSLATION_KEYS
 
   // ── Aparência / logótipo (admin) ───────────────────
   const openBranding = () => setView('branding')
@@ -2780,18 +2793,30 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 </button>
               ))}
             </div>
+            <input
+              className={styles.input}
+              type="search"
+              value={translationsSearch}
+              onChange={(e) => setTranslationsSearch(e.target.value)}
+              placeholder="Procurar nas traduções (conteúdo ou chave)…"
+              aria-label="Procurar traduções"
+            />
             <div className="flex flex-col gap-2">
-              {TRANSLATION_KEYS.map((key) => (
-                <label key={key} className={styles.label}>
-                  {key}
-                  <input
-                    className={styles.input}
-                    value={translationsForm[translationsLang]?.[key] ?? ''}
-                    placeholder={DEFAULT_TRANSLATIONS[translationsLang]?.[key] ?? key}
-                    onChange={setTranslationField(key)}
-                  />
-                </label>
-              ))}
+              {visibleTranslationKeys.length === 0 ? (
+                <p className={styles.muted}>Nenhuma tradução corresponde à pesquisa.</p>
+              ) : (
+                visibleTranslationKeys.map((key) => (
+                  <label key={key} className={styles.label}>
+                    {key}
+                    <input
+                      className={styles.input}
+                      value={translationsForm[translationsLang]?.[key] ?? ''}
+                      placeholder={DEFAULT_TRANSLATIONS[translationsLang]?.[key] ?? key}
+                      onChange={setTranslationField(key)}
+                    />
+                  </label>
+                ))
+              )}
             </div>
             <div className={styles.formActions}>
               <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingTranslations}>
@@ -3033,7 +3058,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ) : (
           <form className={styles.body} onSubmit={handleSave}>
             <div className={styles.label}>
-              Imagem do evento
+              {t('eventImage')}
               <div
                 className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
                 onClick={() => imageInputRef.current?.click()}
@@ -3076,8 +3101,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     <i className="ti ti-photo-up" />
                     <span>
                       {uploadingKey === 'bannerUrl'
-                        ? 'A carregar…'
-                        : 'Clique ou arraste uma imagem (PNG ou JPG, até 5MB, 16:9)'}
+                        ? t('uploading')
+                        : t('imageDropHint')}
                     </span>
                   </div>
                 )}
@@ -3095,7 +3120,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </div>
 
             <div className={styles.label}>
-              Anexo (PDF, PNG ou JPG, até 5MB) — opcional
+              {t('attachmentLabel')}
               {form.attachmentUrl ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2">
                   <a
@@ -3105,7 +3130,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-primary underline underline-offset-2"
                   >
                     <i className="ti ti-paperclip" aria-hidden="true" />
-                    <span className="truncate">{form.attachmentName || 'Anexo'}</span>
+                    <span className="truncate">{form.attachmentName || t('attachmentName')}</span>
                   </a>
                   <button
                     type="button"
@@ -3124,7 +3149,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   disabled={uploadingAttachment}
                 >
                   <i className={`ti ${uploadingAttachment ? 'ti-loader-2' : 'ti-paperclip'}`} aria-hidden="true" />
-                  {uploadingAttachment ? 'A carregar…' : 'Carregar anexo'}
+                  {uploadingAttachment ? t('uploading') : t('uploadAttachment')}
                 </button>
               )}
               <input
@@ -3140,7 +3165,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </div>
 
             <label className={styles.label}>
-              Nome do evento *
+              {t('eventName')} *
               <input
                 className={styles.input}
                 value={form.title}
@@ -3150,7 +3175,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </label>
 
             <label className={styles.label}>
-              Descrição
+              {t('description')}
               <textarea
                 className={styles.textarea}
                 rows={3}
@@ -3161,53 +3186,53 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
             {dateTimeLocked && (
               <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                A data e a hora não podem ser alteradas em eventos publicados. Para as mudar, o evento teria de voltar a rascunho.
+                {t('dateTimeLockedHint')}
               </p>
             )}
 
             <div className={styles.row}>
               <label className={styles.label}>
-                Data de início *
+                {t('startDate')} *
                 <DateField
                   className={styles.input}
                   value={form.startDate}
                   onChange={(v) => setForm((f) => ({ ...f, startDate: v }))}
                   disabled={dateTimeLocked}
                   required
-                  ariaLabel="Data de início"
+                  ariaLabel={t('startDate')}
                 />
               </label>
               <label className={styles.label}>
-                Hora de início
+                {t('startTime')}
                 <TimeField
                   className={styles.input}
                   value={form.startTime}
                   onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
                   disabled={form.allDay || dateTimeLocked}
-                  ariaLabel="Hora de início"
+                  ariaLabel={t('startTime')}
                 />
               </label>
             </div>
 
             <div className={styles.row}>
               <label className={styles.label}>
-                Data de fim
+                {t('endDate')}
                 <DateField
                   className={styles.input}
                   value={form.endDate}
                   onChange={(v) => setForm((f) => ({ ...f, endDate: v }))}
                   disabled={dateTimeLocked}
-                  ariaLabel="Data de fim"
+                  ariaLabel={t('endDate')}
                 />
               </label>
               <label className={styles.label}>
-                Hora de fim
+                {t('endTime')}
                 <TimeField
                   className={styles.input}
                   value={form.endTime}
                   onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
                   disabled={form.allDay || dateTimeLocked}
-                  ariaLabel="Hora de fim"
+                  ariaLabel={t('endTime')}
                 />
               </label>
             </div>
@@ -3228,7 +3253,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 </select>
               </label>
               <label className={styles.label}>
-                Categoria
+                {t('category')}
                 <select
                   className={styles.input}
                   value={form.category}
@@ -3283,14 +3308,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
             {form.loop && (
               <div className={styles.label}>
-                Cartazes do Loop (TV) — opcional
+                {t('loopPosters')}
                 <span className={styles.fieldHint}>
-                  Imagens dedicadas ao carrossel da TV, por formato. Cada igreja escolhe o formato
-                  na configuração do Loop; na TV, o cartaz correspondente é mostrado em ecrã inteiro.
+                  {t('loopPostersHint')}
                 </span>
                 <div className={styles.row}>
                   <div className={styles.label}>
-                    16:9 — 1920×1080
+                    {t('loopFormat169')}
                     <div
                       className={styles.dropzone}
                       onClick={() => loop16InputRef.current?.click()}
@@ -3332,8 +3356,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                           <i className="ti ti-photo-up" />
                           <span>
                             {uploadingKey === 'loopImage16x9'
-                              ? 'A carregar…'
-                              : 'Clique ou arraste (PNG/JPG, 1920×1080)'}
+                              ? t('uploading')
+                              : t('loopDropHint169')}
                           </span>
                         </div>
                       )}
@@ -3350,7 +3374,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     />
                   </div>
                   <div className={styles.label}>
-                    32:9 — 3840×1080
+                    {t('loopFormat329')}
                     <div
                       className={styles.dropzone}
                       onClick={() => loop32InputRef.current?.click()}
@@ -3392,8 +3416,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                           <i className="ti ti-photo-up" />
                           <span>
                             {uploadingKey === 'loopImage32x9'
-                              ? 'A carregar…'
-                              : 'Clique ou arraste (PNG/JPG, 3840×1080)'}
+                              ? t('uploading')
+                              : t('loopDropHint329')}
                           </span>
                         </div>
                       )}
@@ -3422,12 +3446,12 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 }`}
               >
                 <p className="m-0 font-bold">
-                  {overlapInfo.mode === 'block' ? 'Conflito de horário (bloqueado)' : 'Conflito de horário'}
+                  {overlapInfo.mode === 'block' ? t('overlapConflictBlocked') : t('overlapConflict')}
                 </p>
                 <ul className="mb-0 mt-1.5 list-disc pl-5">
                   {overlapInfo.conflicts.map((c) => (
                     <li key={c.id}>
-                      {c.title || '(evento privado)'} — {c.community} · {c.date}
+                      {c.title || t('privateEventShort')} — {c.community} · {c.date}
                       {c.timeStart ? ` · ${c.timeStart}` : ''}
                     </li>
                   ))}
@@ -3435,16 +3459,16 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 {overlapInfo.mode !== 'block' || isAdmin ? (
                   <label className="mt-2.5 flex cursor-pointer items-center gap-2 font-semibold">
                     <input type="checkbox" checked={form.allowOverlap} onChange={setField('allowOverlap')} />
-                    Permitir sobreposição mesmo assim
+                    {t('allowOverlapAnyway')}
                   </label>
                 ) : (
-                  <p className="mb-0 mt-2 text-xs">Sobreposição bloqueada — contacte um administrador.</p>
+                  <p className="mb-0 mt-2 text-xs">{t('overlapBlockedAdmin')}</p>
                 )}
               </div>
             )}
 
             <label className={styles.label}>
-              Morada (igreja/comunidade)
+              {t('address')}
               <input
                 className={styles.input}
                 value={form.location}
@@ -3453,7 +3477,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </label>
 
             <label className={styles.label}>
-              Localização no mapa (opcional)
+              {t('mapLocation')}
               <MapPicker
                 address={form.location}
                 value={
@@ -3473,18 +3497,18 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </label>
 
             <label className={styles.label}>
-              Responsável do evento (opcional)
+              {t('organizer')}
               <input
                 className={styles.input}
                 value={form.organizerName}
                 onChange={setField('organizerName')}
-                placeholder="Nome do responsável"
+                placeholder={t('organizerPlaceholder')}
               />
             </label>
 
             <div className={styles.row}>
               <label className={styles.label}>
-                Telefone do responsável (opcional)
+                {t('organizerPhone')}
                 <input
                   className={styles.input}
                   type="tel"
@@ -3494,7 +3518,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 />
               </label>
               <label className={styles.label}>
-                Email do responsável (opcional)
+                {t('organizerEmail')}
                 <input
                   className={styles.input}
                   type="email"
@@ -3506,7 +3530,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </div>
 
             <label className={styles.label}>
-              Link de inscrições (opcional)
+              {t('registrationLink')}
               <input
                 className={styles.input}
                 type="url"
@@ -3519,24 +3543,24 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             <div className={styles.checks}>
               <label className={styles.check}>
                 <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} disabled={dateTimeLocked} />
-                Dia inteiro
+                {t('allDay')}
               </label>
               <label className={styles.check}>
                 <input type="checkbox" checked={form.isPrivate} onChange={setField('isPrivate')} />
-                Privado (agenda restrita)
+                {t('privateRestricted')}
               </label>
             </div>
 
             {form.isPrivate && (
               <label className={styles.label}>
-                Etiqueta de privacidade *
+                {t('privacyTag')} *
                 <select
                   className={styles.input}
                   value={form.privacyTag}
                   onChange={setField('privacyTag')}
                   required
                 >
-                  <option value="">— Selecione —</option>
+                  <option value="">{t('selectPlaceholder')}</option>
                   {dbPrivacyTags.map((t) => (
                     <option key={t.id} value={t.name}>
                       {t.name}
@@ -3545,7 +3569,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 </select>
                 {dbPrivacyTags.length === 0 && (
                   <span className={styles.fieldHint}>
-                    Ainda não há etiquetas. Crie-as em “Etiquetas de privacidade”.
+                    {t('noPrivacyTagsHint')}
                   </span>
                 )}
               </label>
@@ -3553,30 +3577,30 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
             {!editingId && (
               <fieldset className={styles.recurrence}>
-                <legend>Repetição</legend>
+                <legend>{t('recurrence')}</legend>
                 <div className={styles.row}>
                   <label className={styles.label}>
-                    Tipo
+                    {t('recType')}
                     <select
                       className={styles.input}
                       value={form.recurrenceType}
                       onChange={setField('recurrenceType')}
                     >
-                      <option value="unique">Único</option>
-                      <option value="recurrent">Recorrente</option>
+                      <option value="unique">{t('recUnique')}</option>
+                      <option value="recurrent">{t('recRecurrent')}</option>
                     </select>
                   </label>
                   {form.recurrenceType === 'recurrent' && (
                     <label className={styles.label}>
-                      Frequência
+                      {t('recFrequency')}
                       <select
                         className={styles.input}
                         value={form.frequency}
                         onChange={setField('frequency')}
                       >
-                        <option value="daily">Diária</option>
-                        <option value="weekly">Semanal</option>
-                        <option value="monthly">Mensal</option>
+                        <option value="daily">{t('recDaily')}</option>
+                        <option value="weekly">{t('recWeekly')}</option>
+                        <option value="monthly">{t('recMonthly')}</option>
                       </select>
                     </label>
                   )}
@@ -3586,7 +3610,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <>
                     <div className={styles.row}>
                       <label className={styles.label}>
-                        Repetir a cada
+                        {t('recEvery')}
                         <input
                           type="number"
                           min="1"
@@ -3597,22 +3621,22 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                         />
                       </label>
                       <label className={styles.label}>
-                        Termina
+                        {t('recEnds')}
                         <select
                           className={styles.input}
                           value={form.recEndType}
                           onChange={setField('recEndType')}
                         >
-                          <option value="never">Nunca</option>
-                          <option value="count">Após N ocorrências</option>
-                          <option value="date">Numa data</option>
+                          <option value="never">{t('recNever')}</option>
+                          <option value="count">{t('recAfterN')}</option>
+                          <option value="date">{t('recOnDate')}</option>
                         </select>
                       </label>
                     </div>
 
                     {form.recEndType === 'count' && (
                       <label className={styles.label}>
-                        Número de ocorrências
+                        {t('recOccurrences')}
                         <input
                           type="number"
                           min="1"
@@ -3625,14 +3649,14 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     )}
                     {form.recEndType === 'date' && (
                       <label className={styles.label}>
-                        Data de fim da recorrência (máx. 6 meses)
+                        {t('recEndDate')}
                         <DateField
                           className={styles.input}
                           value={form.recEndDate}
                           min={form.startDate || undefined}
                           max={maxRecurrenceDate(form.startDate)}
                           onChange={(v) => setForm((f) => ({ ...f, recEndDate: v }))}
-                          ariaLabel="Data de fim da recorrência"
+                          ariaLabel={t('recEndDate')}
                         />
                       </label>
                     )}
@@ -3648,7 +3672,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   checked={applyToSeries}
                   onChange={(e) => setApplyToSeries(e.target.checked)}
                 />
-                Aplicar alterações a toda a série
+                {t('applyToSeries')}
               </label>
             )}
 
@@ -3659,16 +3683,16 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 onClick={() => exitForm()}
                 disabled={busy}
               >
-                Cancelar
+                {t('cancel')}
               </button>
               {editingId ? (
                 <button type="submit" className={styles.primaryBtn} disabled={busy}>
-                  {busy ? 'A guardar…' : 'Guardar'}
+                  {busy ? t('saving') : t('save')}
                 </button>
               ) : (
                 <>
                   <button type="submit" className={styles.ghostBtn} disabled={busy}>
-                    {busy ? 'A guardar…' : 'Guardar rascunho'}
+                    {busy ? t('saving') : t('saveDraft')}
                   </button>
                   <button
                     type="button"
@@ -3676,7 +3700,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     disabled={busy}
                     onClick={(e) => handleSave(e, true)}
                   >
-                    <i className="ti ti-send" aria-hidden="true" /> Submeter para aprovação
+                    <i className="ti ti-send" aria-hidden="true" /> {t('submitForApproval')}
                   </button>
                 </>
               )}
