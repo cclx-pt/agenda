@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays, Church, Clock, Lock, MapPin } from 'lucide-react'
+import { Calendar, Church, Clock, Lock, MapPin } from 'lucide-react'
 
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
 import { useEventColors } from '../hooks/useEventColors'
@@ -29,18 +29,10 @@ export default function EventHoverCard({ event, children, side = 'right', align 
         side={side}
         align={align}
         sideOffset={8}
-        className="w-72 overflow-hidden p-0"
+        className="w-72 p-3"
         onClick={(e) => e.stopPropagation()}
       >
-        {event.imageUrl ? (
-          <img src={event.imageUrl} alt="" loading="lazy" className="block aspect-video w-full object-cover" />
-        ) : (
-          <div className="flex aspect-video w-full items-center justify-center border-b border-border bg-muted text-muted-foreground">
-            <CalendarDays className="h-6 w-6" aria-hidden="true" />
-          </div>
-        )}
-
-        <div className="p-3">
+        <div>
           <div className="mb-1.5 flex flex-wrap items-center gap-1 empty:hidden">
             {event.featured && <i className="ti ti-star-filled text-[11px] text-amber-500" aria-hidden="true" />}
             <span className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-foreground">
