@@ -135,14 +135,75 @@ export const recurrenceSchema = z
   .optional()
   .nullable()
 
-// Avança uma data em N unidades de frequência, preservando a hora.
-function advance(date, frequency, steps, interval) {
-  const d = new Date(date)
+// Fuso horário da igreja (igual ao do repositório). As recorrências avançam na
+// "hora de parede" de Lisboa, para preservar o DIA DO MÊS (mensal a 31 → 28/Fev,
+// 30/Abr, sem saltar meses) e a HORA LOCAL (incluindo mudanças de hora/DST),
+// independentemente do fuso do servidor (o Vercel corre em UTC).
+const EVENT_TIME_ZONE = 'Europe/Lisbon'
+const wallClockFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: EVENT_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+// Componentes de "parede" (ano/mês/dia/hora/min/seg) de um instante, em Lisboa.
+function wallParts(instant) {
+  const p = {}
+  for (const part of wallClockFormatter.formatToParts(instant)) {
+    if (part.type !== 'literal') p[part.type] = part.value
+  }
+  return { year: +p.year, month: +p.month, day: +p.day, hour: +p.hour, minute: +p.minute, second: +p.second }
+}
+
+// Deslocação (ms) do fuso de Lisboa face ao UTC no instante dado.
+function zoneOffsetMs(instant) {
+  const p = wallParts(instant)
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - instant.getTime()
+}
+
+// Converte uma hora "de parede" de Lisboa num instante UTC (2 passagens para
+// resolver corretamente junto às mudanças de hora/DST).
+function wallClockToUtc({ year, month, day, hour, minute, second = 0 }) {
+  const naive = Date.UTC(year, month - 1, day, hour, minute, second)
+  let offset = zoneOffsetMs(new Date(naive))
+  offset = zoneOffsetMs(new Date(naive - offset))
+  return new Date(naive - offset)
+}
+
+// Número de dias do mês (month: 1..12).
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+// Avança a partir do início (na hora de parede de Lisboa) em N passos,
+// preservando a hora local e o dia do mês (com clamp nos meses mais curtos).
+// Devolve o instante UTC da ocorrência.
+function advance(startInstant, frequency, steps, interval) {
+  const w = wallParts(new Date(startInstant))
   const n = steps * interval
-  if (frequency === 'daily') d.setDate(d.getDate() + n)
-  else if (frequency === 'weekly') d.setDate(d.getDate() + n * 7)
-  else if (frequency === 'monthly') d.setMonth(d.getMonth() + n)
-  return d
+  if (frequency === 'monthly') {
+    const total = w.month - 1 + n
+    const year = w.year + Math.floor(total / 12)
+    const month = (total % 12) + 1
+    const day = Math.min(w.day, daysInMonth(year, month))
+    return wallClockToUtc({ year, month, day, hour: w.hour, minute: w.minute, second: w.second })
+  }
+  const addDays = frequency === 'weekly' ? n * 7 : n
+  const base = new Date(Date.UTC(w.year, w.month - 1, w.day))
+  base.setUTCDate(base.getUTCDate() + addDays)
+  return wallClockToUtc({
+    year: base.getUTCFullYear(),
+    month: base.getUTCMonth() + 1,
+    day: base.getUTCDate(),
+    hour: w.hour,
+    minute: w.minute,
+    second: w.second,
+  })
 }
 
 // Gera as ocorrências (start/end ISO) a partir do primeiro evento e da regra de
