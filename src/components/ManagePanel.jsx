@@ -11,6 +11,8 @@ import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
 import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
+import DateField from './DateField'
+import TimeField from './TimeField'
 import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
 import defaultLogoUrl from '../assets/cclx_line_logo.png'
@@ -1739,12 +1741,11 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   ))}
                 </select>
               )}
-              <input
-                type="date"
+              <DateField
                 className={styles.filterInput}
                 value={eventFilters.date}
-                onChange={(e) => setEventFilters((f) => ({ ...f, date: e.target.value }))}
-                title="Data"
+                onChange={(v) => setEventFilters((f) => ({ ...f, date: v }))}
+                ariaLabel="Data"
               />
               {(eventFilters.title || eventFilters.community !== 'Todas' || eventFilters.category !== 'Todas' || eventFilters.subcategory !== 'Todas' || eventFilters.privacyTag !== 'Todas' || eventFilters.status !== 'Todos' || eventFilters.date) && (
                 <button
@@ -3167,23 +3168,23 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             <div className={styles.row}>
               <label className={styles.label}>
                 Data de início *
-                <input
-                  type="date"
+                <DateField
                   className={styles.input}
                   value={form.startDate}
-                  onChange={setField('startDate')}
+                  onChange={(v) => setForm((f) => ({ ...f, startDate: v }))}
                   disabled={dateTimeLocked}
                   required
+                  ariaLabel="Data de início"
                 />
               </label>
               <label className={styles.label}>
                 Hora de início
-                <input
-                  type="time"
+                <TimeField
                   className={styles.input}
                   value={form.startTime}
-                  onChange={setField('startTime')}
+                  onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
                   disabled={form.allDay || dateTimeLocked}
+                  ariaLabel="Hora de início"
                 />
               </label>
             </div>
@@ -3191,22 +3192,22 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             <div className={styles.row}>
               <label className={styles.label}>
                 Data de fim
-                <input
-                  type="date"
+                <DateField
                   className={styles.input}
                   value={form.endDate}
-                  onChange={setField('endDate')}
+                  onChange={(v) => setForm((f) => ({ ...f, endDate: v }))}
                   disabled={dateTimeLocked}
+                  ariaLabel="Data de fim"
                 />
               </label>
               <label className={styles.label}>
                 Hora de fim
-                <input
-                  type="time"
+                <TimeField
                   className={styles.input}
                   value={form.endTime}
-                  onChange={setField('endTime')}
+                  onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
                   disabled={form.allDay || dateTimeLocked}
+                  ariaLabel="Hora de fim"
                 />
               </label>
             </div>
@@ -3625,13 +3626,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     {form.recEndType === 'date' && (
                       <label className={styles.label}>
                         Data de fim da recorrência (máx. 6 meses)
-                        <input
-                          type="date"
+                        <DateField
                           className={styles.input}
                           value={form.recEndDate}
                           min={form.startDate || undefined}
                           max={maxRecurrenceDate(form.startDate)}
-                          onChange={setField('recEndDate')}
+                          onChange={(v) => setForm((f) => ({ ...f, recEndDate: v }))}
+                          ariaLabel="Data de fim da recorrência"
                         />
                       </label>
                     )}

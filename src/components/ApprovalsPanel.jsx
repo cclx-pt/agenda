@@ -12,6 +12,7 @@ import { useSubcategories } from '../hooks/useSubcategories'
 import { usePrivacyTags } from '../hooks/usePrivacyTags'
 import * as eventsService from '../services/eventsService'
 import { CATEGORY_META, formatDateNumericValue, formatTimeRange } from '../utils/calendarHelpers'
+import DateField from './DateField'
 
 const STATUS_OPTIONS = [
   { value: 'pendente', label: 'Pendentes' },
@@ -619,11 +620,11 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
                       Início *
-                      <input type="date" className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={delForm.startDate} onChange={setDelField('startDate')} required />
+                      <DateField className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={delForm.startDate} onChange={(v) => setDelForm((f) => ({ ...f, startDate: v }))} required ariaLabel="Início" />
                     </label>
                     <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground">
                       Fim *
-                      <input type="date" className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={delForm.endDate} onChange={setDelField('endDate')} required />
+                      <DateField className="rounded-lg border border-input bg-background px-[11px] py-[9px] text-sm text-foreground" value={delForm.endDate} onChange={(v) => setDelForm((f) => ({ ...f, endDate: v }))} required ariaLabel="Fim" />
                     </label>
                   </div>
                 </div>
