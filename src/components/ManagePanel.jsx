@@ -1512,7 +1512,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   }
 
   const handleDelete = (evt) => {
-    if (!window.confirm(`Eliminar "${evt.title}"? Esta ação é irreversível.`)) return
+    // 1º: eventos recorrentes — escolher o âmbito (só esta ocorrência ou toda a série).
     let scope
     if (evt.seriesId) {
       scope = window.confirm(
@@ -1521,6 +1521,14 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ? 'series'
         : undefined
     }
+    // 2º: confirmação final da operação.
+    const confirmMsg =
+      scope === 'series'
+        ? `Eliminar TODA a série "${evt.title}"? Esta ação é irreversível.`
+        : evt.seriesId
+          ? `Eliminar apenas esta ocorrência de "${evt.title}"? Esta ação é irreversível.`
+          : `Eliminar "${evt.title}"? Esta ação é irreversível.`
+    if (!window.confirm(confirmMsg)) return
     runAction(
       () => eventsService.deleteEvent(evt.id, { scope }),
       scope === 'series' ? 'Série eliminada.' : 'Evento eliminado.'

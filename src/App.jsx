@@ -149,8 +149,7 @@ export default function App() {
   }
   const handleDeleteEvent = async (evt) => {
     if (!isSorEvent(evt)) return
-    if (!window.confirm(`Eliminar "${evt.title}"? Esta ação é irreversível.`)) return
-    // Eventos recorrentes: perguntar se elimina só esta ocorrência ou toda a série.
+    // 1º: eventos recorrentes — escolher o âmbito (só esta ocorrência ou toda a série).
     let scope
     if (evt.seriesId) {
       scope = window.confirm(
@@ -159,6 +158,14 @@ export default function App() {
         ? 'series'
         : undefined
     }
+    // 2º: confirmação final da operação.
+    const confirmMsg =
+      scope === 'series'
+        ? `Eliminar TODA a série "${evt.title}"? Esta ação é irreversível.`
+        : evt.seriesId
+          ? `Eliminar apenas esta ocorrência de "${evt.title}"? Esta ação é irreversível.`
+          : `Eliminar "${evt.title}"? Esta ação é irreversível.`
+    if (!window.confirm(confirmMsg)) return
     try {
       await eventsService.deleteEvent(evt.id, { scope })
       clearEventCache()
