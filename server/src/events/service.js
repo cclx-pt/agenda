@@ -106,9 +106,8 @@ export const eventInputSchema = z
     { message: 'A data de fim não pode ser anterior à de início.', path: ['endDatetime'] }
   )
 
-// Máximo de ocorrências geradas por série (limite de segurança, sobretudo para
-// recorrências "para sempre").
-const MAX_OCCURRENCES = 200
+// Máximo de ocorrências geradas por série (limite de segurança).
+const MAX_OCCURRENCES = 100
 // As recorrências não podem ultrapassar 6 meses a partir do início.
 const MAX_RECURRENCE_MONTHS = 6
 
@@ -119,7 +118,7 @@ export const recurrenceSchema = z
     interval: z.number().int().min(1).max(99).optional().default(1),
     end: z
       .object({
-        type: z.enum(['never', 'count', 'date']),
+        type: z.enum(['count', 'date']),
         count: z.number().int().min(1).max(MAX_OCCURRENCES).optional(),
         date: isoDate.optional(),
       })
@@ -571,6 +570,25 @@ async function markSubmitted(user, id) {
   return updated
 }
 
+// Auto-aprovação: admins e aprovadores publicam diretamente os eventos que
+// submetem (sem passar por "pendente"). Ignora a separação de funções por ser o
+// próprio a criar; o âmbito por igreja já foi validado em create().
+async function autoPublish(user, id) {
+  const updated = await repo.updateStatus(id, {
+    status: 'publicado',
+    rejectionReason: null,
+    touchPublished: true,
+  })
+  await repo.addHistory({
+    eventId: id,
+    actorId: user.sub,
+    fromStatus: 'rascunho',
+    toStatus: 'publicado',
+    comment: 'Aprovado automaticamente (criado por admin/aprovador)',
+  })
+  return updated
+}
+
 // ── Sobreposição de eventos ──────────────────────────────────────
 
 // Modo de sobreposição efetivo para um evento: categoria → igreja → omissão.
@@ -677,6 +695,9 @@ export async function create(user, input) {
     throw new EventError(403, 'Sem acesso a esta igreja.')
   }
   const submit = data.submit === true
+  // Admins e aprovadores auto-aprovam (publicam) os eventos que submetem, sem
+  // passar pela fila de aprovação. Rascunhos guardados continuam rascunhos.
+  const autoApprove = submit && ['admin', 'aprovador'].includes(user.role)
   const allowOverlap = input.allowOverlap === true
 
   // Evento único.
@@ -690,6 +711,7 @@ export async function create(user, input) {
       toStatus: 'rascunho',
       comment: 'Criado',
     })
+    if (autoApprove) return autoPublish(user, event.id)
     return submit ? markSubmitted(user, event.id) : event
   }
 
@@ -716,7 +738,11 @@ export async function create(user, input) {
       toStatus: 'rascunho',
       comment: 'Criado (série)',
     })
-    const created = submit ? await markSubmitted(user, event.id) : event
+    const created = autoApprove
+      ? await autoPublish(user, event.id)
+      : submit
+        ? await markSubmitted(user, event.id)
+        : event
     if (!first) first = created
   }
   return first

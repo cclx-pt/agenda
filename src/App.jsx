@@ -150,13 +150,22 @@ export default function App() {
   const handleDeleteEvent = async (evt) => {
     if (!isSorEvent(evt)) return
     if (!window.confirm(`Eliminar "${evt.title}"? Esta ação é irreversível.`)) return
+    // Eventos recorrentes: perguntar se elimina só esta ocorrência ou toda a série.
+    let scope
+    if (evt.seriesId) {
+      scope = window.confirm(
+        'Este evento faz parte de uma série recorrente. Eliminar TODA a série?\n\nOK = série inteira • Cancelar = apenas este evento'
+      )
+        ? 'series'
+        : undefined
+    }
     try {
-      await eventsService.deleteEvent(evt.id)
+      await eventsService.deleteEvent(evt.id, { scope })
       clearEventCache()
       setDetailEvent(null)
       await reload()
       refreshCategoriesInUse()
-      toast.success('Evento eliminado.')
+      toast.success(scope === 'series' ? 'Série eliminada.' : 'Evento eliminado.')
     } catch (err) {
       toast.error(err.message)
     }

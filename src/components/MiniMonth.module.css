@@ -1,0 +1,95 @@
+/* Mini-calendário mensal (usado nas vistas trimestral/semestral/anual).
+   Usa os tokens de tema atuais (--sc-*) para funcionar em modo claro e escuro. */
+
+.wrap {
+  border-radius: 0.25rem;
+  border: 1px solid hsl(var(--sc-border));
+  background: hsl(var(--sc-card));
+  padding: 0.75rem;
+}
+
+/* Tamanhos: controlam a altura mínima de cada dia. */
+.md { --mini-day-h: 32px; }
+.sm { --mini-day-h: 24px; }
+.xs { --mini-day-h: 18px; }
+
+.title {
+  margin-bottom: 0.5rem;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: hsl(var(--sc-foreground));
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+}
+
+.dow {
+  padding: 2px 0;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: hsl(var(--sc-muted-foreground));
+}
+
+.day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-height: var(--mini-day-h, 32px);
+  border: 1px solid hsl(var(--sc-border));
+  background: hsl(var(--sc-card));
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* Dias com eventos (clicáveis). */
+.hasEvts {
+  cursor: pointer;
+  background: hsl(var(--sc-primary) / 0.1);
+}
+.hasEvts:hover {
+  background: hsl(var(--sc-primary) / 0.2);
+}
+
+/* Dias fora do mês atual (preenchimento). */
+.other {
+  background: hsl(var(--sc-muted) / 0.4);
+  opacity: 0.35;
+}
+
+/* Dia de hoje — deve prevalecer sobre o realce de eventos, por isso vem depois. */
+.today {
+  border-color: hsl(var(--sc-primary));
+  background: hsl(var(--sc-primary));
+}
+
+.num {
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1;
+  color: hsl(var(--sc-muted-foreground));
+}
+.today .num {
+  font-weight: 700;
+  color: hsl(var(--sc-primary-foreground));
+}
+
+/* Barra indicadora de eventos (tamanhos md/sm). */
+.bar {
+  margin-top: 2px;
+  display: block;
+  height: 2px;
+  width: 60%;
+  border-radius: 2px;
+  background: hsl(var(--sc-primary));
+}

@@ -160,7 +160,7 @@ const emptyForm = {
   recurrenceType: 'unique', // 'unique' | 'recurrent'
   frequency: 'weekly', // 'daily' | 'weekly' | 'monthly'
   interval: 1,
-  recEndType: 'never', // 'never' | 'count' | 'date'
+  recEndType: 'count', // 'count' | 'date'
   recEndCount: '',
   recEndDate: '',
 }
@@ -313,7 +313,7 @@ function eventToForm(evt) {
     recurrenceType: 'unique',
     frequency: 'weekly',
     interval: 1,
-    recEndType: 'never',
+    recEndType: 'count',
     recEndCount: '',
     recEndDate: '',
   }
@@ -1394,11 +1394,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     // Recorrência só na criação de um novo evento recorrente.
     if (!editingId && form.recurrenceType === 'recurrent') {
       const end =
-        form.recEndType === 'count'
-          ? { type: 'count', count: Number(form.recEndCount) }
-          : form.recEndType === 'date'
-            ? { type: 'date', date: form.recEndDate }
-            : { type: 'never' }
+        form.recEndType === 'date'
+          ? { type: 'date', date: form.recEndDate }
+          : { type: 'count', count: Number(form.recEndCount) }
       payload.recurrence = {
         frequency: form.frequency,
         interval: Number(form.interval) || 1,
@@ -1433,8 +1431,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     if (!editingId && form.recurrenceType === 'recurrent') {
       if (form.recEndType === 'count') {
         const n = Number(form.recEndCount)
-        if (!Number.isInteger(n) || n < 1) {
-          toast.error('Indique um número de ocorrências válido.')
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+          toast.error('Indique um número de ocorrências válido (1 a 100).')
           return
         }
       }
@@ -3627,7 +3625,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                           value={form.recEndType}
                           onChange={setField('recEndType')}
                         >
-                          <option value="never">{t('recNever')}</option>
                           <option value="count">{t('recAfterN')}</option>
                           <option value="date">{t('recOnDate')}</option>
                         </select>
@@ -3640,7 +3637,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                         <input
                           type="number"
                           min="1"
-                          max="200"
+                          max="100"
                           className={styles.input}
                           value={form.recEndCount}
                           onChange={setField('recEndCount')}
