@@ -63,10 +63,10 @@ export default function MapPicker({ value, onChange, address }) {
     else markerRef.current = L.marker([lat, lng]).addTo(mapObj.current)
   }
 
-  function commit(lat, lng, recenter = false) {
+  function commit(lat, lng, recenter = false, addressText = null) {
     placeMarker(lat, lng)
     if (recenter && mapObj.current) mapObj.current.setView([lat, lng], 16)
-    onChange({ lat, lng, url: googleMapsUrl(lat, lng) })
+    onChange({ lat, lng, url: googleMapsUrl(lat, lng), address: addressText })
   }
 
   async function runSearch(term) {
@@ -91,7 +91,7 @@ export default function MapPicker({ value, onChange, address }) {
   function choose(r) {
     setQuery(r.display_name)
     setResults([])
-    commit(Number(r.lat), Number(r.lon), true)
+    commit(Number(r.lat), Number(r.lon), true, r.display_name)
   }
 
   function clear() {

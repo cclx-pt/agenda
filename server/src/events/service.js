@@ -44,6 +44,8 @@ export const eventInputSchema = z
     featured: z.boolean().optional(),
     loop: z.boolean().optional(),
     isGeneral: z.boolean().optional(),
+    // Evento "antecipado": incluído no Loop mesmo fora da janela de semanas.
+    loopEarly: z.boolean().optional(),
     isPrivate: z.boolean().optional(),
     // Aceita URL absoluto (http/https, ex.: banners da inChurch) ou caminho
     // relativo de upload servido pelo backend (ex.: /data/uploads/abc.png).
@@ -919,6 +921,7 @@ function eventToInsertData(event) {
     featured: event.featured ?? false,
     loop: event.loop ?? false,
     isGeneral: event.isGeneral ?? false,
+    loopEarly: event.loopEarly ?? false,
     isPrivate: event.isPrivate ?? false,
     privacyTag: event.privacyTag ?? null,
     bannerUrl: event.bannerUrl ?? null,
