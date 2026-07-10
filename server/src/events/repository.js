@@ -57,6 +57,7 @@ function mapRow(row) {
     featured: !!row.featured,
     loop: !!row.loop,
     isGeneral: !!row.is_general,
+    loopEarly: !!row.loop_early,
     status: row.status,
     isPrivate: !!row.is_private,
     privacyTag: row.privacy_tag ?? null,
@@ -201,7 +202,9 @@ export async function listForLoop({ church, includeGeneral = true, from, to } = 
   }
   if (to) {
     params.push(to)
-    where.push(`start_datetime < ($${params.length}::date + INTERVAL '1 day')`)
+    // Eventos "antecipados" (loop_early) aparecem no Loop mesmo além da janela
+    // de semanas configurada; os restantes só dentro do intervalo.
+    where.push(`(start_datetime < ($${params.length}::date + INTERVAL '1 day') OR loop_early = TRUE)`)
   }
   params.push(church)
   where.push(
@@ -225,8 +228,8 @@ export async function insert(data, actorId) {
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
        series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop, is_general,
-       loop_image_16x9, loop_image_32x9)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
+       loop_image_16x9, loop_image_32x9, loop_early)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
     [
       id,
       data.title,
@@ -258,6 +261,7 @@ export async function insert(data, actorId) {
       data.isGeneral ?? false,
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
+      data.loopEarly ?? false,
     ]
   )
   return findById(id)
@@ -293,6 +297,7 @@ export async function update(id, data) {
        is_general = $26,
        loop_image_16x9 = $27,
        loop_image_32x9 = $28,
+       loop_early = $29,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -324,6 +329,7 @@ export async function update(id, data) {
       data.isGeneral ?? false,
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
+      data.loopEarly ?? false,
     ]
   )
   return findById(id)
@@ -384,8 +390,9 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        is_general = $24,
        loop_image_16x9 = $25,
        loop_image_32x9 = $26,
+       loop_early = $27,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $27`,
+     WHERE series_id = $1 AND id <> $28`,
     [
       seriesId,
       data.title,
@@ -413,6 +420,7 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.isGeneral ?? false,
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
+      data.loopEarly ?? false,
       exceptId,
     ]
   )

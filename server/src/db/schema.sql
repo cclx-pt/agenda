@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS events (
   featured         BOOLEAN NOT NULL DEFAULT FALSE,
   loop             BOOLEAN NOT NULL DEFAULT FALSE,
   is_general       BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Evento "antecipado": aparece no Loop mesmo fora da janela de semanas.
+  loop_early       BOOLEAN NOT NULL DEFAULT FALSE,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'pendente', 'publicado', 'rejeitado')),
   is_private       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -106,6 +108,8 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS loop BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS is_general BOOLEAN NOT NULL DEFAULT FALSE;
+-- Evento "antecipado" no Loop (idempotente para BD existentes).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS loop_early BOOLEAN NOT NULL DEFAULT FALSE;
 -- Cartazes dedicados ao Loop (TV) por formato (idempotente para BD existentes).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS loop_image_16x9 TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS loop_image_32x9 TEXT;

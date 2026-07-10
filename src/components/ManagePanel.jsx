@@ -140,6 +140,7 @@ const emptyForm = {
   featured: false,
   loop: false,
   isGeneral: false,
+  loopEarly: false,
   isPrivate: false,
   privacyTag: '',
   bannerUrl: '',
@@ -149,6 +150,7 @@ const emptyForm = {
   organizerPhone: '',
   organizerEmail: '',
   registrationUrl: '',
+  registrationType: 'link',
   attachmentUrl: '',
   attachmentName: '',
   mapUrl: '',
@@ -295,6 +297,7 @@ function eventToForm(evt) {
     featured: !!evt.featured,
     loop: !!evt.loop,
     isGeneral: !!evt.isGeneral,
+    loopEarly: !!evt.loopEarly,
     isPrivate: !!evt.isPrivate,
     privacyTag: evt.privacyTag ?? '',
     bannerUrl: evt.bannerUrl ?? '',
@@ -304,6 +307,7 @@ function eventToForm(evt) {
     organizerPhone: evt.organizerPhone ?? '',
     organizerEmail: evt.organizerEmail ?? '',
     registrationUrl: evt.registrationUrl ?? '',
+    registrationType: 'link',
     attachmentUrl: evt.attachmentUrl ?? '',
     attachmentName: evt.attachmentName ?? '',
     mapUrl: evt.mapUrl ?? '',
@@ -1408,6 +1412,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       featured: form.featured === true,
       loop: form.loop === true,
       isGeneral: form.isGeneral === true,
+      loopEarly: form.loopEarly === true,
       isPrivate: form.isPrivate,
       // Etiqueta só se aplica a eventos privados.
       privacyTag: form.isPrivate ? form.privacyTag || null : null,
@@ -1461,7 +1466,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     }
     // Etiqueta de privacidade obrigatória quando o evento é privado.
     if (form.isPrivate && !form.privacyTag) {
-      setActiveTab('opcoes')
+      setActiveTab('datetime')
       toast.error('Selecione uma etiqueta de privacidade para o evento privado.')
       return
     }
@@ -1470,26 +1475,26 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       if (form.recEndType === 'count') {
         const n = Number(form.recEndCount)
         if (!Number.isInteger(n) || n < 1 || n > 100) {
-          setActiveTab('opcoes')
+          setActiveTab('datetime')
           toast.error('Indique um número de ocorrências válido (1 a 100).')
           return
         }
       }
       if (form.recEndType === 'date') {
         if (!form.recEndDate) {
-          setActiveTab('opcoes')
+          setActiveTab('datetime')
           toast.error('Indique a data de fim da recorrência.')
           return
         }
         if (new Date(form.recEndDate) < new Date(form.startDate)) {
-          setActiveTab('opcoes')
+          setActiveTab('datetime')
           toast.error('A data de fim da recorrência não pode ser anterior ao início.')
           return
         }
         const maxRec = new Date(form.startDate)
         maxRec.setMonth(maxRec.getMonth() + 6)
         if (new Date(form.recEndDate) > maxRec) {
-          setActiveTab('opcoes')
+          setActiveTab('datetime')
           toast.error('As recorrências não podem exceder 6 meses a partir do início.')
           return
         }
@@ -3188,9 +3193,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 <TabsTrigger value="detalhes" className="gap-1.5"><i className="ti ti-file-text" aria-hidden="true" />{t('tabDetails')}</TabsTrigger>
                 <TabsTrigger value="datetime" className="gap-1.5"><i className="ti ti-calendar" aria-hidden="true" />{t('tabDateTime')}</TabsTrigger>
                 <TabsTrigger value="classificacao" className="gap-1.5"><i className="ti ti-tags" aria-hidden="true" />{t('tabClassification')}</TabsTrigger>
+                <TabsTrigger value="loop" className="gap-1.5"><i className="ti ti-device-tv" aria-hidden="true" />{t('tabLoop')}</TabsTrigger>
                 <TabsTrigger value="local" className="gap-1.5"><i className="ti ti-map-pin" aria-hidden="true" />{t('tabLocation')}</TabsTrigger>
                 <TabsTrigger value="organizacao" className="gap-1.5"><i className="ti ti-user" aria-hidden="true" />{t('tabOrganization')}</TabsTrigger>
-                <TabsTrigger value="opcoes" className="gap-1.5"><i className="ti ti-settings" aria-hidden="true" />{t('tabOptions')}</TabsTrigger>
+                <TabsTrigger value="registration" className="gap-1.5"><i className="ti ti-ticket" aria-hidden="true" />{t('tabRegistration')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="detalhes" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
@@ -3322,61 +3328,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </label>
               </TabsContent>
 
-              <TabsContent value="datetime" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
-            {dateTimeLocked && (
-              <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                {t('dateTimeLockedHint')}
-              </p>
-            )}
-
-            <div className={styles.row}>
-              <label className={styles.label}>
-                {t('startDate')} *
-                <DateField
-                  className={styles.input}
-                  value={form.startDate}
-                  onChange={(v) => setForm((f) => ({ ...f, startDate: v }))}
-                  disabled={dateTimeLocked}
-                  required
-                  ariaLabel={t('startDate')}
-                />
-              </label>
-              <label className={styles.label}>
-                {t('startTime')}
-                <TimeField
-                  className={styles.input}
-                  value={form.startTime}
-                  onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
-                  disabled={form.allDay || dateTimeLocked}
-                  ariaLabel={t('startTime')}
-                />
-              </label>
-            </div>
-
-            <div className={styles.row}>
-              <label className={styles.label}>
-                {t('endDate')}
-                <DateField
-                  className={styles.input}
-                  value={form.endDate}
-                  onChange={(v) => setForm((f) => ({ ...f, endDate: v }))}
-                  disabled={dateTimeLocked}
-                  ariaLabel={t('endDate')}
-                />
-              </label>
-              <label className={styles.label}>
-                {t('endTime')}
-                <TimeField
-                  className={styles.input}
-                  value={form.endTime}
-                  onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
-                  disabled={form.allDay || dateTimeLocked}
-                  ariaLabel={t('endTime')}
-                />
-              </label>
-            </div>
-              </TabsContent>
-
               <TabsContent value="classificacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <div className={styles.row}>
               <label className={styles.label}>
@@ -3431,19 +3382,25 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 </label>
               </div>
             )}
+              </TabsContent>
 
+              <TabsContent value="loop" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <div className={styles.row}>
+              <label className={`${styles.check} ${styles.checkInline}`} title={t('loopHint')}>
+                <input type="checkbox" checked={form.loop} onChange={setField('loop')} />
+                <i className="ti ti-device-tv" aria-hidden="true" /> {t('loopField')}
+              </label>
               <label className={`${styles.check} ${styles.checkInline}`} title={t('featuredHint')}>
                 <input type="checkbox" checked={form.featured} onChange={setField('featured')} />
                 <i className="ti ti-star-filled text-amber-500" aria-hidden="true" /> {t('featured')}
               </label>
-              <label className={`${styles.check} ${styles.checkInline}`} title={t('loopHint')}>
-                <input type="checkbox" checked={form.loop} onChange={setField('loop')} />
-                <i className="ti ti-repeat" aria-hidden="true" /> {t('loopField')}
-              </label>
               <label className={`${styles.check} ${styles.checkInline}`} title={t('generalHint')}>
                 <input type="checkbox" checked={form.isGeneral} onChange={setField('isGeneral')} />
                 <i className="ti ti-broadcast" aria-hidden="true" /> {t('generalField')}
+              </label>
+              <label className={`${styles.check} ${styles.checkInline}`} title={t('loopEarlyHint')}>
+                <input type="checkbox" checked={form.loopEarly} onChange={setField('loopEarly')} disabled={!form.loop} />
+                <i className="ti ti-clock-up" aria-hidden="true" /> {t('loopEarly')}
               </label>
             </div>
 
@@ -3578,47 +3535,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </div>
             )}
 
-            {overlapInfo.conflicts.length > 0 && (
-              <div
-                className={`rounded-lg border p-3 text-sm ${
-                  overlapInfo.mode === 'block'
-                    ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
-                    : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300'
-                }`}
-              >
-                <p className="m-0 font-bold">
-                  {overlapInfo.mode === 'block' ? t('overlapConflictBlocked') : t('overlapConflict')}
-                </p>
-                <ul className="mb-0 mt-1.5 list-disc pl-5">
-                  {overlapInfo.conflicts.map((c) => (
-                    <li key={c.id}>
-                      {c.title || t('privateEventShort')} — {c.community} · {c.date}
-                      {c.timeStart ? ` · ${c.timeStart}` : ''}
-                    </li>
-                  ))}
-                </ul>
-                {overlapInfo.mode !== 'block' || isAdmin ? (
-                  <label className="mt-2.5 flex cursor-pointer items-center gap-2 font-semibold">
-                    <input type="checkbox" checked={form.allowOverlap} onChange={setField('allowOverlap')} />
-                    {t('allowOverlapAnyway')}
-                  </label>
-                ) : (
-                  <p className="mb-0 mt-2 text-xs">{t('overlapBlockedAdmin')}</p>
-                )}
-              </div>
-            )}
               </TabsContent>
 
               <TabsContent value="local" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
-            <label className={styles.label}>
-              {t('address')}
-              <input
-                className={styles.input}
-                value={form.location}
-                onChange={setField('location')}
-              />
-            </label>
-
             <label className={styles.label}>
               {t('mapLocation')}
               <MapPicker
@@ -3634,10 +3553,16 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     mapLat: next?.lat ?? null,
                     mapLng: next?.lng ?? null,
                     mapUrl: next?.url ?? '',
+                    location: next ? (next.address ?? f.location) : '',
                   }))
                 }
               />
             </label>
+            {form.location && (
+              <p className={styles.fieldHint}>
+                <i className="ti ti-map-pin" aria-hidden="true" /> {t('address')}: {form.location}
+              </p>
+            )}
               </TabsContent>
 
               <TabsContent value="organizacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
@@ -3674,19 +3599,120 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </label>
             </div>
 
-            <label className={styles.label}>
-              {t('registrationLink')}
-              <input
-                className={styles.input}
-                type="url"
-                value={form.registrationUrl}
-                onChange={setField('registrationUrl')}
-                placeholder="https://…"
-              />
-            </label>
               </TabsContent>
 
-              <TabsContent value="opcoes" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
+              <TabsContent value="registration" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
+            <label className={styles.label}>
+              {t('registrationType')}
+              <select
+                className={styles.input}
+                value={form.registrationType}
+                onChange={setField('registrationType')}
+              >
+                <option value="link">{t('registrationTypeLink')}</option>
+                <option value="internal">{t('registrationTypeInternal')}</option>
+              </select>
+            </label>
+            {form.registrationType === 'link' ? (
+              <label className={styles.label}>
+                {t('registrationLink')}
+                <input
+                  className={styles.input}
+                  type="url"
+                  value={form.registrationUrl}
+                  onChange={setField('registrationUrl')}
+                  placeholder="https://…"
+                />
+              </label>
+            ) : (
+              <p className={styles.fieldHint}>{t('registrationInternalSoon')}</p>
+            )}
+              </TabsContent>
+
+              <TabsContent value="datetime" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
+            {dateTimeLocked && (
+              <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                {t('dateTimeLockedHint')}
+              </p>
+            )}
+
+            <div className={styles.row}>
+              <label className={styles.label}>
+                {t('startDate')} *
+                <DateField
+                  className={styles.input}
+                  value={form.startDate}
+                  onChange={(v) => setForm((f) => ({ ...f, startDate: v }))}
+                  disabled={dateTimeLocked}
+                  required
+                  ariaLabel={t('startDate')}
+                />
+              </label>
+              <label className={styles.label}>
+                {t('startTime')}
+                <TimeField
+                  className={styles.input}
+                  value={form.startTime}
+                  onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
+                  disabled={form.allDay || dateTimeLocked}
+                  ariaLabel={t('startTime')}
+                />
+              </label>
+            </div>
+
+            <div className={styles.row}>
+              <label className={styles.label}>
+                {t('endDate')}
+                <DateField
+                  className={styles.input}
+                  value={form.endDate}
+                  onChange={(v) => setForm((f) => ({ ...f, endDate: v }))}
+                  disabled={dateTimeLocked}
+                  ariaLabel={t('endDate')}
+                />
+              </label>
+              <label className={styles.label}>
+                {t('endTime')}
+                <TimeField
+                  className={styles.input}
+                  value={form.endTime}
+                  onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
+                  disabled={form.allDay || dateTimeLocked}
+                  ariaLabel={t('endTime')}
+                />
+              </label>
+            </div>
+
+            {overlapInfo.conflicts.length > 0 && (
+              <div
+                className={`rounded-lg border p-3 text-sm ${
+                  overlapInfo.mode === 'block'
+                    ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
+                    : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300'
+                }`}
+              >
+                <p className="m-0 font-bold">
+                  {overlapInfo.mode === 'block' ? t('overlapConflictBlocked') : t('overlapConflict')}
+                </p>
+                <ul className="mb-0 mt-1.5 list-disc pl-5">
+                  {overlapInfo.conflicts.map((c) => (
+                    <li key={c.id}>
+                      {c.title || t('privateEventShort')} — {c.community} · {c.date}
+                      {c.timeStart ? ` · ${c.timeStart}` : ''}
+                    </li>
+                  ))}
+                </ul>
+                {overlapInfo.mode !== 'block' || isAdmin ? (
+                  <label className="mt-2.5 flex cursor-pointer items-center gap-2 font-semibold">
+                    <input type="checkbox" checked={form.allowOverlap} onChange={setField('allowOverlap')} />
+                    {t('allowOverlapAnyway')}
+                  </label>
+                ) : (
+                  <p className="mb-0 mt-2 text-xs">{t('overlapBlockedAdmin')}</p>
+                )}
+              </div>
+            )}
+
             <div className={styles.checks}>
               <label className={styles.check}>
                 <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} disabled={dateTimeLocked} />
