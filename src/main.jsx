@@ -7,6 +7,7 @@ import App from './App.jsx'
 import LogsPage from './components/LogsPage'
 import ApprovalActionPage from './components/ApprovalActionPage'
 import LoopPage from './components/LoopPage'
+import InvitePage from './components/invite/InvitePage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -27,6 +28,8 @@ const isLogsRoute = routePath === '/logs'
 const isActionRoute = routePath === '/acao'
 const isLoopRoute = routePath.startsWith('/loop/')
 const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
+const isInviteRoute = routePath.startsWith('/invite/')
+const inviteSlug = isInviteRoute ? decodeURIComponent(routePath.slice('/invite/'.length)) : null
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -36,6 +39,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       ) : isLoopRoute ? (
         <I18nProvider>
           <LoopPage church={loopChurch} />
+        </I18nProvider>
+      ) : isInviteRoute ? (
+        <I18nProvider>
+          <InvitePage slug={inviteSlug} />
         </I18nProvider>
       ) : isLogsRoute ? (
         <LogsPage />

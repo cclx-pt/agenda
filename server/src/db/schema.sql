@@ -339,6 +339,90 @@ CREATE TABLE IF NOT EXISTS server_restarts (
 CREATE INDEX IF NOT EXISTS idx_server_restarts_created
   ON server_restarts (created_at DESC);
 
+-- ── Convites / páginas públicas de convite ──────────────────────
+-- Um convite gera uma página pública (landing) partilhável, composta por blocos
+-- de conteúdo reordenáveis. RSVP e pagamento ligam-se a este convite. Pode estar
+-- associado a um evento existente (event_id) ou ser autónomo.
+CREATE TABLE IF NOT EXISTS invites (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id         UUID REFERENCES events (id) ON DELETE SET NULL,
+  slug             TEXT NOT NULL UNIQUE,
+  title            TEXT NOT NULL,
+  banner_url       TEXT,
+  color_theme      TEXT,
+  start_datetime   TIMESTAMPTZ,
+  end_datetime     TIMESTAMPTZ,
+  location         TEXT,
+  -- Open Graph (fallback ao título/banner/descrição quando não definidos).
+  meta_title       TEXT,
+  meta_description  TEXT,
+  meta_image_url   TEXT,
+  -- Custo/pagamento (apenas descreve a configuração; o fluxo de pagamento é à parte).
+  cost_type        TEXT NOT NULL DEFAULT 'gratuito'
+                     CHECK (cost_type IN ('gratuito', 'pago', 'voluntario')),
+  cost_amount      NUMERIC(10, 2),
+  cost_currency    TEXT NOT NULL DEFAULT 'EUR',
+  payment_methods  JSONB,
+  -- RSVP.
+  rsvp_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+  rsvp_deadline    TIMESTAMPTZ,
+  capacity         INTEGER,
+  community        TEXT,
+  status           TEXT NOT NULL DEFAULT 'rascunho'
+                     CHECK (status IN ('rascunho', 'publicado', 'fechado')),
+  published_at     TIMESTAMPTZ,
+  created_by       UUID REFERENCES users (id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invites_event ON invites (event_id);
+CREATE INDEX IF NOT EXISTS idx_invites_status ON invites (status);
+
+-- Blocos de conteúdo ordenados que compõem o corpo da página (banner, agenda,
+-- oradores, info_extra, etc.). `content` é JSONB com a forma própria de cada tipo.
+CREATE TABLE IF NOT EXISTS invite_blocks (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id    UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  type         TEXT NOT NULL,
+  ordering     INTEGER NOT NULL DEFAULT 0,
+  content      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  visible      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_blocks_invite ON invite_blocks (invite_id, ordering);
+
+-- Convidados/RSVP. Cada convidado tem um token único (link pessoal) que permite
+-- consultar o estado sem sessão. payment_state é o estado do pagamento do convidado.
+CREATE TABLE IF NOT EXISTS invite_guests (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id     UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  token         TEXT NOT NULL UNIQUE,
+  name          TEXT,
+  email         TEXT,
+  phone         TEXT,
+  guests_count  INTEGER NOT NULL DEFAULT 1,
+  rsvp_state    TEXT NOT NULL DEFAULT 'pending'
+                  CHECK (rsvp_state IN ('pending', 'confirmed', 'declined', 'waitlisted')),
+  payment_state TEXT NOT NULL DEFAULT 'not_applicable'
+                  CHECK (payment_state IN ('not_applicable', 'pending', 'awaiting_validation', 'paid', 'expired')),
+  extra         JSONB,
+  responded_at  TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_guests_invite ON invite_guests (invite_id);
+
+-- Visualizações da página (métricas simples; fire-and-forget no pedido público).
+CREATE TABLE IF NOT EXISTS invite_page_views (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  viewed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  referer     TEXT,
+  user_agent  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_invite_page_views_invite ON invite_page_views (invite_id);
+
 -- ════════════════════════════════════════════════════════════════
 -- Inscrições & convites (páginas públicas de convite)
 -- ════════════════════════════════════════════════════════════════

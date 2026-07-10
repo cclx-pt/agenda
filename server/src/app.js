@@ -22,6 +22,7 @@ import { delegationsRouter } from './delegations/routes.js'
 import { uploadsRouter } from './uploads/routes.js'
 import { approvalActionRouter } from './approvals/routes.js'
 import { approverScopesRouter } from './approverScopes/routes.js'
+import { invitesRouter, publicInvitesRouter } from './invites/routes.js'
 import { healthRouter } from './health/routes.js'
 
 /**
@@ -72,6 +73,9 @@ app.use('/data/subcategories', subcategoriesRouter)
 app.use('/data/privacy-tags', privacyTagsRouter)
 app.use('/data/delegations', delegationsRouter)
 app.use('/data/approver-scopes', approverScopesRouter)
+// Convites: gestão (autenticada) + página pública por slug (sem sessão).
+app.use('/data/invites', invitesRouter)
+app.use('/data/public/invite', publicInvitesRouter)
 // Imagens de eventos: carregadas (POST) para o Supabase Storage, que serve os
 // URLs públicos diretamente — já não há ficheiros locais a servir.
 app.use('/data/uploads', uploadsRouter)
