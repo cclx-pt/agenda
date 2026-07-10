@@ -50,9 +50,14 @@ function safePayment(payment, instructions) {
   }
 }
 
-// Valor a cobrar segundo a configuração do convite.
-function chargeAmount(invite) {
+// Valor a cobrar: do bilhete escolhido pelo convidado (se houver) ou do custo do
+// convite. Para eventos pagos com bilhetes, o preço vem sempre do bilhete.
+async function chargeAmount(invite, guest) {
   if (invite.costType === 'gratuito') return null
+  if (guest?.ticketId) {
+    const ticket = await invitesRepo.findTicketById(guest.ticketId)
+    if (ticket?.price != null) return Number(ticket.price)
+  }
   return invite.costAmount ?? null
 }
 
@@ -72,7 +77,7 @@ export async function initiate(slug, guestToken, input) {
   if (!connector.supportedMethods.includes(method)) {
     throw new InviteError(409, 'Método de pagamento indisponível de momento.')
   }
-  const amount = chargeAmount(invite)
+  const amount = await chargeAmount(invite, guest)
   const currency = invite.costCurrency || 'EUR'
 
   // Cria o registo (pending) e pede a cobrança ao conector.
@@ -119,7 +124,7 @@ export async function attachReceipt(slug, guestToken, receiptUrl) {
       inviteId: invite.id,
       guestId: guest.id,
       method: 'transferencia',
-      amount: chargeAmount(invite),
+      amount: await chargeAmount(invite, guest),
       currency: invite.costCurrency || 'EUR',
       status: 'pending',
       provider: getConnector(invite.paymentProvider || DEFAULT_PROVIDER).name,

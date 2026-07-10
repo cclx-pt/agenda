@@ -59,6 +59,15 @@ invitesRouter.get(
   })
 )
 
+// Eventos publicados/futuros associáveis a um convite (registado ANTES de /:id).
+invitesRouter.get(
+  '/selectable-events',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ events: await service.listSelectableEvents(req.user) })
+  })
+)
+
 invitesRouter.post(
   '/',
   manageRoles,
@@ -120,6 +129,23 @@ invitesRouter.get(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ guests: await service.listGuests(req.user, req.params.id) })
+  })
+)
+
+// ── Bilhetes (organizador) ──────────────────────────────
+invitesRouter.get(
+  '/:id/tickets',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ tickets: await service.listTickets(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.put(
+  '/:id/tickets',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ tickets: await service.saveTickets(req.user, req.params.id, req.body) })
   })
 )
 

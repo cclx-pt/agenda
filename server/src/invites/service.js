@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { randomBytes, randomUUID } from 'node:crypto'
 import * as repo from './repository.js'
+import * as eventsRepo from '../events/repository.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -102,11 +103,32 @@ const inviteInputSchema = z.object({
   costAmount: z.number().min(0).max(1000000).optional().nullable(),
   costCurrency: z.string().trim().max(8).optional(),
   paymentMethods: z.array(z.enum(PAYMENT_METHODS)).optional().nullable(),
+  // Método de pagamento ÚNICO (substitui a lista). Mantemos payment_methods
+  // sincronizado internamente para o conector.
+  paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
   rsvpEnabled: z.boolean().optional(),
+  // Datas de INSCRIÇÃO (janela): abertura e fecho. As datas do EVENTO são
+  // start/endDatetime (herdadas do evento associado ou manuais).
+  rsvpStartDatetime: isoDate,
   rsvpDeadline: isoDate,
+  useEventBanner: z.boolean().optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
   community: z.string().trim().max(120).optional().nullable(),
 })
+
+// Bilhete (tipo) de um convite pago.
+const ticketSchema = z.object({
+  id: z.string().uuid().optional().nullable(),
+  name: z.string().trim().min(1, 'Indique o nome do bilhete.').max(120),
+  kind: z.enum(['individual', 'grupo', 'campanha']).optional().default('individual'),
+  price: z.number().min(0).max(1000000).optional().nullable(),
+  currency: z.string().trim().max(8).optional(),
+  capacity: z.number().int().min(1).max(1000000).optional().nullable(),
+  groupSize: z.number().int().min(1).max(1000).optional().nullable(),
+  description: z.string().trim().max(500).optional().nullable(),
+  active: z.boolean().optional().default(true),
+})
+const ticketsSchema = z.array(ticketSchema).max(50)
 
 const blockSchema = z.object({
   type: z.enum(BLOCK_TYPES),
@@ -121,8 +143,33 @@ const rsvpSchema = z.object({
   phone: z.string().trim().max(50).optional().nullable(),
   guestsCount: z.number().int().min(1).max(50).optional().default(1),
   attend: z.boolean().optional().default(true),
+  ticketId: z.string().uuid().optional().nullable(),
   extra: z.record(z.any()).optional().nullable(),
 })
+
+// ── Auxiliares de evento associado e pagamento ───────────────────
+
+// Valida que o evento associado existe (se indicado). A herança de título/datas
+// é feita no frontend; a origem do banner resolve-se na leitura (resolveInviteBanner).
+async function assertEventOk(eventId) {
+  if (!eventId) return
+  const ev = await eventsRepo.findById(eventId)
+  if (!ev) throw new InviteError(400, 'Evento associado não encontrado.')
+}
+
+// Método único → mantém payment_methods coerente (lista de 1) para o conector/payload.
+function normalizePayment(data) {
+  data.paymentMethods = data.paymentMethod ? [data.paymentMethod] : null
+}
+
+// Banner efetivo: o do evento associado (se "usar imagem do evento") ou o próprio.
+async function resolveInviteBanner(invite) {
+  if (invite.useEventBanner && invite.eventId) {
+    const ev = await eventsRepo.findById(invite.eventId).catch(() => null)
+    if (ev?.bannerUrl) return ev.bannerUrl
+  }
+  return invite.bannerUrl
+}
 
 // ── Escrita (organizador) ────────────────────────────────────────
 
@@ -132,6 +179,8 @@ export async function create(user, input) {
   if (!canAccessChurch(user, data.community)) {
     throw new InviteError(403, 'Sem acesso a esta igreja.')
   }
+  await assertEventOk(data.eventId)
+  normalizePayment(data)
   data.slug = await generateUniqueSlug(data.title)
   const invite = await repo.insert(data, user.sub)
   // Semeia um bloco banner mínimo para a página não nascer vazia.
@@ -163,8 +212,26 @@ export async function getForEditor(user, id) {
   if (!canAccessChurch(user, invite.community)) {
     throw new InviteError(403, 'Sem acesso a este convite.')
   }
-  const [blocks, views] = await Promise.all([repo.listBlocks(id), repo.countViews(id)])
-  return { ...invite, blocks, views }
+  const [blocks, views, tickets] = await Promise.all([
+    repo.listBlocks(id),
+    repo.countViews(id),
+    repo.listTicketsWithSold(id),
+  ])
+  let event = null
+  if (invite.eventId) {
+    const ev = await eventsRepo.findById(invite.eventId).catch(() => null)
+    if (ev) {
+      event = {
+        id: ev.id,
+        title: ev.title,
+        bannerUrl: ev.bannerUrl ?? null,
+        startDatetime: ev.startDatetime,
+        endDatetime: ev.endDatetime,
+        location: ev.location ?? null,
+      }
+    }
+  }
+  return { ...invite, blocks, views, tickets, event }
 }
 
 export async function update(user, id, input) {
@@ -178,6 +245,8 @@ export async function update(user, id, input) {
   if (!canAccessChurch(user, data.community)) {
     throw new InviteError(403, 'Sem acesso a esta igreja.')
   }
+  await assertEventOk(data.eventId)
+  normalizePayment(data)
   await repo.update(id, data)
   return getForEditor(user, id)
 }
@@ -246,16 +315,17 @@ export async function getPreview(user, id) {
     throw new InviteError(403, 'Sem acesso a este convite.')
   }
   const blocks = await repo.listBlocks(id)
-  return renderPayload(invite, blocks, null, { preview: true })
+  const [tickets, bannerUrl] = await Promise.all([repo.listTicketsWithSold(id), resolveInviteBanner(invite)])
+  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets })
 }
 
 // ── Leitura pública ──────────────────────────────────────────────
 
-function buildMeta(invite) {
+function buildMeta(invite, bannerUrl) {
   return {
     title: invite.metaTitle || invite.title,
     description: invite.metaDescription || null,
-    image: invite.metaImageUrl || invite.bannerUrl || null,
+    image: invite.metaImageUrl || bannerUrl || null,
   }
 }
 
@@ -288,27 +358,44 @@ function guestStatusPayload(guest) {
   }
 }
 
-function renderPayload(invite, blocks, guest, { preview = false } = {}) {
+function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = null, tickets = [] } = {}) {
+  const banner = bannerUrl ?? invite.bannerUrl
   return {
     slug: invite.slug,
     status: invite.status,
     preview,
     invite: {
       title: invite.title,
-      bannerUrl: invite.bannerUrl,
+      bannerUrl: banner,
       colorTheme: invite.colorTheme,
+      // Datas do EVENTO.
       startDatetime: invite.startDatetime,
       endDatetime: invite.endDatetime,
       location: invite.location,
       costType: invite.costType,
       costAmount: invite.costAmount,
       costCurrency: invite.costCurrency,
-      paymentMethods: invite.paymentMethods,
+      paymentMethod: invite.paymentMethod,
       rsvpEnabled: invite.rsvpEnabled,
+      // Datas de INSCRIÇÃO (janela).
+      rsvpStartDatetime: invite.rsvpStartDatetime,
       rsvpDeadline: invite.rsvpDeadline,
       capacity: invite.capacity,
     },
-    meta: buildMeta(invite),
+    meta: buildMeta(invite, banner),
+    // Bilhetes ativos (só relevante para eventos pagos).
+    tickets: (tickets || [])
+      .filter((t) => t.active)
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        kind: t.kind,
+        price: t.price,
+        currency: t.currency,
+        groupSize: t.groupSize,
+        description: t.description,
+        soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
+      })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
     guestStatus: guestStatusPayload(guest),
   }
@@ -321,13 +408,17 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   if (!invite || invite.status === 'rascunho') {
     throw new InviteError(404, 'Convite não encontrado.')
   }
-  const blocks = await repo.listBlocks(invite.id)
+  const [blocks, tickets, bannerUrl] = await Promise.all([
+    repo.listBlocks(invite.id),
+    invite.costType !== 'gratuito' ? repo.listTicketsWithSold(invite.id) : Promise.resolve([]),
+    resolveInviteBanner(invite),
+  ])
   let guest = null
   if (guestToken) {
     const g = await repo.findGuestByToken(guestToken)
     if (g && g.inviteId === invite.id) guest = g
   }
-  return { invite, payload: renderPayload(invite, blocks, guest) }
+  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets }) }
 }
 
 // Metadados Open Graph leves (para crawlers/pré-visualização de link).
@@ -336,7 +427,8 @@ export async function getMeta(slug) {
   if (!invite || invite.status === 'rascunho') {
     throw new InviteError(404, 'Convite não encontrado.')
   }
-  return { slug: invite.slug, ...buildMeta(invite) }
+  const bannerUrl = await resolveInviteBanner(invite)
+  return { slug: invite.slug, ...buildMeta(invite, bannerUrl) }
 }
 
 export function recordView(inviteId, meta) {
@@ -353,17 +445,34 @@ export async function submitRsvp(slug, input) {
   if (!invite.rsvpEnabled) {
     throw new InviteError(409, 'As inscrições não estão abertas para este convite.')
   }
+  if (invite.rsvpStartDatetime && Date.now() < Date.parse(invite.rsvpStartDatetime)) {
+    throw new InviteError(409, 'As inscrições ainda não abriram.')
+  }
   if (invite.rsvpDeadline && Date.now() > Date.parse(invite.rsvpDeadline)) {
     throw new InviteError(410, 'O prazo de inscrição terminou.')
   }
   const data = rsvpSchema.parse(input)
+
+  // Bilhete (evento pago): valida que pertence ao convite e está ativo.
+  let ticket = null
+  if (invite.costType !== 'gratuito' && data.ticketId) {
+    ticket = await repo.findTicketById(data.ticketId)
+    if (!ticket || ticket.inviteId !== invite.id || !ticket.active) {
+      throw new InviteError(400, 'Bilhete inválido.')
+    }
+  }
   const paymentState = invite.costType === 'gratuito' ? 'not_applicable' : 'pending'
 
-  // Capacidade: se exceder, entra em lista de espera.
+  // Capacidade: do bilhete escolhido (se houver) ou global do convite. Excedendo → lista de espera.
   let rsvpState = data.attend ? 'confirmed' : 'declined'
-  if (rsvpState === 'confirmed' && invite.capacity) {
-    const taken = await repo.countConfirmedSeats(invite.id)
-    if (taken + (data.guestsCount ?? 1) > invite.capacity) rsvpState = 'waitlisted'
+  if (rsvpState === 'confirmed') {
+    if (ticket && ticket.capacity != null) {
+      const sold = await repo.countTicketSold(ticket.id)
+      if (sold + (data.guestsCount ?? 1) > ticket.capacity) rsvpState = 'waitlisted'
+    } else if (invite.capacity) {
+      const taken = await repo.countConfirmedSeats(invite.id)
+      if (taken + (data.guestsCount ?? 1) > invite.capacity) rsvpState = 'waitlisted'
+    }
   }
 
   // Idempotente por email: atualiza a resposta existente em vez de duplicar.
@@ -376,6 +485,7 @@ export async function submitRsvp(slug, input) {
       guestsCount: data.guestsCount ?? 1,
       rsvpState,
       paymentState: existing.paymentState === 'not_applicable' ? paymentState : existing.paymentState,
+      ticketId: ticket?.id ?? null,
       extra: data.extra ?? null,
     })
   } else {
@@ -387,8 +497,47 @@ export async function submitRsvp(slug, input) {
       guestsCount: data.guestsCount ?? 1,
       rsvpState,
       paymentState,
+      ticketId: ticket?.id ?? null,
       extra: data.extra ?? null,
     })
   }
   return { token: guest.token, status: guestStatusPayload(guest) }
+}
+
+// ── Eventos associáveis + bilhetes (organizador) ─────────────────
+
+// Eventos publicados e FUTUROS (hoje incluído) que o utilizador pode associar a
+// um convite. Alimenta o seletor de evento no editor (obrigatório por regra de UI).
+export async function listSelectableEvents(user) {
+  ensureCanManage(user)
+  const today = new Date().toISOString().slice(0, 10)
+  const events = await eventsRepo.list({ status: 'publicado', from: today })
+  return events
+    .filter((e) => canAccessChurch(user, e.community))
+    .map((e) => ({
+      id: e.id,
+      title: e.title,
+      startDatetime: e.startDatetime,
+      endDatetime: e.endDatetime,
+      bannerUrl: e.bannerUrl ?? null,
+      location: e.location ?? null,
+      community: e.community,
+    }))
+}
+
+export async function listTickets(user, id) {
+  ensureCanManage(user)
+  const invite = await repo.findById(id)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  return repo.listTicketsWithSold(id)
+}
+
+export async function saveTickets(user, id, input) {
+  ensureCanManage(user)
+  const invite = await repo.findById(id)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const tickets = ticketsSchema.parse(input.tickets ?? [])
+  return repo.replaceTickets(id, tickets)
 }

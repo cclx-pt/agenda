@@ -24,6 +24,23 @@ export async function listInvites() {
   return invites
 }
 
+// Eventos publicados/futuros que se podem associar a um convite.
+export async function getSelectableEvents() {
+  const { events } = await request('/data/invites/selectable-events')
+  return events
+}
+
+// Bilhetes de um convite.
+export async function listTickets(id) {
+  const { tickets } = await request(`/data/invites/${id}/tickets`)
+  return tickets
+}
+
+export async function saveTickets(id, tickets) {
+  const { tickets: saved } = await request(`/data/invites/${id}/tickets`, { method: 'PUT', body: { tickets } })
+  return saved
+}
+
 export async function createInvite(payload) {
   const { invite } = await request('/data/invites', { method: 'POST', body: payload })
   return invite

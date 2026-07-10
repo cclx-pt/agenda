@@ -25,8 +25,12 @@ function mapInvite(row) {
     costAmount: row.cost_amount == null ? null : Number(row.cost_amount),
     costCurrency: row.cost_currency ?? 'EUR',
     paymentMethods: row.payment_methods ?? null,
+    paymentMethod: row.payment_method ?? null,
+    paymentProvider: row.payment_provider ?? null,
     rsvpEnabled: !!row.rsvp_enabled,
+    rsvpStartDatetime: row.rsvp_start_datetime ?? null,
     rsvpDeadline: row.rsvp_deadline ?? null,
+    useEventBanner: !!row.use_event_banner,
     capacity: row.capacity ?? null,
     community: row.community ?? null,
     status: row.status,
@@ -63,6 +67,7 @@ function mapGuest(row) {
     guestsCount: row.guests_count ?? 1,
     rsvpState: row.rsvp_state,
     paymentState: row.payment_state,
+    ticketId: row.ticket_id ?? null,
     extra: row.extra ?? null,
     respondedAt: row.responded_at ?? null,
     createdAt: row.created_at,
@@ -84,8 +89,8 @@ export async function insert(data, actorId) {
       (id, event_id, slug, title, banner_url, color_theme, start_datetime, end_datetime,
        location, meta_title, meta_description, meta_image_url, cost_type, cost_amount,
        cost_currency, payment_methods, rsvp_enabled, rsvp_deadline, capacity, community,
-       created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+       created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
     [
       id,
       data.eventId ?? null,
@@ -108,6 +113,10 @@ export async function insert(data, actorId) {
       data.capacity ?? null,
       data.community ?? null,
       actorId ?? null,
+      toDb(data.rsvpStartDatetime),
+      data.useEventBanner ?? false,
+      data.paymentMethod ?? null,
+      data.paymentProvider ?? null,
     ]
   )
   return findById(id)
@@ -170,6 +179,9 @@ export async function update(id, data) {
        rsvp_deadline = $17,
        capacity = $18,
        community = $19,
+       rsvp_start_datetime = $20,
+       use_event_banner = $21,
+       payment_method = $22,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -192,6 +204,9 @@ export async function update(id, data) {
       toDb(data.rsvpDeadline),
       data.capacity ?? null,
       data.community ?? null,
+      toDb(data.rsvpStartDatetime),
+      data.useEventBanner ?? false,
+      data.paymentMethod ?? null,
     ]
   )
   return findById(id)
@@ -252,8 +267,8 @@ export async function insertGuest(inviteId, data) {
   const id = randomUUID()
   await pool.query(
     `INSERT INTO invite_guests
-      (id, invite_id, token, name, email, phone, guests_count, rsvp_state, payment_state, extra, responded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())`,
+      (id, invite_id, token, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, responded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())`,
     [
       id,
       inviteId,
@@ -265,6 +280,7 @@ export async function insertGuest(inviteId, data) {
       data.rsvpState ?? 'confirmed',
       data.paymentState ?? 'not_applicable',
       data.extra ? JSON.stringify(data.extra) : null,
+      data.ticketId ?? null,
     ]
   )
   return findGuestById(id)
@@ -306,6 +322,7 @@ export async function updateGuest(id, data) {
        rsvp_state = COALESCE($6, rsvp_state),
        payment_state = COALESCE($7, payment_state),
        extra = COALESCE($8, extra),
+       ticket_id = COALESCE($9, ticket_id),
        responded_at = now(),
        updated_at = now()
      WHERE id = $1`,
@@ -318,6 +335,7 @@ export async function updateGuest(id, data) {
       data.rsvpState ?? null,
       data.paymentState ?? null,
       data.extra ? JSON.stringify(data.extra) : null,
+      data.ticketId ?? null,
     ]
   )
   return findGuestById(id)
@@ -350,4 +368,99 @@ export async function countViews(inviteId) {
     [inviteId]
   )
   return rows[0]?.n ?? 0
+}
+
+// ── Bilhetes (tipos) ─────────────────────────────────────────────
+
+function mapTicket(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    inviteId: row.invite_id,
+    name: row.name,
+    kind: row.kind,
+    price: row.price == null ? null : Number(row.price),
+    currency: row.currency ?? 'EUR',
+    capacity: row.capacity ?? null,
+    groupSize: row.group_size ?? null,
+    description: row.description ?? null,
+    active: !!row.active,
+    order: row.sort_order,
+    sold: row.sold == null ? undefined : Number(row.sold),
+  }
+}
+
+export async function listTickets(inviteId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_tickets WHERE invite_id = $1 ORDER BY sort_order ASC, created_at ASC',
+    [inviteId]
+  )
+  return rows.map(mapTicket)
+}
+
+// Bilhetes com a contagem de vendidos (lugares confirmados que os escolheram).
+export async function listTicketsWithSold(inviteId) {
+  const { rows } = await pool.query(
+    `SELECT t.*, COALESCE(SUM(g.guests_count) FILTER (WHERE g.rsvp_state = 'confirmed'), 0) AS sold
+     FROM invite_tickets t
+     LEFT JOIN invite_guests g ON g.ticket_id = t.id
+     WHERE t.invite_id = $1
+     GROUP BY t.id
+     ORDER BY t.sort_order ASC, t.created_at ASC`,
+    [inviteId]
+  )
+  return rows.map(mapTicket)
+}
+
+export async function findTicketById(id) {
+  const { rows } = await pool.query('SELECT * FROM invite_tickets WHERE id = $1', [id])
+  return mapTicket(rows[0])
+}
+
+// Nº de lugares confirmados associados a um bilhete (para verificar capacidade).
+export async function countTicketSold(ticketId) {
+  const { rows } = await pool.query(
+    `SELECT COALESCE(SUM(guests_count), 0)::int AS sold
+     FROM invite_guests WHERE ticket_id = $1 AND rsvp_state = 'confirmed'`,
+    [ticketId]
+  )
+  return rows[0]?.sold ?? 0
+}
+
+// Substitui o conjunto de bilhetes de um convite (mantém ids existentes quando
+// fornecidos, para não perder as ligações dos convidados). Remove os ausentes.
+export async function replaceTickets(inviteId, tickets) {
+  const keepIds = tickets.map((t) => t.id).filter(Boolean)
+  // Remove os bilhetes que já não constam da lista.
+  if (keepIds.length > 0) {
+    await pool.query(
+      `DELETE FROM invite_tickets WHERE invite_id = $1 AND id <> ALL($2::uuid[])`,
+      [inviteId, keepIds]
+    )
+  } else {
+    await pool.query('DELETE FROM invite_tickets WHERE invite_id = $1', [inviteId])
+  }
+  let order = 0
+  for (const t of tickets) {
+    if (t.id) {
+      await pool.query(
+        `UPDATE invite_tickets SET
+           name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
+           group_size = $7, description = $8, active = $9, sort_order = $10, updated_at = now()
+         WHERE id = $1 AND invite_id = $11`,
+        [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
+          t.groupSize ?? null, t.description ?? null, t.active !== false, order, inviteId]
+      )
+    } else {
+      await pool.query(
+        `INSERT INTO invite_tickets
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, active, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
+          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, t.active !== false, order]
+      )
+    }
+    order += 1
+  }
+  return listTickets(inviteId)
 }

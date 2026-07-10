@@ -206,7 +206,7 @@ function PaymentCard({ block, page }) {
   const costType = c.costType || inv.costType || 'gratuito'
   const amount = c.fixedAmount ?? inv.costAmount
   const currency = inv.costCurrency || 'EUR'
-  const methods = c.allowedMethods || inv.paymentMethods || []
+  const methods = c.allowedMethods || (inv.paymentMethod ? [inv.paymentMethod] : [])
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">

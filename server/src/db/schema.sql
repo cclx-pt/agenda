@@ -450,3 +450,33 @@ CREATE TABLE IF NOT EXISTS invite_payments (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_payments_invite ON invite_payments (invite_id);
 CREATE INDEX IF NOT EXISTS idx_invite_payments_guest ON invite_payments (guest_id);
+
+-- Melhorias aos convites: datas de inscrição próprias (start_datetime/end_datetime
+-- passam a ser as datas do EVENTO; rsvp_start_datetime..rsvp_deadline = janela de
+-- inscrição), origem do banner (evento vs próprio) e método de pagamento único.
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS rsvp_start_datetime TIMESTAMPTZ;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS use_event_banner BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS payment_method TEXT;
+
+-- Bilhetes (tipos) de um convite pago: individual, grupo ou campanha. Cada tipo
+-- tem preço, capacidade (NULL = ilimitado) e, para 'grupo', nº de pessoas por bilhete.
+CREATE TABLE IF NOT EXISTS invite_tickets (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'individual'
+                CHECK (kind IN ('individual', 'grupo', 'campanha')),
+  price       NUMERIC(10, 2),
+  currency    TEXT NOT NULL DEFAULT 'EUR',
+  capacity    INTEGER,
+  group_size  INTEGER,
+  description TEXT,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_tickets_invite ON invite_tickets (invite_id);
+
+-- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;

@@ -75,7 +75,12 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
   const [deadlinePassed] = useState(
     () => Boolean(inv.rsvpDeadline) && Date.now() > Date.parse(inv.rsvpDeadline)
   )
-  const [form, setForm] = useState({ name: '', email: '', phone: '', guestsCount: 1, attend: 'yes' })
+  const [notOpenYet] = useState(
+    () => Boolean(inv.rsvpStartDatetime) && Date.now() < Date.parse(inv.rsvpStartDatetime)
+  )
+  const tickets = (page.tickets || []).filter((t) => !t.soldOut)
+  const paidWithTickets = inv.costType !== 'gratuito' && tickets.length > 0
+  const [form, setForm] = useState({ name: '', email: '', phone: '', guestsCount: 1, attend: 'yes', ticketId: '' })
   const [extra, setExtra] = useState({})
   const [busy, setBusy] = useState(false)
 
@@ -98,6 +103,10 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
       toast.error('Indique o seu nome.')
       return
     }
+    if (paidWithTickets && form.attend === 'yes' && !form.ticketId) {
+      toast.error('Escolha um bilhete.')
+      return
+    }
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {
@@ -106,6 +115,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
         phone: form.phone.trim() || null,
         guestsCount: Number(form.guestsCount) || 1,
         attend: form.attend === 'yes',
+        ticketId: form.ticketId || null,
         extra: Object.keys(extra).length ? extra : null,
       })
       onSubmitted(res)
@@ -125,12 +135,29 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
       {c.infoText ? <p className="m-0 mb-4 text-sm text-muted-foreground">{c.infoText}</p> : null}
       {deadlinePassed ? (
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
+      ) : notOpenYet ? (
+        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
             Nome *
             <input className={inputCls} value={form.name} onChange={setField('name')} required />
           </label>
+          {paidWithTickets ? (
+            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+              Bilhete *
+              <select className={inputCls} value={form.ticketId} onChange={setField('ticketId')}>
+                <option value="">— Escolha o bilhete —</option>
+                {tickets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {t.price != null ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ''}
+                    {t.kind === 'grupo' && t.groupSize ? ` (${t.groupSize} pessoas)` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               Email
@@ -270,7 +297,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
     }
   }
 
-  const methods = invite.paymentMethods || []
+  const methods = invite.paymentMethod ? [invite.paymentMethod] : []
   const instr = payment?.instructions
 
   return (
