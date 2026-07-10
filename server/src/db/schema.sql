@@ -423,129 +423,30 @@ CREATE TABLE IF NOT EXISTS invite_page_views (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_page_views_invite ON invite_page_views (invite_id);
 
--- ════════════════════════════════════════════════════════════════
--- Inscrições & convites (páginas públicas de convite)
--- ════════════════════════════════════════════════════════════════
--- Módulo que gera, por cada convite, uma página pública partilhável
--- (landing page) em /convite/<slug> com os detalhes do evento, programa,
--- informação extra, RSVP (inscrição), custo/pagamento, localização e partilha.
--- Assenta sobre a tabela `events` existente (que NÃO é alterada): a ligação é
--- feita SÓ por `convites.evento_id`. Um convite "disponível" (por associar) tem
--- evento_id = NULL; o formulário do evento associa-o definindo evento_id, ou
--- cria um convite novo já com evento_id preenchido.
+-- Conector de pagamento por convite ('manual' por omissão; conectores reais
+-- ligam-se depois — ver server/src/invites/payments/connector.js).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS payment_provider TEXT;
 
--- ── Convites (a "Inscrição & convite") ──────────────────────────
--- Entidade de topo com a configuração da página pública. As datas/meta/banner
--- caem para os valores do evento associado quando não forem definidas aqui.
-CREATE TABLE IF NOT EXISTS convites (
-  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- Evento associado (opcional): NULL = convite disponível/modelo por associar.
-  evento_id            UUID REFERENCES events (id) ON DELETE SET NULL,
-  -- Nome interno da inscrição (ex.: "Retiro de Jovens 2026").
-  titulo               TEXT NOT NULL,
-  -- Segmento de URL amigável e único da página pública (ex.: retiro-jovens-2026-x7f2).
-  landing_page_slug    TEXT NOT NULL UNIQUE,
-  -- Open Graph (partilha): caem para o nome/banner/descrição do evento se vazios.
-  meta_titulo          TEXT,
-  meta_descricao       TEXT,
-  meta_imagem_url      TEXT,
-  -- Aparência da página.
-  banner_url           TEXT,
-  cor_tema             TEXT,
-  -- Datas próprias da inscrição (caem para as do evento se NULL).
-  data_inicio          TIMESTAMPTZ,
-  data_fim             TIMESTAMPTZ,
-  -- Configuração de RSVP (inscrição).
-  rsvp_ativo           BOOLEAN NOT NULL DEFAULT TRUE,
-  rsvp_prazo           TIMESTAMPTZ,
-  capacidade           INTEGER,
-  -- Campos adicionais do formulário de inscrição (ver 04-content-blocks: rsvp.extraFields).
-  rsvp_campos_extra    JSONB NOT NULL DEFAULT '[]'::jsonb,
-  -- Configuração de custo/pagamento — só DESCREVE (o fluxo real fica noutra fase).
-  tipo_custo           TEXT NOT NULL DEFAULT 'gratuito'
-                         CHECK (tipo_custo IN ('gratuito', 'pagamento', 'oferta_voluntaria')),
-  valor_fixo           NUMERIC(10, 2),
-  valor_sugerido       NUMERIC(10, 2),
-  moeda                TEXT NOT NULL DEFAULT 'EUR',
-  -- Métodos aceites: ['mbway','transferencia','referencia'].
-  metodos_pagamento    JSONB NOT NULL DEFAULT '[]'::jsonb,
-  prazo_pagamento_dias INTEGER,
-  -- Publicação: NULL enquanto rascunho/pré-visualização; definido ao enviar o
-  -- convite aos convidados (protege o estado "só rascunho", ver FR-1.2/AC).
-  publicado_em         TIMESTAMPTZ,
-  criado_por           UUID REFERENCES users (id) ON DELETE SET NULL,
-  criado_em            TIMESTAMPTZ NOT NULL DEFAULT now(),
-  atualizado_em        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_convite_datas CHECK (data_fim IS NULL OR data_fim >= data_inicio)
-);
-CREATE INDEX IF NOT EXISTS idx_convites_evento ON convites (evento_id);
-
--- ── Blocos de conteúdo (cartões ordenáveis da página) ───────────
--- Lista ordenada de cartões. O conteúdo real de `agenda`/`info_extra` vive no
--- JSONB `conteudo`; os restantes tipos (banner/rsvp/pagamento/localizacao/
--- partilha) derivam a configuração de `convites`/`events`, mas mantêm aqui a
--- sua posição (`ordem`) e visibilidade (`visivel`) para o editor de cartões.
-CREATE TABLE IF NOT EXISTS blocos_conteudo (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  convite_id    UUID NOT NULL REFERENCES convites (id) ON DELETE CASCADE,
-  tipo          TEXT NOT NULL
-                  CHECK (tipo IN ('banner', 'agenda', 'info_extra', 'rsvp', 'pagamento', 'localizacao', 'partilha')),
-  ordem         INTEGER NOT NULL DEFAULT 0,
-  conteudo      JSONB NOT NULL DEFAULT '{}'::jsonb,
-  visivel       BOOLEAN NOT NULL DEFAULT TRUE,
-  criado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_blocos_conteudo_convite ON blocos_conteudo (convite_id, ordem);
-
--- ── Convidados (inscritos) ──────────────────────────────────────
--- Cada convidado tem um token secreto próprio usado no link pessoal (?g=token)
--- para consultar/atualizar o seu RSVP e estado sem autenticação (FR-1.4).
-CREATE TABLE IF NOT EXISTS convidados (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  convite_id    UUID NOT NULL REFERENCES convites (id) ON DELETE CASCADE,
-  nome          TEXT,
-  email         TEXT,
-  telefone      TEXT,
-  -- Token por convidado (link pessoal). Único em toda a tabela.
-  token         TEXT NOT NULL UNIQUE,
-  rsvp_estado   TEXT NOT NULL DEFAULT 'pendente'
-                  CHECK (rsvp_estado IN ('pendente', 'confirmado', 'recusado', 'lista_espera')),
-  acompanhantes INTEGER NOT NULL DEFAULT 0,
-  -- Respostas aos campos extra configurados no RSVP (chave→valor).
-  respostas     JSONB NOT NULL DEFAULT '{}'::jsonb,
-  respondido_em TIMESTAMPTZ,
-  criado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_convidados_convite ON convidados (convite_id);
-
--- ── Pagamentos (estrutura para a fase seguinte) ─────────────────
--- A página só MOSTRA o custo/métodos nesta fase; as transações reais (MB WAY /
--- transferência / referência) e a validação de comprovativos ficam para depois.
-CREATE TABLE IF NOT EXISTS pagamentos (
+-- Pagamentos dos convidados. Estrutura pronta para ligar a um CONECTOR de
+-- pagamento (MB WAY / Multibanco / transferência). O conector "manual" (default)
+-- gera instruções/referência locais e a validação é feita pelo organizador;
+-- conectores reais preenchem provider_ref/provider_payload e confirmam por webhook.
+CREATE TABLE IF NOT EXISTS invite_payments (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  convidado_id     UUID NOT NULL REFERENCES convidados (id) ON DELETE CASCADE,
-  metodo           TEXT NOT NULL CHECK (metodo IN ('mbway', 'transferencia', 'referencia')),
-  valor            NUMERIC(10, 2),
-  moeda            TEXT NOT NULL DEFAULT 'EUR',
-  estado           TEXT NOT NULL DEFAULT 'pendente'
-                     CHECK (estado IN ('pendente', 'em_validacao', 'pago', 'expirado')),
-  -- Comprovativo carregado (transferência) e/ou referência multibanco gerada.
-  comprovativo_url TEXT,
-  referencia       TEXT,
-  criado_em        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT now()
+  invite_id        UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  guest_id         UUID NOT NULL REFERENCES invite_guests (id) ON DELETE CASCADE,
+  method           TEXT NOT NULL CHECK (method IN ('mbway', 'transferencia', 'referencia')),
+  amount           NUMERIC(10, 2),
+  currency         TEXT NOT NULL DEFAULT 'EUR',
+  status           TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'awaiting_validation', 'paid', 'failed', 'expired', 'cancelled')),
+  provider         TEXT,
+  provider_ref     TEXT,
+  provider_payload JSONB,
+  receipt_url      TEXT,
+  paid_at          TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_pagamentos_convidado ON pagamentos (convidado_id);
-
--- ── Visualizações da página (analítica simples, opcional) ───────
--- Alimenta métricas básicas de "vistas" no painel. Escrita fire-and-forget.
-CREATE TABLE IF NOT EXISTS pagina_visualizacoes (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  convite_id  UUID NOT NULL REFERENCES convites (id) ON DELETE CASCADE,
-  visitado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
-  referer     TEXT,
-  user_agent  TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_pagina_visualizacoes_convite ON pagina_visualizacoes (convite_id);
+CREATE INDEX IF NOT EXISTS idx_invite_payments_invite ON invite_payments (invite_id);
+CREATE INDEX IF NOT EXISTS idx_invite_payments_guest ON invite_payments (guest_id);

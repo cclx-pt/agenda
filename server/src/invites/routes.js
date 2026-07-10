@@ -1,8 +1,11 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import multer from 'multer'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as service from './service.js'
 import { InviteError } from './service.js'
+import * as payments from './payments/service.js'
+import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
 
 // Envolve handlers async: erros de domínio/validação viram respostas HTTP.
 function asyncHandler(fn) {
@@ -23,6 +26,21 @@ function asyncHandler(fn) {
 
 const manageRoles = requireRole('admin', 'aprovador', 'editor')
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Comprovativos de pagamento: PDF/PNG/JPG até 5MB, em memória (→ Supabase Storage).
+const RECEIPT_TYPES = new Map([
+  ['image/png', '.png'],
+  ['image/jpeg', '.jpg'],
+  ['application/pdf', '.pdf'],
+])
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) =>
+    RECEIPT_TYPES.has(file.mimetype) ? cb(null, true) : cb(new Error('Formato inválido. Apenas PDF, PNG ou JPG.')),
+})
+
+const guestToken = (req) => (typeof req.query.g === 'string' ? req.query.g : undefined)
 
 // ── Rotas de gestão (autenticadas) — /data/invites ──────────────
 export const invitesRouter = Router()
@@ -105,6 +123,31 @@ invitesRouter.get(
   })
 )
 
+// ── Pagamentos (organizador) ────────────────────────────────────
+invitesRouter.get(
+  '/:id/payments',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ payments: await payments.listPayments(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.post(
+  '/payments/:paymentId/validate',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ payment: await payments.validatePayment(req.user, req.params.paymentId) })
+  })
+)
+
+invitesRouter.post(
+  '/payments/:paymentId/reject',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ payment: await payments.rejectPayment(req.user, req.params.paymentId) })
+  })
+)
+
 invitesRouter.delete(
   '/:id',
   manageRoles,
@@ -145,3 +188,51 @@ publicInvitesRouter.post(
     res.status(201).json(await service.submitRsvp(req.params.slug, req.body))
   })
 )
+
+// ── Pagamentos (convidado, autenticado pelo token pessoal ?g=) ──
+// Callback assíncrono de um conector real (o conector valida a assinatura).
+publicInvitesRouter.post(
+  '/webhook/:provider',
+  asyncHandler(async (req, res) => {
+    res.json(await payments.handleWebhook(req.params.provider, req))
+  })
+)
+
+// Estado do pagamento do convidado.
+publicInvitesRouter.get(
+  '/:slug/payment',
+  asyncHandler(async (req, res) => {
+    res.json({ payment: await payments.getForGuest(req.params.slug, guestToken(req)) })
+  })
+)
+
+// Iniciar um pagamento (escolher método) — devolve instruções/referência.
+publicInvitesRouter.post(
+  '/:slug/payment',
+  asyncHandler(async (req, res) => {
+    res.status(201).json({ payment: await payments.initiate(req.params.slug, guestToken(req), req.body) })
+  })
+)
+
+// Carregar o comprovativo (transferência) — multipart, campo "file".
+publicInvitesRouter.post('/:slug/payment/receipt', (req, res) => {
+  receiptUpload.single('file')(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      const message = err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro demasiado grande (máx. 5MB).' : 'Falha no upload.'
+      return res.status(400).json({ error: message })
+    }
+    if (err) return res.status(400).json({ error: err.message || 'Falha no upload.' })
+    if (!req.file) return res.status(400).json({ error: 'Nenhum ficheiro recebido.' })
+    if (!isStorageConfigured()) return res.status(503).json({ error: 'Armazenamento não configurado.' })
+    try {
+      const ext = RECEIPT_TYPES.get(req.file.mimetype) ?? '.bin'
+      const url = await uploadImage(req.file.buffer, { ext, contentType: req.file.mimetype })
+      const payment = await payments.attachReceipt(req.params.slug, guestToken(req), url)
+      res.status(201).json({ payment })
+    } catch (uploadErr) {
+      if (uploadErr instanceof InviteError) return res.status(uploadErr.status).json({ error: uploadErr.message })
+      console.error('[invites] comprovativo:', uploadErr?.message ?? uploadErr)
+      res.status(502).json({ error: 'Falha ao guardar o comprovativo.' })
+    }
+  })
+})

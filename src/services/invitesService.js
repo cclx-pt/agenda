@@ -82,3 +82,51 @@ export async function submitRsvp(slug, payload) {
     body: payload,
   })
 }
+
+// ── Pagamentos ───────────────────────────────────────────────────
+
+// Convidado (público, autenticado pelo token pessoal).
+export async function getGuestPayment(slug, guestToken) {
+  const qs = guestToken ? `?g=${encodeURIComponent(guestToken)}` : ''
+  const { payment } = await request(`/data/public/invite/${encodeURIComponent(slug)}/payment${qs}`)
+  return payment
+}
+
+export async function initiatePayment(slug, guestToken, method) {
+  const qs = guestToken ? `?g=${encodeURIComponent(guestToken)}` : ''
+  const { payment } = await request(`/data/public/invite/${encodeURIComponent(slug)}/payment${qs}`, {
+    method: 'POST',
+    body: { method },
+  })
+  return payment
+}
+
+export async function uploadReceipt(slug, guestToken, file) {
+  const qs = guestToken ? `?g=${encodeURIComponent(guestToken)}` : ''
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/data/public/invite/${encodeURIComponent(slug)}/payment/receipt${qs}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Falha ao carregar o comprovativo.')
+  return data.payment
+}
+
+// Organizador (autenticado).
+export async function listInvitePayments(id) {
+  const { payments } = await request(`/data/invites/${id}/payments`)
+  return payments
+}
+
+export async function validatePayment(paymentId) {
+  const { payment } = await request(`/data/invites/payments/${paymentId}/validate`, { method: 'POST' })
+  return payment
+}
+
+export async function rejectPayment(paymentId) {
+  const { payment } = await request(`/data/invites/payments/${paymentId}/reject`, { method: 'POST' })
+  return payment
+}

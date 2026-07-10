@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, InfoExtraCard, NarrativeCard, SpeakersCard, AgendaCard, WorkshopsCard,
@@ -189,9 +189,174 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
   )
 }
 
+const PAYMENT_METHOD_LABEL = {
+  mbway: 'MB WAY',
+  transferencia: 'Transferência bancária',
+  referencia: 'Referência Multibanco',
+}
+
+// Fluxo de pagamento do convidado (aparece só para eventos pagos, a quem já se
+// inscreveu). Escolha do método → instruções (IBAN/referência) → comprovativo.
+function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
+  const applicable =
+    invite.costType !== 'gratuito' && !!guestToken && !!guestStatus && guestStatus.paymentState !== 'not_applicable'
+  const [payment, setPayment] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (!applicable) return undefined
+    let alive = true
+    invitesService
+      .getGuestPayment(slug, guestToken)
+      .then((p) => {
+        if (alive) setPayment(p)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [applicable, slug, guestToken])
+
+  if (!applicable) return null
+
+  const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
+  const rowCls = 'flex justify-between gap-3 border-b border-border/60 py-1.5 text-sm'
+  const stateNow = payment?.status || guestStatus.paymentState
+
+  if (stateNow === 'paid') {
+    return (
+      <div className={cardCls + ' flex items-center gap-2 text-emerald-700 dark:text-emerald-400'}>
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+        <p className="m-0 font-semibold">Pagamento confirmado. Obrigado!</p>
+      </div>
+    )
+  }
+  if (stateNow === 'awaiting_validation') {
+    return (
+      <div className={cardCls}>
+        <h2 className="m-0 mb-1 text-lg font-bold text-foreground">Pagamento</h2>
+        <p className="m-0 text-sm text-muted-foreground">Comprovativo recebido. Aguarda validação do organizador.</p>
+      </div>
+    )
+  }
+
+  const choose = async (method) => {
+    setBusy(true)
+    try {
+      const p = await invitesService.initiatePayment(slug, guestToken, method)
+      setPayment(p)
+      onUpdate?.({ ...guestStatus, paymentState: p.status })
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const onReceipt = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const p = await invitesService.uploadReceipt(slug, guestToken, file)
+      setPayment(p)
+      onUpdate?.({ ...guestStatus, paymentState: p.status })
+      toast.success('Comprovativo enviado. Aguarda validação.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const methods = invite.paymentMethods || []
+  const instr = payment?.instructions
+
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
+        <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        Pagamento
+      </h2>
+      {!instr ? (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-sm text-muted-foreground">Escolha como quer pagar:</p>
+          {methods.length === 0 ? (
+            <p className="m-0 text-sm text-muted-foreground">Sem métodos configurados. Contacte o organizador.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {methods.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => choose(m)}
+                  className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  style={{ backgroundColor: accent }}
+                >
+                  {PAYMENT_METHOD_LABEL[m] || m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : instr.type === 'transfer' ? (
+        <div className="flex flex-col gap-2">
+          <div className={rowCls}>
+            <span className="text-muted-foreground">IBAN</span>
+            <span className="font-mono font-semibold text-foreground">{instr.iban}</span>
+          </div>
+          <div className={rowCls}>
+            <span className="text-muted-foreground">Beneficiário</span>
+            <span className="font-semibold text-foreground">{instr.beneficiary}</span>
+          </div>
+          {instr.amount != null ? (
+            <div className={rowCls}>
+              <span className="text-muted-foreground">Valor</span>
+              <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
+            </div>
+          ) : null}
+          <label
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {uploading ? 'A enviar…' : 'Carregar comprovativo'}
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+          </label>
+        </div>
+      ) : instr.type === 'reference' ? (
+        <div className="flex flex-col gap-2">
+          <div className={rowCls}>
+            <span className="text-muted-foreground">Entidade</span>
+            <span className="font-mono font-semibold text-foreground">{instr.entity}</span>
+          </div>
+          <div className={rowCls}>
+            <span className="text-muted-foreground">Referência</span>
+            <span className="font-mono font-semibold text-foreground">{instr.reference}</span>
+          </div>
+          {instr.amount != null ? (
+            <div className={rowCls}>
+              <span className="text-muted-foreground">Valor</span>
+              <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
+            </div>
+          ) : null}
+          <p className="m-0 text-xs text-muted-foreground">
+            Pague no homebanking ou Multibanco. Confirmamos a inscrição assim que recebermos o pagamento.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function InvitePage({ slug }) {
   const [state, setState] = useState({ loading: true, error: null, page: null })
   const [guestStatus, setGuestStatus] = useState(null)
+  const [guestToken, setGuestToken] = useState(
+    () => new URLSearchParams(window.location.search).get('g') || undefined
+  )
 
   useEffect(() => {
     let alive = true
@@ -238,6 +403,7 @@ export default function InvitePage({ slug }) {
     setGuestStatus(res.status)
     // Atualiza o URL com o token pessoal para futuras visitas (sem recarregar).
     if (res.token) {
+      setGuestToken(res.token)
       const url = new URL(window.location.href)
       url.searchParams.set('g', res.token)
       window.history.replaceState({}, '', url)
@@ -269,6 +435,21 @@ export default function InvitePage({ slug }) {
           }
           const Comp = BLOCK_COMPONENTS[block.type]
           if (!Comp) return null
+          if (block.type === 'pagamento') {
+            return (
+              <div key={block.id} className="flex flex-col gap-4">
+                <Comp block={block} page={page} accent={accent} />
+                <PaymentFlowCard
+                  slug={page.slug}
+                  guestToken={guestToken}
+                  invite={page.invite}
+                  guestStatus={guestStatus}
+                  accent={accent}
+                  onUpdate={setGuestStatus}
+                />
+              </div>
+            )
+          }
           return <Comp key={block.id} block={block} page={page} accent={accent} />
         })}
         {/* Rodapé de marca discreto quando não há bloco rodapé próprio. */}

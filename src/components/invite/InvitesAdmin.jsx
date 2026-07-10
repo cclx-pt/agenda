@@ -25,6 +25,22 @@ const STATUS_BADGE = {
 }
 const STATUS_LABEL = { rascunho: 'Rascunho', publicado: 'Publicado', fechado: 'Fechado' }
 
+const PAY_METHOD_LABEL = { mbway: 'MB WAY', transferencia: 'Transferência', referencia: 'Referência' }
+const PAY_LABEL = {
+  pending: 'Pendente',
+  awaiting_validation: 'Em validação',
+  paid: 'Pago',
+  failed: 'Falhado',
+  expired: 'Expirado',
+  cancelled: 'Cancelado',
+}
+const PAY_BADGE = {
+  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  awaiting_validation: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
+  paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+}
+
 function toDateInput(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -73,6 +89,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [uploading, setUploading] = useState(false)
   const [addType, setAddType] = useState(ADDABLE_TYPES[0]?.type ?? 'info_extra')
   const [guests, setGuests] = useState(null)
+  const [payments, setPayments] = useState(null)
 
   const setField = (k) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -180,9 +197,41 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   const loadGuests = async () => {
     try {
-      setGuests(await invitesService.listInviteGuests(invite.id))
+      const [g, p] = await Promise.all([
+        invitesService.listInviteGuests(invite.id),
+        settings.costType !== 'gratuito' ? invitesService.listInvitePayments(invite.id) : Promise.resolve([]),
+      ])
+      setGuests(g)
+      setPayments(p)
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  const validatePay = async (p) => {
+    setBusy(true)
+    try {
+      await invitesService.validatePayment(p.id)
+      toast.success('Pagamento validado.')
+      await loadGuests()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rejectPay = async (p) => {
+    if (!window.confirm('Rejeitar este pagamento? O convidado poderá tentar de novo.')) return
+    setBusy(true)
+    try {
+      await invitesService.rejectPayment(p.id)
+      toast.success('Pagamento rejeitado.')
+      await loadGuests()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -406,6 +455,46 @@ function InviteEditor({ invite, onBack, onSaved }) {
           )
         ) : null}
       </section>
+
+      {/* Pagamentos (só para eventos pagos) */}
+      {settings.costType !== 'gratuito' && payments ? (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <h3 className="m-0 mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Pagamentos</h3>
+          {payments.length === 0 ? (
+            <p className="m-0 text-sm text-muted-foreground">Sem pagamentos ainda.</p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {payments.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center gap-2 border-b border-border/60 py-1.5 text-sm">
+                  <span className="font-medium text-foreground">{p.guestName || '(sem nome)'}</span>
+                  <span className="text-muted-foreground">· {PAY_METHOD_LABEL[p.method] || p.method}</span>
+                  {p.amount != null ? (
+                    <span className="text-muted-foreground">· {Number(p.amount).toFixed(2)} {p.currency}</span>
+                  ) : null}
+                  {p.receiptUrl ? (
+                    <a href={p.receiptUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      comprovativo
+                    </a>
+                  ) : null}
+                  <span className={'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ' + (PAY_BADGE[p.status] || 'bg-muted text-muted-foreground')}>
+                    {PAY_LABEL[p.status] || p.status}
+                  </span>
+                  {['pending', 'awaiting_validation'].includes(p.status) ? (
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => validatePay(p)} disabled={busy} className="rounded-lg border border-emerald-600/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/15">
+                        Validar
+                      </button>
+                      <button type="button" onClick={() => rejectPay(p)} disabled={busy} className="rounded-lg border border-destructive/40 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                        Rejeitar
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {/* Barra de ações fixa em baixo */}
       <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-border bg-background/95 py-3 backdrop-blur">

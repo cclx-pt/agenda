@@ -85,6 +85,18 @@ export const config = {
   cron: {
     secret: process.env.CRON_SECRET,
   },
+
+  // Pagamentos dos convites. O conector 'manual' (por omissão) usa estes dados
+  // para mostrar instruções de transferência e gerar uma referência local; os
+  // conectores reais (MB WAY / Multibanco via ifthenpay/easypay) ligam-se depois
+  // e ignoram estes campos. `webhookSecret` valida os callbacks de um conector real.
+  payments: {
+    provider: process.env.PAYMENTS_PROVIDER ?? 'manual',
+    iban: process.env.PAYMENTS_IBAN ?? 'PT50 0000 0000 0000 0000 0000 0',
+    beneficiary: process.env.PAYMENTS_BENEFICIARY ?? 'CCLX',
+    mbEntity: process.env.PAYMENTS_MB_ENTITY ?? '00000',
+    webhookSecret: process.env.PAYMENTS_WEBHOOK_SECRET,
+  },
 }
 
 export const ROLES = ['admin', 'aprovador', 'editor', 'visitante']
