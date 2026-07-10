@@ -250,6 +250,53 @@ export async function sendApprovalRequestEmail(to, { name, eventTitle, eventDate
 }
 
 /**
+ * Notifica um moderador de que há um pedido de alteração de data/hora a um evento
+ * publicado, à espera de aprovação. Liga ao painel de aprovações (sem ação de um
+ * clique — a aprovação é feita no painel, revalidando permissões e estado).
+ */
+export async function sendChangeRequestEmail(to, { name, eventTitle, requesterName, currentWhen, proposedWhen, scope, link }) {
+  const title = eventTitle || 'Evento'
+  const subject = `Agenda CCLX — Alteração de data pendente: ${title}`
+  const greeting = name ? `Olá ${name},` : 'Olá,'
+  const scopeText = scope === 'series' ? 'toda a série' : 'apenas esta ocorrência'
+
+  const text =
+    `${greeting}\n\nFoi pedida uma alteração de data/hora a um evento publicado.\n\nEvento: ${title}` +
+    (requesterName ? `\nPedido por: ${requesterName}` : '') +
+    (currentWhen ? `\nData atual: ${currentWhen}` : '') +
+    (proposedWhen ? `\nNova data: ${proposedWhen}` : '') +
+    `\nÂmbito: ${scopeText}` +
+    `\n\nRever e aprovar: ${link}\n\nAgenda CCLX`
+
+  const row = (label, value) =>
+    value ? `<p style="margin:2px 0;color:#6b7280">${escapeHtml(label)}: ${escapeHtml(value)}</p>` : ''
+
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#1f2937">Agenda CCLX</h2>
+      <p style="margin:0 0 8px">${escapeHtml(greeting)}</p>
+      <p style="margin:8px 0;color:#374151">Foi pedida uma alteração de data/hora a um evento publicado:</p>
+      <p style="margin:14px 0 2px;font-size:18px;font-weight:700;color:#111827">${escapeHtml(title)}</p>
+      ${row('Pedido por', requesterName)}
+      ${row('Data atual', currentWhen)}
+      ${row('Nova data', proposedWhen)}
+      ${row('Âmbito', scopeText)}
+      <div style="margin:22px 0">
+        <a href="${link}" style="display:inline-block;padding:10px 22px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none">Rever no painel de aprovações</a>
+      </div>
+      <p style="color:#9ca3af;font-size:12px">O evento continua visível com a data atual até a alteração ser aprovada.</p>
+    </div>`
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Para: ${to}\n[email:mock] Alteração pendente: ${title}\n${link}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
+/**
  * Notifica um editor de que lhe foi atribuída uma delegação de aprovação, com o
  * âmbito (igreja/categoria/período) e um link para o painel de aprovações.
  */

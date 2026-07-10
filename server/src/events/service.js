@@ -9,7 +9,7 @@ import * as settingsService from '../settings/service.js'
 import * as delegationsRepo from '../delegations/repository.js'
 import * as approverScopesRepo from '../approverScopes/repository.js'
 import * as usersRepo from '../users/repository.js'
-import { sendEventStatusEmail, sendApprovalRequestEmail } from '../auth/email.js'
+import { sendEventStatusEmail, sendApprovalRequestEmail, sendChangeRequestEmail } from '../auth/email.js'
 import { signApprovalToken } from '../approvals/token.js'
 import { config } from '../config.js'
 import { waitUntil } from '@vercel/functions'
@@ -878,4 +878,363 @@ export async function reject(user, id, reason) {
 
 export function history(id) {
   return repo.listHistory(id)
+}
+
+// ── Pedidos de alteração (data/hora/recorrência) a eventos publicados ─────────
+
+// Validação do pedido de alteração. A recorrência é validada à parte
+// (recurrenceSchema) e só é obrigatória no âmbito 'series'.
+const changeRequestSchema = z
+  .object({
+    scope: z.enum(['single', 'series']).default('single'),
+    startDatetime: isoDate,
+    endDatetime: isoDate.optional().nullable(),
+    allDay: z.boolean().optional(),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    allowOverlap: z.boolean().optional(),
+  })
+  .refine(
+    (d) => !d.endDatetime || Date.parse(d.endDatetime) >= Date.parse(d.startDatetime),
+    { message: 'A data de fim não pode ser anterior à de início.', path: ['endDatetime'] }
+  )
+
+// Início do dia de HOJE na hora de parede de Lisboa, como instante UTC. Serve de
+// corte para "ocorrências futuras" ao regenerar uma série.
+function todayStartInstant() {
+  const now = wallParts(new Date())
+  return wallClockToUtc({ year: now.year, month: now.month, day: now.day, hour: 0, minute: 0, second: 0 })
+}
+
+// Extrai os campos partilhados de um evento (forma da BD → forma de `insert`),
+// para recriar ocorrências ao regenerar uma série. Não inclui data/hora/série.
+function eventToInsertData(event) {
+  return {
+    title: event.title,
+    description: event.description ?? null,
+    allDay: event.allDay ?? false,
+    location: event.location ?? null,
+    community: event.community ?? 'Sede',
+    category: event.category ?? 'evento',
+    subcategory: event.subcategory ?? null,
+    featured: event.featured ?? false,
+    loop: event.loop ?? false,
+    isGeneral: event.isGeneral ?? false,
+    isPrivate: event.isPrivate ?? false,
+    privacyTag: event.privacyTag ?? null,
+    bannerUrl: event.bannerUrl ?? null,
+    loopImage16x9: event.loopImage16x9 ?? null,
+    loopImage32x9: event.loopImage32x9 ?? null,
+    organizerName: event.organizerName ?? null,
+    organizerContact: event.organizerContact ?? null,
+    organizerPhone: event.organizerPhone ?? null,
+    organizerEmail: event.organizerEmail ?? null,
+    registrationUrl: event.registrationUrl ?? null,
+    attachmentUrl: event.attachmentUrl ?? null,
+    attachmentName: event.attachmentName ?? null,
+    mapUrl: event.mapUrl ?? null,
+    mapLat: event.mapLat ?? null,
+    mapLng: event.mapLng ?? null,
+  }
+}
+
+// Aplica um pedido de alteração ao evento (usado tanto na aplicação imediata por
+// admin/aprovador como na aprovação de um pedido de editor). Verifica a
+// sobreposição no momento da aplicação. Devolve o evento âncora atualizado/recriado.
+async function applyChange(user, event, request, { allowOverlap = false } = {}) {
+  const scope = request.scope === 'series' ? 'series' : 'single'
+  const recurrence = request.recurrence ? recurrenceSchema.parse(request.recurrence) : null
+  const allDay = request.allDay ?? false
+  // A BD devolve TIMESTAMPTZ como objetos Date; normaliza para ISO (o
+  // generateOccurrences usa Date.parse, que espera strings).
+  const startIso = new Date(request.startDatetime).toISOString()
+  const endIso = request.endDatetime ? new Date(request.endDatetime).toISOString() : null
+
+  // ── Âmbito "apenas esta ocorrência": muda só a data/hora deste evento. ──
+  if (scope === 'single') {
+    await assertOverlapOk(
+      user,
+      {
+        community: event.community,
+        category: event.category,
+        startDatetime: startIso,
+        endDatetime: endIso,
+        allDay,
+      },
+      { excludeId: event.id, allowOverlap }
+    )
+    const updated = await repo.updateDateTime(event.id, {
+      startDatetime: startIso,
+      endDatetime: endIso,
+      allDay,
+    })
+    await repo.addHistory({
+      eventId: event.id,
+      actorId: user.sub,
+      fromStatus: event.status,
+      toStatus: event.status,
+      comment: 'Data/hora alterada',
+    })
+    return updated
+  }
+
+  // ── Âmbito "toda a série": regenera as ocorrências FUTURAS. ──
+  if (!recurrence) {
+    throw new EventError(400, 'Indique a recorrência para alterar toda a série.')
+  }
+  const occurrences = generateOccurrences(startIso, endIso, recurrence)
+  if (occurrences.length === 0) {
+    throw new EventError(400, 'A recorrência indicada não gera ocorrências.')
+  }
+  const seriesId = event.seriesId ?? randomUUID()
+  // Verifica a sobreposição de TODAS as novas ocorrências antes de escrever
+  // (excluindo a própria série, que vai ser regenerada).
+  for (const occ of occurrences) {
+    await assertOverlapOk(
+      user,
+      {
+        community: event.community,
+        category: event.category,
+        startDatetime: occ.startDatetime,
+        endDatetime: occ.endDatetime,
+        allDay,
+      },
+      { excludeId: event.id, excludeSeriesId: seriesId, allowOverlap }
+    )
+  }
+  // Regenera reaproveitando o evento âncora (não o eliminamos: manteria válido o
+  // pedido de alteração, cuja FK a este evento é ON DELETE CASCADE). O âncora
+  // passa a ser a 1.ª ocorrência; as restantes ocorrências futuras da série são
+  // eliminadas e recriadas. As ocorrências PASSADAS mantêm-se.
+  const cutoff = todayStartInstant()
+  const [firstOcc, ...restOccs] = occurrences
+
+  if (event.seriesId) {
+    await repo.removeSeriesFrom(event.seriesId, cutoff, event.id)
+  } else {
+    // Evento único a passar a série: associa o âncora à nova série.
+    await repo.setSeriesId(event.id, seriesId)
+  }
+  await repo.updateDateTime(event.id, {
+    startDatetime: firstOcc.startDatetime,
+    endDatetime: firstOcc.endDatetime,
+    allDay,
+  })
+  await repo.addHistory({
+    eventId: event.id,
+    actorId: user.sub,
+    fromStatus: event.status,
+    toStatus: event.status,
+    comment: 'Data/hora alterada (série regenerada)',
+  })
+
+  const shared = { ...eventToInsertData(event), allDay, seriesId }
+  for (const occ of restOccs) {
+    const created = await repo.insert(
+      { ...shared, startDatetime: occ.startDatetime, endDatetime: occ.endDatetime },
+      event.createdBy ?? user.sub
+    )
+    // Recriadas já como publicadas (a alteração parte de um evento aprovado).
+    await repo.updateStatus(created.id, { status: 'publicado', touchPublished: true })
+    await repo.addHistory({
+      eventId: created.id,
+      actorId: user.sub,
+      fromStatus: null,
+      toStatus: 'publicado',
+      comment: 'Ocorrência recriada (alteração de recorrência)',
+    })
+  }
+  return repo.findById(event.id)
+}
+
+// Notifica (em segundo plano) os moderadores de que há um pedido de alteração
+// pendente, com um link para o painel de aprovações. Exclui o requerente.
+function notifyChangeApprovers(event, request, requesterId, requesterName) {
+  const fmtWhen = (dateKey, time, allDay) => {
+    if (!dateKey) return ''
+    const [y, m, d] = String(dateKey).split('-')
+    const date = y && m && d ? `${d}/${m}/${y}` : dateKey
+    return allDay || !time ? date : `${date} às ${time}`
+  }
+  const currentWhen = fmtWhen(event.date, event.timeStart, event.allDay)
+  const proposedWhen = fmtWhen(request.date, request.timeStart, request.allDay)
+  const task = (async () => {
+    const approvers = await listApproversFor(event)
+    const base = config.appUrl.replace(/\/+$/, '')
+    const link = `${base}/?aprovacoes=1`
+    for (const approver of approvers) {
+      if (!approver?.email || approver.id === requesterId) continue
+      await sendChangeRequestEmail(approver.email, {
+        name: approver.name,
+        eventTitle: event.title,
+        requesterName,
+        currentWhen,
+        proposedWhen,
+        scope: request.scope,
+        link,
+      })
+    }
+  })().catch((err) => {
+    console.error('[events] Falha ao notificar alteração pendente:', err?.message ?? err)
+  })
+  try {
+    waitUntil(task)
+  } catch {
+    /* fora do runtime Vercel: no-op; o processo persistente conclui a task */
+  }
+}
+
+/**
+ * Submete um pedido de alteração de data/hora/recorrência a um evento PUBLICADO.
+ * Admin/aprovador aplicam de imediato (auto-aprovado); editores deixam o pedido
+ * pendente até um moderador o aprovar. O evento mantém-se visível entretanto.
+ */
+export async function requestChange(user, id, input) {
+  const data = changeRequestSchema.parse(input)
+  const event = await repo.findById(id)
+  if (!event) throw new EventError(404, 'Evento não encontrado.')
+  ensureCanEdit(user, event)
+  if (event.status !== 'publicado') {
+    throw new EventError(409, 'Só eventos publicados usam o fluxo de alteração. Edite a data diretamente.')
+  }
+  // Valida a recorrência (obrigatória no âmbito "série").
+  const recurrence = recurrenceSchema.parse(input.recurrence)
+  if (data.scope === 'series' && !recurrence) {
+    throw new EventError(400, 'Indique a recorrência para alterar toda a série.')
+  }
+  const changeData = {
+    eventId: event.id,
+    seriesId: event.seriesId ?? null,
+    scope: data.scope,
+    startDatetime: data.startDatetime,
+    endDatetime: data.endDatetime ?? null,
+    allDay: data.allDay ?? false,
+    recurrence: recurrence ?? null,
+    reason: data.reason ?? null,
+    requestedBy: user.sub,
+  }
+
+  // Admin e aprovador aplicam de imediato (mesma regra da auto-aprovação de
+  // eventos). Regista o pedido PRIMEIRO: se a tabela ainda não existir (migração
+  // pendente) falha aqui, ANTES de tocar no evento — nunca deixa uma alteração
+  // meio-aplicada. Se a aplicação falhar (ex.: sobreposição bloqueada), remove o
+  // pedido (rollback) para não deixar um "pendente" órfão.
+  if (['admin', 'aprovador'].includes(user.role)) {
+    const request = await repo.insertChangeRequest(changeData)
+    try {
+      await applyChange(user, event, changeData, { allowOverlap: data.allowOverlap === true })
+    } catch (err) {
+      await repo.deleteChangeRequest(request.id).catch(() => {})
+      throw err
+    }
+    const resolved = await repo.updateChangeRequestStatus(request.id, {
+      status: 'aprovado',
+      resolvedBy: user.sub,
+    })
+    return { applied: true, request: resolved }
+  }
+
+  // Editor: fica pendente até um moderador aprovar. Notifica os moderadores.
+  const request = await repo.insertChangeRequest(changeData)
+  notifyChangeApprovers(event, request, user.sub, user.name)
+  return { applied: false, request }
+}
+
+// Normaliza o filtro de estado dos pedidos de alteração.
+function normalizeChangeStatus(status) {
+  if (!status || status === 'todos') return ['pendente', 'aprovado', 'rejeitado']
+  return [status]
+}
+
+/**
+ * Lista os pedidos de alteração que o utilizador pode moderar (mesmo âmbito das
+ * aprovações de eventos): admin vê tudo; aprovador/editor veem os das suas
+ * igrejas (mais os cobertos por delegações ativas).
+ */
+export async function listChangeRequests(user, { status } = {}) {
+  let all
+  try {
+    all = await repo.listChangeRequests({ status: normalizeChangeStatus(status) })
+  } catch (err) {
+    // Fail-open se a tabela ainda não existir (migração pendente): lista vazia,
+    // para não quebrar o painel de aprovações.
+    console.error('[events] pedidos de alteração indisponíveis (migração pendente?):', err?.message ?? err)
+    return []
+  }
+  if (isAdmin(user.role)) return all
+  const delegations = await delegationsRepo.listActiveForDelegate(user.sub)
+  let scopes = []
+  if (user.role === 'aprovador') {
+    try {
+      scopes = await approverScopesRepo.listByApprover(user.sub)
+    } catch {
+      scopes = []
+    }
+  }
+  const inScope = (c) =>
+    scopes.length === 0 ||
+    scopes.some(
+      (s) =>
+        (s.church == null || s.church === c.eventCommunity) &&
+        (s.category == null || s.category === c.eventCategory) &&
+        (s.subcategory == null || s.subcategory === c.eventSubcategory) &&
+        (s.privacyTag == null || s.privacyTag === c.eventPrivacyTag)
+    )
+  const byDelegation = (c) =>
+    delegations.some(
+      (d) =>
+        (d.church == null || d.church === c.eventCommunity) &&
+        (d.category == null || d.category === c.eventCategory) &&
+        (d.subcategory == null || d.subcategory === c.eventSubcategory)
+    )
+  return all.filter((c) => {
+    if (canAccessChurch(user, c.eventCommunity)) {
+      return user.role === 'aprovador' ? inScope(c) : true
+    }
+    return byDelegation(c)
+  })
+}
+
+export async function approveChange(user, requestId) {
+  if (!canManageEvents(user.role)) throw new EventError(403, 'Sem permissão para aprovar.')
+  const request = await repo.findChangeRequestById(requestId)
+  if (!request) throw new EventError(404, 'Pedido de alteração não encontrado.')
+  if (request.status !== 'pendente') {
+    throw new EventError(409, 'Apenas pedidos pendentes podem ser aprovados.')
+  }
+  const event = await repo.findById(request.eventId)
+  if (!event) throw new EventError(404, 'Evento não encontrado.')
+  if (!(await canModerate(user, event))) {
+    throw new EventError(403, 'Sem acesso a esta igreja.')
+  }
+  // Separação de funções (RA-09): não-admin não aprova o pedido que submeteu.
+  if (user.role !== 'admin' && request.requestedBy === user.sub) {
+    throw new EventError(403, 'Não pode aprovar uma alteração que submeteu.')
+  }
+  await applyChange(user, event, request)
+  const resolved = await repo.updateChangeRequestStatus(requestId, {
+    status: 'aprovado',
+    resolvedBy: user.sub,
+  })
+  return resolved
+}
+
+export async function rejectChange(user, requestId, reason) {
+  if (!canManageEvents(user.role)) throw new EventError(403, 'Sem permissão para rejeitar.')
+  const trimmed = (reason ?? '').trim()
+  if (!trimmed) throw new EventError(400, 'É obrigatório indicar o motivo da rejeição.')
+  const request = await repo.findChangeRequestById(requestId)
+  if (!request) throw new EventError(404, 'Pedido de alteração não encontrado.')
+  if (request.status !== 'pendente') {
+    throw new EventError(409, 'Apenas pedidos pendentes podem ser rejeitados.')
+  }
+  const event = await repo.findById(request.eventId)
+  if (!event) throw new EventError(404, 'Evento não encontrado.')
+  if (!(await canModerate(user, event))) {
+    throw new EventError(403, 'Sem acesso a esta igreja.')
+  }
+  return repo.updateChangeRequestStatus(requestId, {
+    status: 'rejeitado',
+    rejectionReason: trimmed,
+    resolvedBy: user.sub,
+  })
 }

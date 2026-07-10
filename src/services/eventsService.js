@@ -73,6 +73,35 @@ export async function rejectEvent(id, reason) {
   return event
 }
 
+/**
+ * Submete um pedido de alteração de data/hora/recorrência a um evento publicado.
+ * Devolve `{ applied, request }` — `applied` é true quando foi aplicado de
+ * imediato (admin/aprovador); false quando ficou pendente de aprovação (editor).
+ */
+export async function requestEventChange(id, payload) {
+  return request(`/data/events/${id}/change-request`, { method: 'POST', body: payload })
+}
+
+/** Lista os pedidos de alteração que o utilizador pode moderar, por estado. */
+export async function listChangeRequests(status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+  const { changes } = await request(`/data/events/change-requests${qs}`)
+  return changes
+}
+
+export async function approveChangeRequest(id) {
+  const { request: req } = await request(`/data/events/change-requests/${id}/approve`, { method: 'POST' })
+  return req
+}
+
+export async function rejectChangeRequest(id, reason) {
+  const { request: req } = await request(`/data/events/change-requests/${id}/reject`, {
+    method: 'POST',
+    body: { reason },
+  })
+  return req
+}
+
 // ── Integração inChurch (apenas admin) ───────────────────────────
 
 /** Lê a configuração da integração inChurch (interruptor, intervalo, estado). */

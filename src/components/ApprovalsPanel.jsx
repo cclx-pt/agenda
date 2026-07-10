@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import {
-  X, Check, Ban, Download, Plus, Trash2, ShieldCheck, ClipboardCheck, Filter, UserCheck,
+  X, Check, Ban, Download, Plus, Trash2, ShieldCheck, ClipboardCheck, Filter, UserCheck, CalendarClock,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -35,6 +35,20 @@ const STATUS_BADGE = {
   rascunho: 'bg-muted text-muted-foreground',
 }
 
+// Estados dos pedidos de alteração (fluxo próprio: pendente/aprovado/rejeitado).
+const CHANGE_STATUS_OPTIONS = [
+  { value: 'pendente', label: 'Pendentes' },
+  { value: 'aprovado', label: 'Aprovados' },
+  { value: 'rejeitado', label: 'Rejeitados' },
+  { value: 'todos', label: 'Todos' },
+]
+const CHANGE_STATUS_LABEL = { pendente: 'Pendente', aprovado: 'Aprovado', rejeitado: 'Rejeitado' }
+const CHANGE_STATUS_BADGE = {
+  pendente: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  aprovado: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
+  rejeitado: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+}
+
 const emptyDelegation = { delegateId: '', church: '', category: '', subcategory: '', startDate: '', endDate: '', active: true }
 const emptyScope = { approverId: '', church: '', category: '', subcategory: '', privacyTag: '' }
 
@@ -51,6 +65,12 @@ function downloadCsv(content, filename) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// Rótulo "dd/mm/aaaa · HH:MM" (ou só a data, se dia inteiro) para um evento/pedido.
+function whenLabel(iso, time, allDay) {
+  const d = formatDateNumericValue(iso)
+  return allDay || !time ? d : `${d} · ${time}`
 }
 
 export default function ApprovalsPanel({ onClose, onChanged }) {
@@ -73,6 +93,11 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+
+  // Pedidos de alteração a eventos publicados (data/hora/recorrência).
+  const [changes, setChanges] = useState([])
+  const [changeStatus, setChangeStatus] = useState('pendente')
+  const [loadingChanges, setLoadingChanges] = useState(true)
 
   const [delegations, setDelegations] = useState([])
   const [editors, setEditors] = useState([])
@@ -129,6 +154,22 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadApprovals()
   }, [loadApprovals])
+
+  const loadChanges = useCallback(async () => {
+    setLoadingChanges(true)
+    try {
+      setChanges(await eventsService.listChangeRequests(changeStatus))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoadingChanges(false)
+    }
+  }, [changeStatus])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadChanges()
+  }, [loadChanges])
 
   const loadDelegations = useCallback(async () => {
     if (!canManageDelegations) return
@@ -190,6 +231,12 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
     [events, churchFilter, categoryFilter, privacyTagFilter, visibilityFilter]
   )
 
+  // Nº de alterações pendentes na lista carregada (badge no separador).
+  const pendingChangesCount = useMemo(
+    () => changes.filter((c) => c.status === 'pendente').length,
+    [changes]
+  )
+
   const handleApprove = async (evt) => {
     setBusy(true)
     try {
@@ -217,6 +264,40 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
       toast.success('Evento rejeitado.')
       onChanged?.()
       await loadApprovals()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleApproveChange = async (c) => {
+    setBusy(true)
+    try {
+      await eventsService.approveChangeRequest(c.id)
+      toast.success('Alteração aprovada e aplicada.')
+      onChanged?.()
+      await loadChanges()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRejectChange = async (c) => {
+    const reason = window.prompt('Motivo da rejeição da alteração:')
+    if (reason == null) return
+    if (!reason.trim()) {
+      toast.error('É obrigatório indicar o motivo da rejeição.')
+      return
+    }
+    setBusy(true)
+    try {
+      await eventsService.rejectChangeRequest(c.id, reason.trim())
+      toast.success('Alteração rejeitada.')
+      onChanged?.()
+      await loadChanges()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -416,6 +497,11 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
           </h2>
           <div className="flex items-center gap-2">
             {tabBtn('approvals', 'Aprovações', <ClipboardCheck className="h-4 w-4" aria-hidden="true" />)}
+            {tabBtn(
+              'changes',
+              pendingChangesCount ? `Alterações (${pendingChangesCount})` : 'Alterações',
+              <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            )}
             {canManageDelegations && tabBtn('delegations', 'Delegações', <ShieldCheck className="h-4 w-4" aria-hidden="true" />)}
             {isAdmin && tabBtn('approvers', 'Aprovadores', <UserCheck className="h-4 w-4" aria-hidden="true" />)}
             <button
@@ -560,6 +646,91 @@ export default function ApprovalsPanel({ onClose, onChanged }) {
                           <button
                             type="button"
                             onClick={() => handleReject(e)}
+                            disabled={busy}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-destructive/40 bg-transparent px-3 py-2 text-[13px] font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                          >
+                            <Ban className="h-4 w-4" aria-hidden="true" />
+                            Rejeitar
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : tab === 'changes' ? (
+            <>
+              {/* Toolbar: filtro de estado dos pedidos de alteração */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                  <select
+                    className="cursor-pointer rounded-lg border border-input bg-background px-2.5 py-2 text-[13px] text-foreground"
+                    value={changeStatus}
+                    onChange={(e) => setChangeStatus(e.target.value)}
+                    aria-label="Estado da alteração"
+                  >
+                    {CHANGE_STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-[13px] text-muted-foreground">
+                  {changes.length} pedido{changes.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              <p className="m-0 text-xs text-muted-foreground">
+                Alterações de data/hora/recorrência a eventos publicados. O evento mantém-se visível
+                com a data atual até a alteração ser aprovada.
+              </p>
+
+              {/* Lista de pedidos de alteração */}
+              {loadingChanges ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">A carregar…</p>
+              ) : changes.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sem pedidos de alteração.</p>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                  {changes.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong className="text-sm text-foreground">{c.eventTitle || 'Evento'}</strong>
+                          <span className={'rounded-full px-2 py-[3px] text-[11px] font-bold uppercase tracking-wide ' + (CHANGE_STATUS_BADGE[c.status] || CHANGE_STATUS_BADGE.pendente)}>
+                            {CHANGE_STATUS_LABEL[c.status] || c.status}
+                          </span>
+                          <span className="rounded-full bg-muted px-2 py-[3px] text-[11px] font-semibold text-muted-foreground">
+                            {c.scope === 'series' ? 'Toda a série' : 'Só esta ocorrência'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          <span className="line-through opacity-70">{whenLabel(c.eventStartDatetime, c.eventTimeStart, c.eventAllDay)}</span>
+                          {' → '}
+                          <span className="font-semibold text-foreground">{whenLabel(c.startDatetime, c.timeStart, c.allDay)}</span>
+                          {c.eventCommunity ? ` · ${c.eventCommunity}` : ''}
+                          {c.requesterName ? ` · ${c.requesterName}` : ''}
+                        </span>
+                        {c.reason ? <span className="text-xs text-muted-foreground">Nota: {c.reason}</span> : null}
+                        {c.status === 'rejeitado' && c.rejectionReason ? (
+                          <span className="text-xs text-destructive">Motivo: {c.rejectionReason}</span>
+                        ) : null}
+                      </div>
+                      {c.status === 'pendente' && (
+                        <div className="flex flex-shrink-0 gap-1.5 max-[560px]:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleApproveChange(c)}
+                            disabled={busy}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-transparent px-3 py-2 text-[13px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+                          >
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectChange(c)}
                             disabled={busy}
                             className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-destructive/40 bg-transparent px-3 py-2 text-[13px] font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
                           >

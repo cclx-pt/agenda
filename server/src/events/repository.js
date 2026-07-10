@@ -445,3 +445,168 @@ export async function listHistory(eventId) {
   )
   return rows
 }
+
+// Atualiza APENAS a data/hora de um evento (aplicação de um pedido de alteração
+// a um evento publicado). Não toca nos restantes campos.
+export async function updateDateTime(id, { startDatetime, endDatetime, allDay }) {
+  await pool.query(
+    `UPDATE events SET
+       start_datetime = $2,
+       end_datetime = $3,
+       all_day = $4,
+       updated_at = now()
+     WHERE id = $1`,
+    [id, toDb(startDatetime), toDb(endDatetime), allDay ?? false]
+  )
+  return findById(id)
+}
+
+// Elimina as ocorrências de uma série a partir de um instante (inclusive),
+// opcionalmente excluindo um id (a ocorrência âncora, que é reaproveitada). Usado
+// ao regenerar as ocorrências FUTURAS de uma série numa alteração de recorrência.
+export async function removeSeriesFrom(seriesId, fromInstant, exceptId = null) {
+  const params = [seriesId, toDb(fromInstant)]
+  let sql = 'DELETE FROM events WHERE series_id = $1 AND start_datetime >= $2'
+  if (exceptId) {
+    params.push(exceptId)
+    sql += ` AND id <> $${params.length}`
+  }
+  const { rowCount } = await pool.query(sql, params)
+  return rowCount
+}
+
+// Associa um evento a uma série (ao converter um evento único em recorrente).
+export async function setSeriesId(id, seriesId) {
+  await pool.query('UPDATE events SET series_id = $2, updated_at = now() WHERE id = $1', [id, seriesId])
+}
+
+// ── Pedidos de alteração (data/hora/recorrência) a eventos publicados ─────────
+
+function mapChangeRequest(row) {
+  if (!row) return null
+  const startParts = zonedParts(row.start_datetime)
+  const endParts = zonedParts(row.end_datetime)
+  const allDay = !!row.all_day
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    seriesId: row.series_id ?? null,
+    scope: row.scope,
+    startDatetime: row.start_datetime,
+    endDatetime: row.end_datetime,
+    date: startParts?.dateKey ?? null,
+    endDate: endParts?.dateKey ?? null,
+    timeStart: allDay ? null : (startParts?.time ?? null),
+    timeEnd: allDay ? null : (endParts?.time ?? null),
+    allDay,
+    recurrence: row.recurrence ?? null,
+    reason: row.reason ?? null,
+    status: row.status,
+    rejectionReason: row.rejection_reason ?? null,
+    requestedBy: row.requested_by ?? null,
+    resolvedBy: row.resolved_by ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    resolvedAt: row.resolved_at ?? null,
+    // Campos vindos do JOIN (contexto do evento e do requerente), quando pedidos.
+    requesterName: row.requester_name ?? null,
+    requesterEmail: row.requester_email ?? null,
+    eventTitle: row.event_title ?? null,
+    eventCommunity: row.event_community ?? null,
+    eventCategory: row.event_category ?? null,
+    eventSubcategory: row.event_subcategory ?? null,
+    eventPrivacyTag: row.event_privacy_tag ?? null,
+    eventStatus: row.event_status ?? null,
+    // Data/hora ATUAL do evento (para mostrar "de → para").
+    eventStartDatetime: row.event_start_datetime ?? null,
+    eventEndDatetime: row.event_end_datetime ?? null,
+    eventDate: zonedParts(row.event_start_datetime)?.dateKey ?? null,
+    eventTimeStart: row.event_all_day ? null : (zonedParts(row.event_start_datetime)?.time ?? null),
+    eventAllDay: row.event_all_day == null ? null : !!row.event_all_day,
+  }
+}
+
+// SELECT com o contexto do evento e do requerente, partilhado pelas leituras.
+const CHANGE_SELECT = `
+  SELECT c.*,
+         ru.name  AS requester_name,
+         ru.email AS requester_email,
+         e.title          AS event_title,
+         e.community      AS event_community,
+         e.category       AS event_category,
+         e.subcategory    AS event_subcategory,
+         e.privacy_tag    AS event_privacy_tag,
+         e.status         AS event_status,
+         e.start_datetime AS event_start_datetime,
+         e.end_datetime   AS event_end_datetime,
+         e.all_day        AS event_all_day
+  FROM event_change_requests c
+  LEFT JOIN users ru ON ru.id = c.requested_by
+  LEFT JOIN events e ON e.id = c.event_id
+`
+
+export async function insertChangeRequest(data) {
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO event_change_requests
+      (id, event_id, series_id, scope, start_datetime, end_datetime, all_day,
+       recurrence, reason, requested_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [
+      id,
+      data.eventId,
+      data.seriesId ?? null,
+      data.scope ?? 'single',
+      toDb(data.startDatetime),
+      toDb(data.endDatetime),
+      data.allDay ?? false,
+      data.recurrence ? JSON.stringify(data.recurrence) : null,
+      data.reason ?? null,
+      data.requestedBy ?? null,
+    ]
+  )
+  return findChangeRequestById(id)
+}
+
+export async function findChangeRequestById(id) {
+  const { rows } = await pool.query(`${CHANGE_SELECT} WHERE c.id = $1`, [id])
+  return mapChangeRequest(rows[0])
+}
+
+// Lista pedidos de alteração por estado (string ou array). Mais recentes primeiro.
+export async function listChangeRequests({ status } = {}) {
+  const params = []
+  let where = ''
+  if (status) {
+    const statuses = Array.isArray(status) ? status : [status]
+    if (statuses.length > 0) {
+      params.push(statuses)
+      where = `WHERE c.status = ANY($${params.length})`
+    }
+  }
+  const { rows } = await pool.query(
+    `${CHANGE_SELECT} ${where} ORDER BY c.created_at DESC`,
+    params
+  )
+  return rows.map(mapChangeRequest)
+}
+
+export async function updateChangeRequestStatus(id, { status, rejectionReason = null, resolvedBy = null }) {
+  await pool.query(
+    `UPDATE event_change_requests SET
+       status = $2,
+       rejection_reason = $3,
+       resolved_by = $4,
+       resolved_at = now(),
+       updated_at = now()
+     WHERE id = $1`,
+    [id, status, rejectionReason, resolvedBy]
+  )
+  return findChangeRequestById(id)
+}
+
+// Remove um pedido de alteração (usado como rollback quando a aplicação imediata
+// falha após o registo do pedido).
+export async function deleteChangeRequest(id) {
+  await pool.query('DELETE FROM event_change_requests WHERE id = $1', [id])
+}

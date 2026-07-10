@@ -161,6 +161,33 @@ eventsRouter.get(
   })
 )
 
+// Pedidos de alteração (data/hora/recorrência) a eventos publicados que o
+// utilizador pode moderar. Registado ANTES de `/:id` (o guard de :id devolveria
+// 404 por "change-requests" não ser um UUID).
+eventsRouter.get(
+  '/change-requests',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ changes: await service.listChangeRequests(req.user, { status: req.query.status }) })
+  })
+)
+
+eventsRouter.post(
+  '/change-requests/:reqId/approve',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ request: await service.approveChange(req.user, req.params.reqId) })
+  })
+)
+
+eventsRouter.post(
+  '/change-requests/:reqId/reject',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ request: await service.rejectChange(req.user, req.params.reqId, req.body?.reason) })
+  })
+)
+
 // Pré-visualização de sobreposições (aviso em tempo real no formulário).
 eventsRouter.get(
   '/overlaps',
@@ -241,5 +268,15 @@ eventsRouter.post(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ event: await service.reject(req.user, req.params.id, req.body?.reason) })
+  })
+)
+
+// Pedido de alteração de data/hora/recorrência a um evento publicado. Admin/
+// aprovador aplicam de imediato; editores deixam o pedido pendente de aprovação.
+eventsRouter.post(
+  '/:id/change-request',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json(await service.requestChange(req.user, req.params.id, req.body))
   })
 )

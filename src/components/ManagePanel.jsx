@@ -319,6 +319,26 @@ function eventToForm(evt) {
   }
 }
 
+// Estado inicial do pedido de alteração de data/hora/recorrência de um evento
+// PUBLICADO. Pré-preenchido com a data/hora atuais; âmbito "apenas este evento".
+function eventToChangeForm(evt) {
+  return {
+    scope: 'single', // 'single' | 'series'
+    startDate: toDateInput(evt.startDatetime),
+    startTime: toTimeInput(evt.startDatetime),
+    endDate: toDateInput(evt.endDatetime),
+    endTime: toTimeInput(evt.endDatetime),
+    allDay: !!evt.allDay,
+    reason: '',
+    // Recorrência (apenas no âmbito "toda a série").
+    frequency: 'weekly',
+    interval: 1,
+    recEndType: 'count',
+    recEndCount: '',
+    recEndDate: '',
+  }
+}
+
 /**
  * ChurchAccessPicker — escolhe as igrejas a que um aprovador ou editor tem
  * acesso no SoR. `value === null` significa "todas as igrejas" (sem restrição).
@@ -453,6 +473,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [dragActive, setDragActive] = useState(false)
   // Ao editar uma ocorrência de uma série, aplicar a toda a série.
   const [applyToSeries, setApplyToSeries] = useState(false)
+  // Pedido de alteração de data/hora/recorrência de um evento publicado
+  // (null quando não aplicável). Fluxo de aprovação separado da edição normal.
+  const [changeForm, setChangeForm] = useState(
+    initialEditEvent && initialEditEvent.status === 'publicado'
+      ? eventToChangeForm(initialEditEvent)
+      : null
+  )
   const [integration, setIntegration] = useState(null) // config da inChurch
   const [syncing, setSyncing] = useState(false) // sincronização inChurch a decorrer
   const [purging, setPurging] = useState(false) // purga dos eventos externos a decorrer
@@ -553,6 +580,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setEditingId(null)
     setEditingStatus(null)
     setApplyToSeries(false)
+    setChangeForm(null)
     setView('form')
   }
 
@@ -561,6 +589,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setEditingId(evt.id)
     setEditingStatus(evt.status ?? null)
     setApplyToSeries(false)
+    setChangeForm(evt.status === 'publicado' ? eventToChangeForm(evt) : null)
     setView('form')
   }
 
@@ -1473,6 +1502,84 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               : 'Rascunho criado.'
         )
       }
+      await load()
+      exitForm()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Atualiza um campo do formulário de alteração (data/hora/recorrência).
+  const setChangeField = (key) => (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setChangeForm((f) => ({ ...f, [key]: value }))
+  }
+
+  // Admin e aprovador aplicam a alteração de imediato; o editor submete-a para
+  // aprovação. O backend revalida o papel — aqui é só para o rótulo do botão.
+  const changeAppliesImmediately = hasRole('admin', 'aprovador')
+
+  // Submete (ou aplica) um pedido de alteração de data/hora/recorrência a um
+  // evento publicado. Fluxo separado da gravação normal do formulário.
+  const handleRequestChange = async () => {
+    if (!changeForm) return
+    if (!changeForm.startDate) {
+      toast.error('Indique a nova data de início.')
+      return
+    }
+    const startIso = combineDateTime(changeForm.startDate, changeForm.startTime)
+    const endIso = changeForm.endDate ? combineDateTime(changeForm.endDate, changeForm.endTime) : null
+    if (endIso && new Date(endIso) < new Date(startIso)) {
+      toast.error('A data de fim não pode ser anterior à de início.')
+      return
+    }
+    const payload = {
+      scope: changeForm.scope,
+      startDatetime: startIso,
+      endDatetime: endIso,
+      allDay: changeForm.allDay,
+      reason: changeForm.reason.trim() || null,
+    }
+    // Âmbito "toda a série": valida e envia a recorrência (regenera as futuras).
+    if (changeForm.scope === 'series') {
+      if (changeForm.recEndType === 'count') {
+        const n = Number(changeForm.recEndCount)
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+          toast.error('Indique um número de ocorrências válido (1 a 100).')
+          return
+        }
+      }
+      if (changeForm.recEndType === 'date') {
+        if (!changeForm.recEndDate) {
+          toast.error('Indique a data de fim da recorrência.')
+          return
+        }
+        if (new Date(changeForm.recEndDate) < new Date(changeForm.startDate)) {
+          toast.error('A data de fim da recorrência não pode ser anterior ao início.')
+          return
+        }
+        const maxRec = new Date(changeForm.startDate)
+        maxRec.setMonth(maxRec.getMonth() + 6)
+        if (new Date(changeForm.recEndDate) > maxRec) {
+          toast.error('As recorrências não podem exceder 6 meses a partir do início.')
+          return
+        }
+      }
+      payload.recurrence = {
+        frequency: changeForm.frequency,
+        interval: Number(changeForm.interval) || 1,
+        end:
+          changeForm.recEndType === 'date'
+            ? { type: 'date', date: changeForm.recEndDate }
+            : { type: 'count', count: Number(changeForm.recEndCount) },
+      }
+    }
+    setBusy(true)
+    try {
+      const res = await eventsService.requestEventChange(editingId, payload)
+      toast.success(res.applied ? 'Alteração aplicada.' : 'Alteração submetida para aprovação.')
       await load()
       exitForm()
     } catch (err) {
@@ -3667,6 +3774,172 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     )}
                   </>
                 )}
+              </fieldset>
+            )}
+
+            {changeForm && (
+              <fieldset className={styles.recurrence}>
+                <legend>{t('changeDateTitle')}</legend>
+                <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                  {changeAppliesImmediately ? t('changeApplyHint') : t('changeRequestHint')}
+                </p>
+
+                <label className={styles.label}>
+                  {t('changeScope')}
+                  <select
+                    className={styles.input}
+                    value={changeForm.scope}
+                    onChange={setChangeField('scope')}
+                  >
+                    <option value="single">{t('changeScopeSingle')}</option>
+                    <option value="series">{t('changeScopeSeries')}</option>
+                  </select>
+                </label>
+
+                <div className={styles.row}>
+                  <label className={styles.label}>
+                    {t('startDate')} *
+                    <DateField
+                      className={styles.input}
+                      value={changeForm.startDate}
+                      onChange={(v) => setChangeForm((f) => ({ ...f, startDate: v }))}
+                      required
+                      ariaLabel={t('startDate')}
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    {t('startTime')}
+                    <TimeField
+                      className={styles.input}
+                      value={changeForm.startTime}
+                      onChange={(v) => setChangeForm((f) => ({ ...f, startTime: v }))}
+                      disabled={changeForm.allDay}
+                      ariaLabel={t('startTime')}
+                    />
+                  </label>
+                </div>
+
+                <div className={styles.row}>
+                  <label className={styles.label}>
+                    {t('endDate')}
+                    <DateField
+                      className={styles.input}
+                      value={changeForm.endDate}
+                      onChange={(v) => setChangeForm((f) => ({ ...f, endDate: v }))}
+                      ariaLabel={t('endDate')}
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    {t('endTime')}
+                    <TimeField
+                      className={styles.input}
+                      value={changeForm.endTime}
+                      onChange={(v) => setChangeForm((f) => ({ ...f, endTime: v }))}
+                      disabled={changeForm.allDay}
+                      ariaLabel={t('endTime')}
+                    />
+                  </label>
+                </div>
+
+                <label className={styles.check}>
+                  <input type="checkbox" checked={changeForm.allDay} onChange={setChangeField('allDay')} />
+                  {t('allDay')}
+                </label>
+
+                {changeForm.scope === 'series' && (
+                  <>
+                    <span className={styles.fieldHint}>{t('changeSeriesRecurrenceHint')}</span>
+                    <div className={styles.row}>
+                      <label className={styles.label}>
+                        {t('recFrequency')}
+                        <select
+                          className={styles.input}
+                          value={changeForm.frequency}
+                          onChange={setChangeField('frequency')}
+                        >
+                          <option value="daily">{t('recDaily')}</option>
+                          <option value="weekly">{t('recWeekly')}</option>
+                          <option value="monthly">{t('recMonthly')}</option>
+                        </select>
+                      </label>
+                      <label className={styles.label}>
+                        {t('recEvery')}
+                        <input
+                          type="number"
+                          min="1"
+                          max="99"
+                          className={styles.input}
+                          value={changeForm.interval}
+                          onChange={setChangeField('interval')}
+                        />
+                      </label>
+                    </div>
+                    <div className={styles.row}>
+                      <label className={styles.label}>
+                        {t('recEnds')}
+                        <select
+                          className={styles.input}
+                          value={changeForm.recEndType}
+                          onChange={setChangeField('recEndType')}
+                        >
+                          <option value="count">{t('recAfterN')}</option>
+                          <option value="date">{t('recOnDate')}</option>
+                        </select>
+                      </label>
+                      {changeForm.recEndType === 'count' ? (
+                        <label className={styles.label}>
+                          {t('recOccurrences')}
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            className={styles.input}
+                            value={changeForm.recEndCount}
+                            onChange={setChangeField('recEndCount')}
+                          />
+                        </label>
+                      ) : (
+                        <label className={styles.label}>
+                          {t('recEndDate')}
+                          <DateField
+                            className={styles.input}
+                            value={changeForm.recEndDate}
+                            min={changeForm.startDate || undefined}
+                            max={maxRecurrenceDate(changeForm.startDate)}
+                            onChange={(v) => setChangeForm((f) => ({ ...f, recEndDate: v }))}
+                            ariaLabel={t('recEndDate')}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <label className={styles.label}>
+                  {t('changeReason')}
+                  <textarea
+                    className={styles.textarea}
+                    rows={2}
+                    value={changeForm.reason}
+                    onChange={setChangeField('reason')}
+                    placeholder={t('changeReasonPlaceholder')}
+                  />
+                </label>
+
+                <div>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    disabled={busy}
+                    onClick={handleRequestChange}
+                  >
+                    <i
+                      className={`ti ${changeAppliesImmediately ? 'ti-calendar-check' : 'ti-send'}`}
+                      aria-hidden="true"
+                    />{' '}
+                    {changeAppliesImmediately ? t('changeApply') : t('changeSubmit')}
+                  </button>
+                </div>
               </fieldset>
             )}
 
