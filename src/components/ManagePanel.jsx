@@ -150,7 +150,7 @@ const emptyForm = {
   organizerPhone: '',
   organizerEmail: '',
   registrationUrl: '',
-  registrationType: 'link',
+  registrationType: 'none',
   attachmentUrl: '',
   attachmentName: '',
   mapUrl: '',
@@ -307,7 +307,7 @@ function eventToForm(evt) {
     organizerPhone: evt.organizerPhone ?? '',
     organizerEmail: evt.organizerEmail ?? '',
     registrationUrl: evt.registrationUrl ?? '',
-    registrationType: 'link',
+    registrationType: evt.registrationUrl ? 'link' : 'none',
     attachmentUrl: evt.attachmentUrl ?? '',
     attachmentName: evt.attachmentName ?? '',
     mapUrl: evt.mapUrl ?? '',
@@ -1422,7 +1422,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       organizerName: form.organizerName.trim() || null,
       organizerPhone: form.organizerPhone.trim() || null,
       organizerEmail: form.organizerEmail.trim() || null,
-      registrationUrl: form.registrationUrl.trim() || null,
+      registrationUrl: form.registrationType === 'link' ? form.registrationUrl.trim() || null : null,
       attachmentUrl: form.attachmentUrl.trim() || null,
       attachmentName: form.attachmentName.trim() || null,
       mapUrl: form.mapUrl.trim() || null,
@@ -1466,7 +1466,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     }
     // Etiqueta de privacidade obrigatória quando o evento é privado.
     if (form.isPrivate && !form.privacyTag) {
-      setActiveTab('datetime')
+      setActiveTab('classificacao')
       toast.error('Selecione uma etiqueta de privacidade para o evento privado.')
       return
     }
@@ -3194,8 +3194,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 <TabsTrigger value="datetime" className="gap-1.5"><i className="ti ti-calendar" aria-hidden="true" />{t('tabDateTime')}</TabsTrigger>
                 <TabsTrigger value="classificacao" className="gap-1.5"><i className="ti ti-tags" aria-hidden="true" />{t('tabClassification')}</TabsTrigger>
                 <TabsTrigger value="loop" className="gap-1.5"><i className="ti ti-device-tv" aria-hidden="true" />{t('tabLoop')}</TabsTrigger>
-                <TabsTrigger value="local" className="gap-1.5"><i className="ti ti-map-pin" aria-hidden="true" />{t('tabLocation')}</TabsTrigger>
-                <TabsTrigger value="organizacao" className="gap-1.5"><i className="ti ti-user" aria-hidden="true" />{t('tabOrganization')}</TabsTrigger>
                 <TabsTrigger value="registration" className="gap-1.5"><i className="ti ti-ticket" aria-hidden="true" />{t('tabRegistration')}</TabsTrigger>
               </TabsList>
 
@@ -3326,6 +3324,65 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 onChange={setField('description')}
               />
             </label>
+
+            <label className={styles.label}>
+              {t('mapLocation')}
+              <MapPicker
+                address={form.location}
+                value={
+                  form.mapLat != null && form.mapLng != null
+                    ? { lat: form.mapLat, lng: form.mapLng, url: form.mapUrl }
+                    : null
+                }
+                onChange={(next) =>
+                  setForm((f) => ({
+                    ...f,
+                    mapLat: next?.lat ?? null,
+                    mapLng: next?.lng ?? null,
+                    mapUrl: next?.url ?? '',
+                    location: next ? (next.address ?? f.location) : '',
+                  }))
+                }
+              />
+            </label>
+            {form.location && (
+              <p className={styles.fieldHint}>
+                <i className="ti ti-map-pin" aria-hidden="true" /> {t('address')}: {form.location}
+              </p>
+            )}
+
+            <label className={styles.label}>
+              {t('organizer')}
+              <input
+                className={styles.input}
+                value={form.organizerName}
+                onChange={setField('organizerName')}
+                placeholder={t('organizerPlaceholder')}
+              />
+            </label>
+
+            <div className={styles.row}>
+              <label className={styles.label}>
+                {t('organizerPhone')}
+                <input
+                  className={styles.input}
+                  type="tel"
+                  value={form.organizerPhone}
+                  onChange={setField('organizerPhone')}
+                  placeholder="Ex.: 912 345 678"
+                />
+              </label>
+              <label className={styles.label}>
+                {t('organizerEmail')}
+                <input
+                  className={styles.input}
+                  type="email"
+                  value={form.organizerEmail}
+                  onChange={setField('organizerEmail')}
+                  placeholder="nome@exemplo.pt"
+                />
+              </label>
+            </div>
               </TabsContent>
 
               <TabsContent value="classificacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
@@ -3381,6 +3438,35 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   </select>
                 </label>
               </div>
+            )}
+
+            <label className={styles.check}>
+              <input type="checkbox" checked={form.isPrivate} onChange={setField('isPrivate')} />
+              {t('privateRestricted')}
+            </label>
+
+            {form.isPrivate && (
+              <label className={styles.label}>
+                {t('privacyTag')} *
+                <select
+                  className={styles.input}
+                  value={form.privacyTag}
+                  onChange={setField('privacyTag')}
+                  required
+                >
+                  <option value="">{t('selectPlaceholder')}</option>
+                  {dbPrivacyTags.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                {dbPrivacyTags.length === 0 && (
+                  <span className={styles.fieldHint}>
+                    {t('noPrivacyTagsHint')}
+                  </span>
+                )}
+              </label>
             )}
               </TabsContent>
 
@@ -3537,70 +3623,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
               </TabsContent>
 
-              <TabsContent value="local" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
-            <label className={styles.label}>
-              {t('mapLocation')}
-              <MapPicker
-                address={form.location}
-                value={
-                  form.mapLat != null && form.mapLng != null
-                    ? { lat: form.mapLat, lng: form.mapLng, url: form.mapUrl }
-                    : null
-                }
-                onChange={(next) =>
-                  setForm((f) => ({
-                    ...f,
-                    mapLat: next?.lat ?? null,
-                    mapLng: next?.lng ?? null,
-                    mapUrl: next?.url ?? '',
-                    location: next ? (next.address ?? f.location) : '',
-                  }))
-                }
-              />
-            </label>
-            {form.location && (
-              <p className={styles.fieldHint}>
-                <i className="ti ti-map-pin" aria-hidden="true" /> {t('address')}: {form.location}
-              </p>
-            )}
-              </TabsContent>
-
-              <TabsContent value="organizacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
-            <label className={styles.label}>
-              {t('organizer')}
-              <input
-                className={styles.input}
-                value={form.organizerName}
-                onChange={setField('organizerName')}
-                placeholder={t('organizerPlaceholder')}
-              />
-            </label>
-
-            <div className={styles.row}>
-              <label className={styles.label}>
-                {t('organizerPhone')}
-                <input
-                  className={styles.input}
-                  type="tel"
-                  value={form.organizerPhone}
-                  onChange={setField('organizerPhone')}
-                  placeholder="Ex.: 912 345 678"
-                />
-              </label>
-              <label className={styles.label}>
-                {t('organizerEmail')}
-                <input
-                  className={styles.input}
-                  type="email"
-                  value={form.organizerEmail}
-                  onChange={setField('organizerEmail')}
-                  placeholder="nome@exemplo.pt"
-                />
-              </label>
-            </div>
-
-              </TabsContent>
-
               <TabsContent value="registration" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <label className={styles.label}>
               {t('registrationType')}
@@ -3609,11 +3631,12 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 value={form.registrationType}
                 onChange={setField('registrationType')}
               >
+                <option value="none">{t('registrationTypeNone')}</option>
                 <option value="link">{t('registrationTypeLink')}</option>
                 <option value="internal">{t('registrationTypeInternal')}</option>
               </select>
             </label>
-            {form.registrationType === 'link' ? (
+            {form.registrationType === 'link' && (
               <label className={styles.label}>
                 {t('registrationLink')}
                 <input
@@ -3624,7 +3647,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   placeholder="https://…"
                 />
               </label>
-            ) : (
+            )}
+            {form.registrationType === 'internal' && (
               <p className={styles.fieldHint}>{t('registrationInternalSoon')}</p>
             )}
               </TabsContent>
@@ -3718,35 +3742,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} disabled={dateTimeLocked} />
                 {t('allDay')}
               </label>
-              <label className={styles.check}>
-                <input type="checkbox" checked={form.isPrivate} onChange={setField('isPrivate')} />
-                {t('privateRestricted')}
-              </label>
             </div>
-
-            {form.isPrivate && (
-              <label className={styles.label}>
-                {t('privacyTag')} *
-                <select
-                  className={styles.input}
-                  value={form.privacyTag}
-                  onChange={setField('privacyTag')}
-                  required
-                >
-                  <option value="">{t('selectPlaceholder')}</option>
-                  {dbPrivacyTags.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {dbPrivacyTags.length === 0 && (
-                  <span className={styles.fieldHint}>
-                    {t('noPrivacyTagsHint')}
-                  </span>
-                )}
-              </label>
-            )}
 
             {!editingId && (
               <fieldset className={styles.recurrence}>
