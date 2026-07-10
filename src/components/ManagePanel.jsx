@@ -13,6 +13,7 @@ import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
 import DateField from './DateField'
 import TimeField from './TimeField'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
 import defaultLogoUrl from '../assets/cclx_line_logo.png'
@@ -471,6 +472,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [uploadingKey, setUploadingKey] = useState(null)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  // Separador ativo do formulário de evento (restruturação em separadores).
+  const [activeTab, setActiveTab] = useState('detalhes')
   // Ao editar uma ocorrência de uma série, aplicar a toda a série.
   const [applyToSeries, setApplyToSeries] = useState(false)
   // Pedido de alteração de data/hora/recorrência de um evento publicado
@@ -581,6 +584,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setEditingStatus(null)
     setApplyToSeries(false)
     setChangeForm(null)
+    setActiveTab('detalhes')
     setView('form')
   }
 
@@ -590,6 +594,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setEditingStatus(evt.status ?? null)
     setApplyToSeries(false)
     setChangeForm(evt.status === 'publicado' ? eventToChangeForm(evt) : null)
+    setActiveTab('detalhes')
     setView('form')
   }
 
@@ -1438,21 +1443,25 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const handleSave = async (e, submitForApproval = false) => {
     e.preventDefault()
     if (!form.title.trim() || !form.startDate) {
+      setActiveTab(!form.title.trim() ? 'detalhes' : 'datetime')
       toast.error('Título e data de início são obrigatórios.')
       return
     }
     if (formCategoryRequiresSub && !form.subcategory) {
+      setActiveTab('classificacao')
       toast.error('Esta categoria exige uma subcategoria.')
       return
     }
     const startIso = combineDateTime(form.startDate, form.startTime)
     const endIso = form.endDate ? combineDateTime(form.endDate, form.endTime) : null
     if (endIso && new Date(endIso) < new Date(startIso)) {
+      setActiveTab('datetime')
       toast.error('A data de fim não pode ser anterior à de início.')
       return
     }
     // Etiqueta de privacidade obrigatória quando o evento é privado.
     if (form.isPrivate && !form.privacyTag) {
+      setActiveTab('opcoes')
       toast.error('Selecione uma etiqueta de privacidade para o evento privado.')
       return
     }
@@ -1461,22 +1470,26 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       if (form.recEndType === 'count') {
         const n = Number(form.recEndCount)
         if (!Number.isInteger(n) || n < 1 || n > 100) {
+          setActiveTab('opcoes')
           toast.error('Indique um número de ocorrências válido (1 a 100).')
           return
         }
       }
       if (form.recEndType === 'date') {
         if (!form.recEndDate) {
+          setActiveTab('opcoes')
           toast.error('Indique a data de fim da recorrência.')
           return
         }
         if (new Date(form.recEndDate) < new Date(form.startDate)) {
+          setActiveTab('opcoes')
           toast.error('A data de fim da recorrência não pode ser anterior ao início.')
           return
         }
         const maxRec = new Date(form.startDate)
         maxRec.setMonth(maxRec.getMonth() + 6)
         if (new Date(form.recEndDate) > maxRec) {
+          setActiveTab('opcoes')
           toast.error('As recorrências não podem exceder 6 meses a partir do início.')
           return
         }
@@ -3169,7 +3182,18 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </div>
           </div>
         ) : (
-          <form className={styles.body} onSubmit={handleSave}>
+          <form className={styles.body} onSubmit={handleSave} noValidate>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex w-full flex-col gap-3">
+              <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1">
+                <TabsTrigger value="detalhes" className="gap-1.5"><i className="ti ti-file-text" aria-hidden="true" />{t('tabDetails')}</TabsTrigger>
+                <TabsTrigger value="datetime" className="gap-1.5"><i className="ti ti-calendar" aria-hidden="true" />{t('tabDateTime')}</TabsTrigger>
+                <TabsTrigger value="classificacao" className="gap-1.5"><i className="ti ti-tags" aria-hidden="true" />{t('tabClassification')}</TabsTrigger>
+                <TabsTrigger value="local" className="gap-1.5"><i className="ti ti-map-pin" aria-hidden="true" />{t('tabLocation')}</TabsTrigger>
+                <TabsTrigger value="organizacao" className="gap-1.5"><i className="ti ti-user" aria-hidden="true" />{t('tabOrganization')}</TabsTrigger>
+                <TabsTrigger value="opcoes" className="gap-1.5"><i className="ti ti-settings" aria-hidden="true" />{t('tabOptions')}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="detalhes" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <div className={styles.label}>
               {t('eventImage')}
               <div
@@ -3296,7 +3320,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 onChange={setField('description')}
               />
             </label>
+              </TabsContent>
 
+              <TabsContent value="datetime" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             {dateTimeLocked && (
               <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
                 {t('dateTimeLockedHint')}
@@ -3349,7 +3375,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 />
               </label>
             </div>
+              </TabsContent>
 
+              <TabsContent value="classificacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <div className={styles.row}>
               <label className={styles.label}>
                 {entity}
@@ -3579,7 +3607,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 )}
               </div>
             )}
+              </TabsContent>
 
+              <TabsContent value="local" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <label className={styles.label}>
               {t('address')}
               <input
@@ -3608,7 +3638,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 }
               />
             </label>
+              </TabsContent>
 
+              <TabsContent value="organizacao" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <label className={styles.label}>
               {t('organizer')}
               <input
@@ -3652,7 +3684,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 placeholder="https://…"
               />
             </label>
+              </TabsContent>
 
+              <TabsContent value="opcoes" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">
             <div className={styles.checks}>
               <label className={styles.check}>
                 <input type="checkbox" checked={form.allDay} onChange={setField('allDay')} disabled={dateTimeLocked} />
@@ -3942,6 +3976,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 </div>
               </fieldset>
             )}
+              </TabsContent>
+            </Tabs>
 
             {editingId && form.seriesId && (
               <label className={styles.check}>
