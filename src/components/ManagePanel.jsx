@@ -13,6 +13,7 @@ import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
 import DateField from './DateField'
 import TimeField from './TimeField'
+import InvitesAdmin from './invite/InvitesAdmin'
 import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
 import defaultLogoUrl from '../assets/cclx_line_logo.png'
@@ -259,6 +260,7 @@ const SECTION = {
   branding: { icon: 'ti-photo', title: 'Aparência' },
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
   loop: { icon: 'ti-device-tv', title: 'Loop (TV)' },
+  invites: { icon: 'ti-mail', title: 'Convites' },
 }
 
 // view → chave de tradução do título da secção (churches usa manageEntities;
@@ -276,6 +278,7 @@ const SECTION_TKEY = {
   branding: 'appearance',
   overlaps: 'overlaps',
   loop: 'manageLoop',
+  invites: 'manageInvites',
 }
 
 function eventToForm(evt) {
@@ -1777,6 +1780,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <span className={styles.menuDesc}>{t('manageLoopDesc')}</span>
                 </button>
               )}
+              {isManager && (
+                <button className={styles.menuCard} onClick={() => setView('invites')} disabled={busy}>
+                  <i className="ti ti-mail" aria-hidden="true" />
+                  <span className={styles.menuTitle}>{t('manageInvites')}</span>
+                  <span className={styles.menuDesc}>{t('manageInvitesDesc')}</span>
+                </button>
+              )}
             </div>
           </div>
         ) : view === 'events' ? (
@@ -3004,6 +3014,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 {uploadingLogo ? 'A carregar…' : 'Carregar logótipo'}
               </button>
             </div>
+          </div>
+        ) : view === 'invites' ? (
+          <div className={styles.body}>
+            <InvitesAdmin />
           </div>
         ) : view === 'loop' ? (
           <div className={styles.body}>
