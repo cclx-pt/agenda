@@ -3034,7 +3034,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             ) : (
               <ul className={styles.list}>
                 {loopChurches.map((church) => {
-                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', ...(loopConfig[church] || {}) }
+                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30, ...(loopConfig[church] || {}) }
                   const link = `${window.location.origin}/loop/${encodeURIComponent(church)}`
                   return (
                     <li key={church} className={`${styles.item} ${styles.userItemCol}`}>
@@ -3072,6 +3072,30 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                               value={cfg.weeks}
                               disabled={busy}
                               onChange={(e) => setLoopField(church, 'weeks', Number(e.target.value) || 1)}
+                            />
+                          </label>
+                          <label className={styles.check} title="Segundos por slide">
+                            Seg./slide
+                            <input
+                              type="number"
+                              min="3"
+                              max="120"
+                              className={styles.smallSelect}
+                              value={cfg.secondsPerSlide}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'secondsPerSlide', Number(e.target.value) || 15)}
+                            />
+                          </label>
+                          <label className={styles.check} title="Segundos por slide em destaque">
+                            Seg./slide (destaque)
+                            <input
+                              type="number"
+                              min="3"
+                              max="300"
+                              className={styles.smallSelect}
+                              value={cfg.secondsPerSlideFeatured}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'secondsPerSlideFeatured', Number(e.target.value) || 30)}
                             />
                           </label>
                           <label className={styles.check} title="Formato do ecrã da TV">
