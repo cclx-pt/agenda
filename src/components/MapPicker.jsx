@@ -39,11 +39,20 @@ export default function MapPicker({ value, onChange, address }) {
     if (mapObj.current || !mapRef.current) return
     const hasPoint = value?.lat != null && value?.lng != null
     const start = hasPoint ? [value.lat, value.lng] : DEFAULT_CENTER
-    const map = L.map(mapRef.current).setView(start, hasPoint ? 15 : 11)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const map = L.map(mapRef.current).setView(start, hasPoint ? 16 : 13)
+    // Duas camadas gratuitas e sem chave de API: ruas (OpenStreetMap) e
+    // satélite (Esri World Imagery). Um seletor no canto alterna entre elas.
+    const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
     }).addTo(map)
+    const satellite = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics', maxZoom: 19 }
+    )
+    L.control
+      .layers({ 'Mapa de ruas': streets, Satélite: satellite }, {}, { collapsed: false })
+      .addTo(map)
     map.on('click', (e) => commit(e.latlng.lat, e.latlng.lng))
     mapObj.current = map
     if (hasPoint) placeMarker(value.lat, value.lng)
