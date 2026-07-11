@@ -447,7 +447,14 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
 export default function ManagePanel({ onClose, initialView = 'home', initialEditEvent = null }) {
   const { user, hasRole } = useAuth()
   const { t, entity, entities, refreshTranslations, logoUrl, subcategoryColors, refreshBranding } = useI18n()
-  const containerRef = useModalA11y(onClose)
+  // Ao editar/criar um evento (view 'form') o painel NÃO fecha por clique fora
+  // nem por Esc — evita perder alterações. Só Guardar/Cancelar/X saem.
+  const viewRef = useRef(initialEditEvent ? 'form' : initialView)
+  const dismissPanel = useCallback(() => {
+    if (viewRef.current === 'form') return
+    onClose()
+  }, [onClose])
+  const containerRef = useModalA11y(dismissPanel)
 
   const isAdmin = hasRole('admin')
   // Quem pode gerir/moderar eventos: admin (todas as igrejas) e aprovador/editor
@@ -477,6 +484,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState(initialEditEvent ? 'form' : initialView) // 'home'|'events'|'form'|'users'|'api'|'reports'
+  // Mantém o ref sincronizado com a view (o guard de fecho lê-o fora do render).
+  useEffect(() => {
+    viewRef.current = view
+  }, [view])
   const [editingId, setEditingId] = useState(initialEditEvent?.id ?? null)
   const [editingStatus, setEditingStatus] = useState(initialEditEvent?.status ?? null)
   const [form, setForm] = useState(initialEditEvent ? eventToForm(initialEditEvent) : emptyForm)
@@ -1721,7 +1732,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     <motion.div
       className={styles.overlay}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) dismissPanel()
       }}
       role="dialog"
       aria-modal="true"
