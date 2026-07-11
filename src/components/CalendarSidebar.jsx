@@ -1,5 +1,5 @@
 import {
-  parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE,
+  parseDateKey, MONTHS_PT, WEEKDAYS_FULL, CATEGORY_META, STATUS_META, API_BADGE, seriesCode,
 } from '../utils/calendarHelpers'
 import { CalendarPlus, Church, Lock, Plus, Tag, Tags, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -148,6 +148,9 @@ export default function CalendarSidebar({
                     )}
                     {evt.isApi && (
                       <span className="ml-auto flex-shrink-0 rounded bg-blue-500 px-1.5 py-px text-[9px] font-extrabold tracking-wide text-white" title={API_BADGE.title}>{API_BADGE.label}</span>
+                    )}
+                    {evt.seriesId && (
+                      <span className="ml-auto flex-shrink-0 rounded bg-violet-500 px-1.5 py-px text-[9px] font-extrabold tracking-wide text-white" title={`Série recorrente #${seriesCode(evt.seriesId)}`}>#{seriesCode(evt.seriesId)}</span>
                     )}
                   </button>
                   </EventHoverCard>
