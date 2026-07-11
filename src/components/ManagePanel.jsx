@@ -482,6 +482,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     dbCategories.find((c) => c.slug === form.category)?.requiresSubcategory ?? false
   // Eventos publicados (aprovados): a data/hora ficam bloqueadas na edição.
   const dateTimeLocked = editingStatus === 'publicado'
+  // Recorrência configurável: ao criar, ou ao editar um rascunho que ainda não é série.
+  const canConfigureRecurrence = !editingId || (editingStatus === 'rascunho' && !form.seriesId)
   // Upload de imagem do evento.
   const [uploadingKey, setUploadingKey] = useState(null)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
@@ -1469,8 +1471,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       mapLng: form.mapLng ?? null,
       allowOverlap: form.allowOverlap === true,
     }
-    // Recorrência só na criação de um novo evento recorrente.
-    if (!editingId && form.recurrenceType === 'recurrent') {
+    // Recorrência: na criação, ou ao tornar um rascunho recorrente na edição.
+    if (canConfigureRecurrence && form.recurrenceType === 'recurrent') {
       const end =
         form.recEndType === 'date'
           ? { type: 'date', date: form.recEndDate }
@@ -1509,8 +1511,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       toast.error('Selecione uma etiqueta de privacidade para o evento privado.')
       return
     }
-    // Validação da recorrência (apenas na criação).
-    if (!editingId && form.recurrenceType === 'recurrent') {
+    // Validação da recorrência (criação ou tornar um rascunho recorrente).
+    if (canConfigureRecurrence && form.recurrenceType === 'recurrent') {
       if (form.recEndType === 'count') {
         const n = Number(form.recEndCount)
         if (!Number.isInteger(n) || n < 1 || n > 100) {
@@ -1546,7 +1548,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       if (editingId) {
         const scope = applyToSeries && form.seriesId ? 'series' : undefined
         await eventsService.updateEvent(editingId, payload, { scope })
-        toast.success(scope === 'series' ? 'Série atualizada.' : 'Evento atualizado.')
+        toast.success(
+          payload.recurrence
+            ? 'Série de rascunhos criada.'
+            : scope === 'series'
+              ? 'Série atualizada.'
+              : 'Evento atualizado.'
+        )
       } else {
         await eventsService.createEvent(payload)
         toast.success(
@@ -3858,7 +3866,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </label>
             </div>
 
-            {!editingId && (
+            {canConfigureRecurrence && (
               <fieldset className={styles.recurrence}>
                 <legend>{t('recurrence')}</legend>
                 <div className={styles.row}>
