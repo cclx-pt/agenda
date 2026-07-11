@@ -770,6 +770,54 @@ export async function update(user, id, input, { scope } = {}) {
     data.allDay = existing.allDay
   }
   const allowOverlap = input.allowOverlap === true
+
+  // Tornar recorrente na EDIÇÃO: apenas um rascunho único (ainda sem série) pode
+  // ganhar recorrência. Materializa a série mantendo ESTE evento como 1ª
+  // ocorrência (preserva id e histórico); as restantes entram como novos rascunhos.
+  const recurrence = recurrenceSchema.parse(input.recurrence)
+  if (recurrence && existing.status === 'rascunho' && !existing.seriesId) {
+    const occurrences = generateOccurrences(data.startDatetime, data.endDatetime, recurrence)
+    // Verifica TODAS as ocorrências antes de tocar em qualquer evento.
+    for (const occ of occurrences) {
+      await assertOverlapOk(
+        user,
+        { ...data, startDatetime: occ.startDatetime, endDatetime: occ.endDatetime },
+        { allowOverlap, excludeId: id }
+      )
+    }
+    const seriesId = randomUUID()
+    const [firstOcc, ...restOcc] = occurrences
+    // 1ª ocorrência = o próprio evento (mantém id/histórico); a data não muda.
+    await repo.update(id, {
+      ...data,
+      startDatetime: firstOcc.startDatetime,
+      endDatetime: firstOcc.endDatetime,
+    })
+    await repo.setSeriesId(id, seriesId)
+    await repo.addHistory({
+      eventId: id,
+      actorId: user.sub,
+      fromStatus: existing.status,
+      toStatus: existing.status,
+      comment: 'Tornado recorrente (série)',
+    })
+    // Restantes ocorrências como novos rascunhos da mesma série.
+    for (const occ of restOcc) {
+      const event = await repo.insert(
+        { ...data, startDatetime: occ.startDatetime, endDatetime: occ.endDatetime, seriesId },
+        user.sub
+      )
+      await repo.addHistory({
+        eventId: event.id,
+        actorId: user.sub,
+        fromStatus: null,
+        toStatus: 'rascunho',
+        comment: 'Criado (série)',
+      })
+    }
+    return repo.findById(id)
+  }
+
   await assertOverlapOk(user, data, {
     excludeId: id,
     excludeSeriesId: scope === 'series' ? existing.seriesId : undefined,
