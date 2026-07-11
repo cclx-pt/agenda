@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { STATUS_META, API_BADGE, formatTimeRange, formatDateLabel, formatDateRangeLabel, isMultiDay } from '../utils/calendarHelpers'
+import { STATUS_META, API_BADGE, seriesCode, formatTimeRange, formatDateLabel, formatDateRangeLabel, isMultiDay } from '../utils/calendarHelpers'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useEventColors } from '../hooks/useEventColors'
 import { Button } from '@/components/ui/button'
@@ -109,6 +109,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
               <span className="inline-flex items-center gap-1 rounded-sm bg-blue-500 px-2 py-[3px] text-[9px] font-extrabold uppercase tracking-wider text-white" title={API_BADGE.title}>
                 <i className={`ti ${API_BADGE.icon}`} aria-hidden="true" />
                 {API_BADGE.label}
+              </span>
+            )}
+            {event.seriesId && (
+              <span className="inline-flex items-center gap-1 rounded-sm bg-violet-500 px-2 py-[3px] text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Série recorrente #${seriesCode(event.seriesId)}`}>
+                <i className="ti ti-repeat" aria-hidden="true" />
+                #{seriesCode(event.seriesId)}
               </span>
             )}
           </div>

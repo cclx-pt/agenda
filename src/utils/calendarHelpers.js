@@ -217,3 +217,12 @@ export const STATUS_META = {
 
 // Selo para eventos importados da API externa (inChurch / inRadar).
 export const API_BADGE = { label: 'APP', icon: 'ti-cloud-download', title: 'Evento importado da inChurch (APP)' }
+
+// Código curto e estável para distinguir séries recorrentes entre si, derivado
+// do series_id (sem alterar a BD). O mesmo series_id dá sempre o mesmo código.
+export function seriesCode(seriesId) {
+  if (!seriesId) return null
+  const hex = String(seriesId).replace(/[^0-9a-f]/gi, '').slice(0, 8)
+  if (!hex) return null
+  return String(parseInt(hex, 16) % 10000).padStart(4, '0')
+}

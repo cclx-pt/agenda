@@ -1,4 +1,4 @@
-import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, isMultiDay, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
+import { mondayFirstDay, toDateKey, WEEKDAYS_SHORT, STATUS_META, API_BADGE, seriesCode, isMultiDay, isPastDateKey, PAST_DAY_CLASS } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
 import EventHoverCard from './EventHoverCard'
 import { cn } from '@/lib/utils'
@@ -71,6 +71,11 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                     <span className="mt-0.5 inline-flex items-center gap-[3px] rounded bg-blue-500 px-1.5 py-px text-[0.6rem] font-extrabold uppercase tracking-wide text-white" title={API_BADGE.title}>
                       <i className={`ti ${API_BADGE.icon}`} aria-hidden="true" />
                       {API_BADGE.label}
+                    </span>
+                  )}
+                  {evt.seriesId && (
+                    <span className="mt-0.5 inline-flex items-center gap-[3px] rounded bg-violet-500 px-1.5 py-px text-[0.6rem] font-extrabold uppercase tracking-wide text-white" title={`Série recorrente #${seriesCode(evt.seriesId)}`}>
+                      <i className="ti ti-repeat" aria-hidden="true" />#{seriesCode(evt.seriesId)}
                     </span>
                   )}
                 </button>

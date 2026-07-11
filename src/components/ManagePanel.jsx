@@ -457,6 +457,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Quem pode gerir/moderar eventos: admin (todas as igrejas) e aprovador/editor
   // (limitados às suas igrejas). O acesso por igreja é revalidado no backend.
   const isManager = hasRole('admin', 'aprovador', 'editor')
+  // Só admin/aprovador podem aplicar uma alteração a TODA a série.
+  const isAdminOrApprover = hasRole('admin', 'aprovador')
   const myChurches =
     Array.isArray(user?.churches) && user.churches.length > 0 ? user.churches : null
   const canAccessChurch = (community) =>
@@ -501,8 +503,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [dragActive, setDragActive] = useState(false)
   // Separador ativo do formulário de evento (restruturação em separadores).
   const [activeTab, setActiveTab] = useState('detalhes')
-  // Ao editar uma ocorrência de uma série, aplicar a toda a série.
-  const [applyToSeries, setApplyToSeries] = useState(false)
   // Pedido de alteração de data/hora/recorrência de um evento publicado
   // (null quando não aplicável). Fluxo de aprovação separado da edição normal.
   const [changeForm, setChangeForm] = useState(
@@ -609,7 +609,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setForm(emptyForm)
     setEditingId(null)
     setEditingStatus(null)
-    setApplyToSeries(false)
     setChangeForm(null)
     setActiveTab('detalhes')
     setView('form')
@@ -619,7 +618,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setForm(eventToForm(evt))
     setEditingId(evt.id)
     setEditingStatus(evt.status ?? null)
-    setApplyToSeries(false)
     setChangeForm(evt.status === 'publicado' ? eventToChangeForm(evt) : null)
     setActiveTab('detalhes')
     setView('form')
@@ -1557,7 +1555,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       const payload = buildPayload()
       if (submitForApproval && !editingId) payload.submit = true
       if (editingId) {
-        const scope = applyToSeries && form.seriesId ? 'series' : undefined
+        // Séries: perguntar (só a admin/aprovador) se aplica a toda a série.
+        let scope
+        if (form.seriesId && isAdminOrApprover) {
+          scope = window.confirm(
+            'Este evento faz parte de uma série recorrente. Aplicar esta alteração a TODA a série?\n\nOK = toda a série • Cancelar = apenas este evento'
+          )
+            ? 'series'
+            : undefined
+        }
         await eventsService.updateEvent(editingId, payload, { scope })
         toast.success(
           payload.recurrence
@@ -1761,11 +1767,27 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </button>
             )}
             <i className={`ti ${section.icon}`} aria-hidden="true" />
-            {view === 'form'
-              ? editingId ? t('editEvent') : t('newEvent')
-              : view === 'churches'
-                ? t('manageEntities', { entities })
-                : t(SECTION_TKEY[view] ?? 'manageAgenda')}
+            {view === 'form' ? (
+              editingId ? (
+                <>
+                  {t('editEvent')}
+                  {form.title.trim() && (
+                    <span
+                      className="max-w-[260px] truncate font-normal text-muted-foreground max-[560px]:max-w-[130px]"
+                      title={form.title.trim()}
+                    >
+                      — {form.title.trim()}
+                    </span>
+                  )}
+                </>
+              ) : (
+                t('newEvent')
+              )
+            ) : view === 'churches' ? (
+              t('manageEntities', { entities })
+            ) : (
+              t(SECTION_TKEY[view] ?? 'manageAgenda')
+            )}
           </h3>
           <button className={styles.closeBtn} onClick={onClose} aria-label={t('close')}>
             <i className="ti ti-x" aria-hidden="true" />
@@ -4133,17 +4155,6 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             )}
               </TabsContent>
             </Tabs>
-
-            {editingId && form.seriesId && (
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={applyToSeries}
-                  onChange={(e) => setApplyToSeries(e.target.checked)}
-                />
-                {t('applyToSeries')}
-              </label>
-            )}
 
             <div className={styles.formActions}>
               <button
