@@ -8,7 +8,7 @@ import { useChurches, invalidateChurches } from '../hooks/useChurches'
 import { useCategories, invalidateCategories } from '../hooks/useCategories'
 import { useSubcategories, invalidateSubcategories } from '../hooks/useSubcategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
-import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
+import { CATEGORY_META, formatDateNumeric, formatDateNumericValue, seriesCode } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
 import DateField from './DateField'
@@ -348,6 +348,8 @@ function eventToChangeForm(evt) {
     endTime: toTimeInput(evt.endDatetime),
     allDay: !!evt.allDay,
     reason: '',
+    // Recriar também as ocorrências passadas (só admin, âmbito "toda a série").
+    includePast: false,
     // Recorrência (apenas no âmbito "toda a série").
     frequency: 'weekly',
     interval: 1,
@@ -1626,6 +1628,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       endDatetime: endIso,
       allDay: changeForm.allDay,
       reason: changeForm.reason.trim() || null,
+      includePast: changeForm.includePast === true,
     }
     // Âmbito "toda a série": valida e envia a recorrência (regenera as futuras).
     if (changeForm.scope === 'series') {
@@ -1780,6 +1783,14 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                       title={form.title.trim()}
                     >
                       — {form.title.trim()}
+                    </span>
+                  )}
+                  {form.seriesId && (
+                    <span
+                      className="flex-shrink-0 rounded-sm bg-violet-500 px-1.5 py-0.5 text-[11px] font-extrabold tracking-wide text-white"
+                      title={`Série recorrente #${seriesCode(form.seriesId)}`}
+                    >
+                      #{seriesCode(form.seriesId)}
                     </span>
                   )}
                 </>
@@ -4137,6 +4148,19 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                         </label>
                       )}
                     </div>
+                    {isAdmin && (
+                      <label
+                        className={styles.check}
+                        title="Recria TODAS as ocorrências, incluindo as passadas, a partir da nova data de início. Ação destrutiva."
+                      >
+                        <input
+                          type="checkbox"
+                          checked={changeForm.includePast}
+                          onChange={setChangeField('includePast')}
+                        />
+                        Recriar também as ocorrências passadas (apaga e gera tudo de novo)
+                      </label>
+                    )}
                   </>
                 )}
 

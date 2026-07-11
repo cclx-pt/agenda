@@ -5,7 +5,6 @@ import {
   WEEKDAYS_SHORT,
   STATUS_META,
   API_BADGE,
-  seriesCode,
   formatTimeRange,
   formatDateNumeric,
   parseDateKey,
@@ -109,11 +108,6 @@ export default function ListView({ year, events, onSelectEvent }) {
                       {e.isApi && (
                         <span className="rounded-sm bg-blue-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white" title={API_BADGE.title}>
                           {API_BADGE.label}
-                        </span>
-                      )}
-                      {e.seriesId && (
-                        <span className="inline-flex items-center gap-1 rounded-sm bg-violet-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white" title={`Série recorrente #${seriesCode(e.seriesId)}`}>
-                          <i className="ti ti-repeat" aria-hidden="true" />#{seriesCode(e.seriesId)}
                         </span>
                       )}
                       <span
