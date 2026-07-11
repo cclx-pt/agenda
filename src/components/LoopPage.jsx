@@ -4,6 +4,8 @@ import { CalendarDays, Church } from 'lucide-react'
 import { getLoop } from '../services/apiService'
 
 const REFETCH_MS = 5 * 60 * 1000 // recarrega os eventos a cada 5 min
+const INTRO_VIDEO = '/vinheta-cclx.mp4' // vinheta CCLX antes do loop
+const INTRO_MAX_MS = 30000 // segurança: passa ao loop se o vídeo não terminar
 
 /**
  * LoopPage — página pública (para TV) que passa em carrossel, permanentemente,
@@ -13,6 +15,7 @@ const REFETCH_MS = 5 * 60 * 1000 // recarrega os eventos a cada 5 min
 export default function LoopPage({ church }) {
   const [state, setState] = useState({ loading: true, active: false, events: [], error: null, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 })
   const [index, setIndex] = useState(0)
+  const [introDone, setIntroDone] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -28,6 +31,14 @@ export default function LoopPage({ church }) {
     const t = setInterval(load, REFETCH_MS)
     return () => clearInterval(t)
   }, [load])
+
+  // Segurança: se o vídeo não disparar onEnded (falha de autoplay/ficheiro),
+  // avança para o loop ao fim de INTRO_MAX_MS.
+  useEffect(() => {
+    if (introDone) return
+    const t = setTimeout(() => setIntroDone(true), INTRO_MAX_MS)
+    return () => clearTimeout(t)
+  }, [introDone])
 
   const events = state.events
   const count = events.length
@@ -47,6 +58,22 @@ export default function LoopPage({ church }) {
       {children}
     </div>
   )
+
+  // Vinheta CCLX primeiro; ao terminar (ou por erro/segurança) passa ao loop.
+  if (!introDone)
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black">
+        <video
+          src={INTRO_VIDEO}
+          autoPlay
+          muted
+          playsInline
+          onEnded={() => setIntroDone(true)}
+          onError={() => setIntroDone(true)}
+          className="h-full w-full object-contain"
+        />
+      </div>
+    )
 
   if (state.loading) return wrap(<span className="text-2xl">A carregar…</span>)
   if (state.error) return wrap(<span className="text-2xl">{state.error}</span>)
