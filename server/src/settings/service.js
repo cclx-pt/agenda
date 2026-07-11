@@ -134,17 +134,26 @@ export async function updateBranding(input, actorId) {
 // app_settings key 'loop' = { [igreja]: { active, showGeneral, weeks, format } }.
 const LOOP_KEY = 'loop'
 const LOOP_FORMATS = ['16:9', '32:9']
-const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4, format: '16:9' }
+const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 }
 
 function normalizeLoopChurch(cfg) {
   const c = cfg && typeof cfg === 'object' ? cfg : {}
   const weeks = Number(c.weeks)
+  const sps = Number(c.secondsPerSlide)
+  const spsFeat = Number(c.secondsPerSlideFeatured)
   return {
     active: !!c.active,
     showGeneral: c.showGeneral !== false, // por omissão true
     weeks: Number.isInteger(weeks) && weeks >= 1 && weeks <= 52 ? weeks : LOOP_DEFAULTS.weeks,
     // Formato do ecrã da TV: 16:9 (1920x1080) ou 32:9 (3840x1080, ultrawide).
     format: LOOP_FORMATS.includes(c.format) ? c.format : LOOP_DEFAULTS.format,
+    // Duração de cada slide (segundos): normal e em destaque.
+    secondsPerSlide:
+      Number.isFinite(sps) && sps >= 3 && sps <= 120 ? Math.round(sps) : LOOP_DEFAULTS.secondsPerSlide,
+    secondsPerSlideFeatured:
+      Number.isFinite(spsFeat) && spsFeat >= 3 && spsFeat <= 300
+        ? Math.round(spsFeat)
+        : LOOP_DEFAULTS.secondsPerSlideFeatured,
   }
 }
 

@@ -18,7 +18,7 @@ loopRouter.get('/:church', async (req, res, next) => {
     if (!church) return res.status(404).json({ error: 'Igreja não indicada.' })
     const cfg = await settings.getLoopConfigForChurch(church)
     if (!cfg.active) {
-      return res.json({ active: false, church, weeks: cfg.weeks, format: cfg.format, events: [] })
+      return res.json({ active: false, church, weeks: cfg.weeks, format: cfg.format, secondsPerSlide: cfg.secondsPerSlide, secondsPerSlideFeatured: cfg.secondsPerSlideFeatured, events: [] })
     }
     const now = new Date()
     const end = new Date(now)
@@ -30,7 +30,7 @@ loopRouter.get('/:church', async (req, res, next) => {
       to: ymd(end),
     })
     res.setHeader('Cache-Control', 'public, max-age=120')
-    res.json({ active: true, church, weeks: cfg.weeks, format: cfg.format, events })
+    res.json({ active: true, church, weeks: cfg.weeks, format: cfg.format, secondsPerSlide: cfg.secondsPerSlide, secondsPerSlideFeatured: cfg.secondsPerSlideFeatured, events })
   } catch (err) {
     next(err)
   }

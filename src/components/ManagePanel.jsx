@@ -262,7 +262,7 @@ const SECTION = {
   translations: { icon: 'ti-language', title: 'Traduções' },
   branding: { icon: 'ti-photo', title: 'Aparência' },
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
-  loop: { icon: 'ti-device-tv', title: 'Loop (TV)' },
+  loop: { icon: 'ti-device-tv', title: 'Loop + CCLX' },
   invites: { icon: 'ti-mail', title: 'Convites' },
 }
 
@@ -739,7 +739,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     try {
       const saved = await eventsService.updateLoopConfig(loopConfig)
       setLoopConfig(saved || {})
-      toast.success('Configuração do Loop guardada.')
+      toast.success('Configuração do Loop + CCLX guardada.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -3040,15 +3040,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ) : view === 'loop' ? (
           <div className={styles.body}>
             <p className={styles.muted}>
-              O Loop é uma página pública (para TV) que passa em carrossel, sem parar, os cartazes
-              dos eventos publicados marcados com “Loop”. Configure por comunidade e abra o link na TV.
+              O Loop + CCLX é uma página pública (para TV) que passa em carrossel, sem parar, os cartazes
+              dos eventos publicados marcados com “Loop + CCLX”. Configure por comunidade e abra o link na TV.
             </p>
             {loopChurches.length === 0 ? (
               <p className={styles.muted}>Sem igrejas.</p>
             ) : (
               <ul className={styles.list}>
                 {loopChurches.map((church) => {
-                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', ...(loopConfig[church] || {}) }
+                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30, ...(loopConfig[church] || {}) }
                   const link = `${window.location.origin}/loop/${encodeURIComponent(church)}`
                   return (
                     <li key={church} className={`${styles.item} ${styles.userItemCol}`}>
@@ -3058,7 +3058,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                           <span className={styles.itemMeta}>{link}</span>
                         </div>
                         <div className={styles.userControls}>
-                          <label className={styles.check} title="Loop ativo nesta comunidade">
+                          <label className={styles.check} title="Loop + CCLX ativo nesta comunidade">
                             <input
                               type="checkbox"
                               checked={cfg.active}
@@ -3088,6 +3088,30 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                               onChange={(e) => setLoopField(church, 'weeks', Number(e.target.value) || 1)}
                             />
                           </label>
+                          <label className={styles.check} title="Segundos por slide">
+                            Seg./slide
+                            <input
+                              type="number"
+                              min="3"
+                              max="120"
+                              className={styles.smallSelect}
+                              value={cfg.secondsPerSlide}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'secondsPerSlide', Number(e.target.value) || 15)}
+                            />
+                          </label>
+                          <label className={styles.check} title="Segundos por slide em destaque">
+                            Seg./slide (destaque)
+                            <input
+                              type="number"
+                              min="3"
+                              max="300"
+                              className={styles.smallSelect}
+                              value={cfg.secondsPerSlideFeatured}
+                              disabled={busy}
+                              onChange={(e) => setLoopField(church, 'secondsPerSlideFeatured', Number(e.target.value) || 30)}
+                            />
+                          </label>
                           <label className={styles.check} title="Formato do ecrã da TV">
                             Formato
                             <select
@@ -3105,7 +3129,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                             href={link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="Abrir Loop"
+                            title="Abrir Loop + CCLX"
                           >
                             <i className="ti ti-external-link" aria-hidden="true" />
                           </a>

@@ -122,6 +122,8 @@ export async function getLoop(church) {
     active: !!data.active,
     weeks: data.weeks ?? 4,
     format: data.format === '32:9' ? '32:9' : '16:9',
+    secondsPerSlide: Number(data.secondsPerSlide) > 0 ? Number(data.secondsPerSlide) : 15,
+    secondsPerSlideFeatured: Number(data.secondsPerSlideFeatured) > 0 ? Number(data.secondsPerSlideFeatured) : 30,
     church: data.church ?? church,
     events: Array.isArray(data.events) ? data.events.map(mapSorEvent) : [],
   }
