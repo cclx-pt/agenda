@@ -942,6 +942,7 @@ const changeRequestSchema = z
     allDay: z.boolean().optional(),
     reason: z.string().trim().max(1000).optional().nullable(),
     allowOverlap: z.boolean().optional(),
+    includePast: z.boolean().optional(),
   })
   .refine(
     (d) => !d.endDatetime || Date.parse(d.endDatetime) >= Date.parse(d.startDatetime),
@@ -991,7 +992,7 @@ function eventToInsertData(event) {
 // Aplica um pedido de alteração ao evento (usado tanto na aplicação imediata por
 // admin/aprovador como na aprovação de um pedido de editor). Verifica a
 // sobreposição no momento da aplicação. Devolve o evento âncora atualizado/recriado.
-async function applyChange(user, event, request, { allowOverlap = false } = {}) {
+async function applyChange(user, event, request, { allowOverlap = false, includePast = false } = {}) {
   const scope = request.scope === 'series' ? 'series' : 'single'
   const recurrence = request.recurrence ? recurrenceSchema.parse(request.recurrence) : null
   const allDay = request.allDay ?? false
@@ -1054,9 +1055,10 @@ async function applyChange(user, event, request, { allowOverlap = false } = {}) 
   }
   // Regenera reaproveitando o evento âncora (não o eliminamos: manteria válido o
   // pedido de alteração, cuja FK a este evento é ON DELETE CASCADE). O âncora
-  // passa a ser a 1.ª ocorrência; as restantes ocorrências futuras da série são
-  // eliminadas e recriadas. As ocorrências PASSADAS mantêm-se.
-  const cutoff = todayStartInstant()
+  // passa a ser a 1.ª ocorrência; as restantes ocorrências da série são
+  // eliminadas e recriadas. Por omissão só as FUTURAS (as passadas mantêm-se);
+  // com `includePast` (apenas admin) elimina e recria TODAS, inclusive passadas.
+  const cutoff = includePast && user.role === 'admin' ? new Date(0) : todayStartInstant()
   const [firstOcc, ...restOccs] = occurrences
 
   if (event.seriesId) {
@@ -1172,7 +1174,10 @@ export async function requestChange(user, id, input) {
   if (['admin', 'aprovador'].includes(user.role)) {
     const request = await repo.insertChangeRequest(changeData)
     try {
-      await applyChange(user, event, changeData, { allowOverlap: data.allowOverlap === true })
+      await applyChange(user, event, changeData, {
+        allowOverlap: data.allowOverlap === true,
+        includePast: data.includePast === true,
+      })
     } catch (err) {
       await repo.deleteChangeRequest(request.id).catch(() => {})
       throw err

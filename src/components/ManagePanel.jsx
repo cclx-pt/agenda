@@ -345,6 +345,8 @@ function eventToChangeForm(evt) {
     endTime: toTimeInput(evt.endDatetime),
     allDay: !!evt.allDay,
     reason: '',
+    // Recriar também as ocorrências passadas (só admin, âmbito "toda a série").
+    includePast: false,
     // Recorrência (apenas no âmbito "toda a série").
     frequency: 'weekly',
     interval: 1,
@@ -1623,6 +1625,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       endDatetime: endIso,
       allDay: changeForm.allDay,
       reason: changeForm.reason.trim() || null,
+      includePast: changeForm.includePast === true,
     }
     // Âmbito "toda a série": valida e envia a recorrência (regenera as futuras).
     if (changeForm.scope === 'series') {
@@ -4131,6 +4134,19 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                         </label>
                       )}
                     </div>
+                    {isAdmin && (
+                      <label
+                        className={styles.check}
+                        title="Recria TODAS as ocorrências, incluindo as passadas, a partir da nova data de início. Ação destrutiva."
+                      >
+                        <input
+                          type="checkbox"
+                          checked={changeForm.includePast}
+                          onChange={setChangeField('includePast')}
+                        />
+                        Recriar também as ocorrências passadas (apaga e gera tudo de novo)
+                      </label>
+                    )}
                   </>
                 )}
 
