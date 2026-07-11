@@ -3326,6 +3326,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </label>
 
             <label className={styles.label}>
+              {t('address')}
+              <input
+                className={styles.input}
+                value={form.location}
+                onChange={setField('location')}
+              />
+            </label>
+
+            <label className={styles.label}>
               {t('mapLocation')}
               <MapPicker
                 address={form.location}
@@ -3340,16 +3349,11 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     mapLat: next?.lat ?? null,
                     mapLng: next?.lng ?? null,
                     mapUrl: next?.url ?? '',
-                    location: next ? (next.address ?? f.location) : '',
+                    location: next?.address ?? f.location,
                   }))
                 }
               />
             </label>
-            {form.location && (
-              <p className={styles.fieldHint}>
-                <i className="ti ti-map-pin" aria-hidden="true" /> {t('address')}: {form.location}
-              </p>
-            )}
 
             <label className={styles.label}>
               {t('organizer')}
