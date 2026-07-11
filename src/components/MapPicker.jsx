@@ -32,6 +32,7 @@ export default function MapPicker({ value, onChange, address }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
+  const [noResults, setNoResults] = useState(false)
 
   // Inicializa o mapa uma única vez (limpa no unmount / StrictMode).
   useEffect(() => {
@@ -69,20 +70,40 @@ export default function MapPicker({ value, onChange, address }) {
     onChange({ lat, lng, url: googleMapsUrl(lat, lng), address: addressText })
   }
 
+  // Uma consulta ao Nominatim, com viés para Portugal e resultados em pt.
+  async function geocode(q) {
+    const url =
+      'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8' +
+      `&countrycodes=pt&accept-language=pt&q=${encodeURIComponent(q)}`
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? data : []
+  }
+
   async function runSearch(term) {
     const q = (term ?? query).trim()
-    if (!q) return
+    if (q.length < 3) {
+      setResults([])
+      setNoResults(false)
+      return
+    }
     setSearching(true)
     setResults([])
+    setNoResults(false)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
-        { headers: { Accept: 'application/json' } }
-      )
-      const data = await res.json()
-      setResults(Array.isArray(data) ? data : [])
+      let data = await geocode(q)
+      // Sem resultados? Tenta sem a 1ª palavra — apanha nomes de local/marca à
+      // frente da morada (ex.: "CCLX Açores" → "Açores").
+      if (data.length === 0) {
+        const words = q.split(/\s+/)
+        if (words.length > 1) data = await geocode(words.slice(1).join(' '))
+      }
+      setResults(data)
+      setNoResults(data.length === 0)
     } catch {
       setResults([])
+      setNoResults(true)
     } finally {
       setSearching(false)
     }
@@ -91,6 +112,7 @@ export default function MapPicker({ value, onChange, address }) {
   function choose(r) {
     setQuery(r.display_name)
     setResults([])
+    setNoResults(false)
     commit(Number(r.lat), Number(r.lon), true, r.display_name)
   }
 
@@ -99,6 +121,7 @@ export default function MapPicker({ value, onChange, address }) {
       mapObj.current.removeLayer(markerRef.current)
       markerRef.current = null
     }
+    setNoResults(false)
     onChange(null)
   }
 
@@ -112,14 +135,17 @@ export default function MapPicker({ value, onChange, address }) {
           <input
             className="w-full rounded-lg border border-input bg-background py-2 pl-8 pr-2.5 text-[13px] text-foreground outline-none focus:border-ring"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setNoResults(false)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
                 runSearch()
               }
             }}
-            placeholder="Procurar morada ou local…"
+            placeholder="Procurar morada, rua ou localidade…"
           />
         </div>
         <button
@@ -161,6 +187,12 @@ export default function MapPicker({ value, onChange, address }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {noResults && !searching && (
+        <p className="text-[11px] font-medium text-muted-foreground">
+          Sem resultados. Tente por morada, rua ou localidade (ex.: “Ponta Delgada”) — ou clique no mapa para marcar o local.
+        </p>
       )}
 
       <div ref={mapRef} className="h-[260px] w-full overflow-hidden rounded-lg border border-border" />
