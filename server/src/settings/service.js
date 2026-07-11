@@ -130,18 +130,35 @@ export async function updateBranding(input, actorId) {
   return { logoUrl, subcategoryColors }
 }
 
-// ── Configuração do Loop (carrossel público por igreja, para TV) ──
-// app_settings key 'loop' = { [igreja]: { active, showGeneral, weeks, format } }.
+// ── Configuração do Loop + CCLX (múltiplos "loops" nomeados, para TV) ──
+// app_settings key 'loop' = { [slug]: { name, community, active, showGeneral,
+// weeks, format, secondsPerSlide, secondsPerSlideFeatured } }.
+// `community`: nome de igreja OU '' (= todas as igrejas). `slug` (chave) é
+// estável e usado no URL público /loop/<slug>. Config antiga (chaveada por
+// igreja, sem `name`) é migrada em leitura (name=community=igreja da chave).
 const LOOP_KEY = 'loop'
 const LOOP_FORMATS = ['16:9', '32:9']
 const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 }
 
-function normalizeLoopChurch(cfg) {
+// Texto → slug seguro em URL (sem acentos).
+function loopSlug(str) {
+  return String(str ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function normalizeLoop(cfg, fallbackName = '') {
   const c = cfg && typeof cfg === 'object' ? cfg : {}
   const weeks = Number(c.weeks)
   const sps = Number(c.secondsPerSlide)
   const spsFeat = Number(c.secondsPerSlideFeatured)
   return {
+    name: String(c.name ?? fallbackName ?? '').trim(),
+    // Igreja/comunidade cujos eventos aparecem; '' = todas as igrejas.
+    community: String(c.community ?? '').trim(),
     active: !!c.active,
     showGeneral: c.showGeneral !== false, // por omissão true
     weeks: Number.isInteger(weeks) && weeks >= 1 && weeks <= 52 ? weeks : LOOP_DEFAULTS.weeks,
@@ -157,26 +174,49 @@ function normalizeLoopChurch(cfg) {
   }
 }
 
-/** Mapa completo { [igreja]: { active, showGeneral, weeks } } (admin). */
+/**
+ * Mapa dos loops { [slug]: { name, community, active, ... } } (admin).
+ * Migra config antiga (chaveada por igreja, sem `name`) para o novo formato.
+ */
 export async function getLoopConfig() {
   const stored = await repo.get(LOOP_KEY)
-  return stored && typeof stored === 'object' ? stored : {}
+  const raw = stored && typeof stored === 'object' ? stored : {}
+  const out = {}
+  for (const [key, val] of Object.entries(raw)) {
+    if (!key || !val || typeof val !== 'object') continue
+    const legacy = val.name === undefined && val.community === undefined
+    const merged = legacy ? { ...val, name: key, community: key } : val
+    const slug = loopSlug(val.slug || merged.name || key)
+    if (!slug || out[slug]) continue
+    out[slug] = normalizeLoop(merged)
+  }
+  return out
 }
 
-/** Configuração efetiva (com omissões) para uma igreja (nome insensível a maiúsculas). */
-export async function getLoopConfigForChurch(church) {
+/** Loop efetivo pelo slug (aceita slug ou nome de igreja antigo). */
+export async function getLoopBySlug(slugOrChurch) {
   const all = await getLoopConfig()
-  const key = Object.keys(all).find((k) => k.toLowerCase() === String(church ?? '').toLowerCase())
-  return normalizeLoopChurch(key ? all[key] : null)
+  const want = loopSlug(slugOrChurch)
+  return all[want] ? { slug: want, ...all[want] } : null
 }
 
-/** Valida e persiste o mapa de configuração do Loop (admin). */
+/** Valida e persiste os loops (admin). Aceita array ou mapa; chaveia por slug. */
 export async function updateLoopConfig(input, actorId) {
   const raw = input && typeof input === 'object' ? input : {}
+  const list = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw).map(([slug, cfg]) => ({ slug, ...(cfg && typeof cfg === 'object' ? cfg : {}) }))
   const out = {}
-  for (const [church, cfg] of Object.entries(raw)) {
-    if (!church) continue
-    out[church] = normalizeLoopChurch(cfg)
+  for (const cfg of list) {
+    if (!cfg || typeof cfg !== 'object') continue
+    const loop = normalizeLoop(cfg)
+    if (!loop.name) continue // um loop precisa de nome
+    const base = loopSlug(cfg.slug || loop.name)
+    if (!base) continue
+    let slug = base
+    let n = 2
+    while (out[slug]) slug = `${base}-${n++}`
+    out[slug] = loop
   }
   await repo.set(LOOP_KEY, out, actorId)
   return out

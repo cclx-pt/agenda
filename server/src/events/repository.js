@@ -206,12 +206,14 @@ export async function listForLoop({ church, includeGeneral = true, from, to } = 
     // de semanas configurada; os restantes só dentro do intervalo.
     where.push(`(start_datetime < ($${params.length}::date + INTERVAL '1 day') OR loop_early = TRUE)`)
   }
-  params.push(church)
-  where.push(
-    includeGeneral
-      ? `(lower(community) = lower($${params.length}) OR is_general = TRUE)`
-      : `lower(community) = lower($${params.length})`
-  )
+  if (church) {
+    params.push(church)
+    where.push(
+      includeGeneral
+        ? `(lower(community) = lower($${params.length}) OR is_general = TRUE)`
+        : `lower(community) = lower($${params.length})`
+    )
+  }
   const { rows } = await pool.query(
     `SELECT * FROM events WHERE ${where.join(' AND ')} ORDER BY start_datetime ASC`,
     params

@@ -184,6 +184,16 @@ function maxRecurrenceDate(startDate) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+// Texto → slug seguro em URL (espelha o backend), para pré-visualizar o link.
+function loopSlugify(str) {
+  return String(str ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, churches: null, privacyTags: null }
 
 const emptyChurch = { name: '', externalId: '', address: '', postalCode: '' }
@@ -494,8 +504,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [newUser, setNewUser] = useState(emptyUser)
   const [editingUser, setEditingUser] = useState(null) // edição de um utilizador existente (estado local, gravação atómica)
   const [report, setReport] = useState(null)
-  // Configuração do Loop (carrossel TV) por comunidade.
-  const [loopConfig, setLoopConfig] = useState({})
+  // Loops (carrosséis públicos para TV): lista de loops com nome próprio (CRUD).
+  const [loops, setLoops] = useState([])
   const [loopChurches, setLoopChurches] = useState([])
   // Gestão de igrejas (admin).
   const [churchForm, setChurchForm] = useState(emptyChurch)
@@ -709,12 +719,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // ── Aparência / logótipo (admin) ───────────────────
   const openBranding = () => setView('branding')
 
-  // ── Loop (carrossel TV) por comunidade (admin) ─────────────────
+  // ── Loops (carrosséis TV com nome próprio) — CRUD (admin) ─────────
   const openLoop = async () => {
     setBusy(true)
     try {
       const { config, churches } = await eventsService.getLoopConfig()
-      setLoopConfig(config || {})
+      // config = { [slug]: { name, community, ... } } → lista editável.
+      setLoops(Object.entries(config || {}).map(([slug, cfg]) => ({ _key: slug, slug, ...cfg })))
       setLoopChurches(churches || [])
       setView('loop')
     } catch (err) {
@@ -724,19 +735,47 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     }
   }
 
-  const setLoopField = (church, key, value) => {
-    setLoopConfig((prev) => ({
+  const addLoop = () => {
+    setLoops((prev) => [
       ...prev,
-      [church]: { active: false, showGeneral: true, weeks: 4, format: '16:9', ...(prev[church] || {}), [key]: value },
-    }))
+      {
+        _key: `new-${Date.now()}-${prev.length}`,
+        slug: '',
+        name: '',
+        community: '',
+        active: false,
+        showGeneral: true,
+        weeks: 4,
+        format: '16:9',
+        secondsPerSlide: 15,
+        secondsPerSlideFeatured: 30,
+      },
+    ])
+  }
+
+  const setLoopField = (index, key, value) => {
+    setLoops((prev) => prev.map((l, i) => (i === index ? { ...l, [key]: value } : l)))
+  }
+
+  const removeLoop = (index) => {
+    setLoops((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSaveLoop = async () => {
+    if (loops.some((l) => !String(l.name || '').trim())) {
+      toast.error('Cada loop precisa de um nome.')
+      return
+    }
     setBusy(true)
     try {
-      const saved = await eventsService.updateLoopConfig(loopConfig)
-      setLoopConfig(saved || {})
-      toast.success('Configuração do Loop + CCLX guardada.')
+      const payload = loops.map((l) => {
+        const c = { ...l }
+        delete c._key
+        return c
+      })
+      const saved = await eventsService.updateLoopConfig(payload)
+      setLoops(Object.entries(saved || {}).map(([slug, cfg]) => ({ _key: slug, slug, ...cfg })))
+      toast.success('Loops guardados.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -3026,110 +3065,157 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ) : view === 'loop' ? (
           <div className={styles.body}>
             <p className={styles.muted}>
-              O Loop + CCLX é uma página pública (para TV) que passa em carrossel, sem parar, os cartazes
-              dos eventos publicados marcados com “Loop + CCLX”. Configure por comunidade e abra o link na TV.
+              Crie vários “Loop + CCLX” (páginas para TV). Cada loop passa em carrossel, sem parar,
+              as imagens dos eventos publicados marcados com “Loop + CCLX” de uma igreja (ou de todas).
+              Abra o link numa TV.
             </p>
-            {loopChurches.length === 0 ? (
-              <p className={styles.muted}>Sem igrejas.</p>
+            <div className={styles.toolbar}>
+              <button className={styles.primaryBtn} onClick={addLoop} disabled={busy}>
+                <i className="ti ti-plus" aria-hidden="true" />
+                <span>Adicionar loop</span>
+              </button>
+            </div>
+            {loops.length === 0 ? (
+              <p className={styles.muted}>Ainda não há loops. Carregue em “Adicionar loop” para criar o primeiro.</p>
             ) : (
               <ul className={styles.list}>
-                {loopChurches.map((church) => {
-                  const cfg = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30, ...(loopConfig[church] || {}) }
-                  const link = `${window.location.origin}/loop/${encodeURIComponent(church)}`
+                {loops.map((loop, i) => {
+                  const slug = loop.slug || loopSlugify(loop.name)
+                  const link = slug ? `${window.location.origin}/loop/${slug}` : ''
                   return (
-                    <li key={church} className={`${styles.item} ${styles.userItemCol}`}>
+                    <li key={loop._key} className={`${styles.item} ${styles.userItemCol}`}>
                       <div className={styles.userTop}>
-                        <div className={styles.itemText}>
-                          <strong className={styles.itemTitle}>{church}</strong>
-                          <span className={styles.itemMeta}>{link}</span>
+                        <div className={styles.itemText} style={{ flex: 1 }}>
+                          <input
+                            className={styles.input}
+                            placeholder="Nome do loop (ex.: Sede — Ecrã do átrio)"
+                            value={loop.name}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'name', e.target.value)}
+                          />
+                          {link ? (
+                            <span className={styles.itemMeta}>{link}</span>
+                          ) : (
+                            <span className={styles.itemMeta}>Dê um nome para gerar o link.</span>
+                          )}
                         </div>
-                        <div className={styles.userControls}>
-                          <label className={styles.check} title="Loop + CCLX ativo nesta comunidade">
-                            <input
-                              type="checkbox"
-                              checked={cfg.active}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'active', e.target.checked)}
-                            />
-                            Ativo
-                          </label>
-                          <label className={styles.check} title="Incluir eventos gerais">
-                            <input
-                              type="checkbox"
-                              checked={cfg.showGeneral}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'showGeneral', e.target.checked)}
-                            />
-                            Eventos gerais
-                          </label>
-                          <label className={styles.check} title="Nº de semanas a mostrar">
-                            Semanas
-                            <input
-                              type="number"
-                              min="1"
-                              max="52"
-                              className={styles.smallSelect}
-                              value={cfg.weeks}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'weeks', Number(e.target.value) || 1)}
-                            />
-                          </label>
-                          <label className={styles.check} title="Segundos por slide">
-                            Seg./slide
-                            <input
-                              type="number"
-                              min="3"
-                              max="120"
-                              className={styles.smallSelect}
-                              value={cfg.secondsPerSlide}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'secondsPerSlide', Number(e.target.value) || 15)}
-                            />
-                          </label>
-                          <label className={styles.check} title="Segundos por slide em destaque">
-                            Seg./slide (destaque)
-                            <input
-                              type="number"
-                              min="3"
-                              max="300"
-                              className={styles.smallSelect}
-                              value={cfg.secondsPerSlideFeatured}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'secondsPerSlideFeatured', Number(e.target.value) || 30)}
-                            />
-                          </label>
-                          <label className={styles.check} title="Formato do ecrã da TV">
-                            Formato
-                            <select
-                              className={styles.smallSelect}
-                              value={cfg.format}
-                              disabled={busy}
-                              onChange={(e) => setLoopField(church, 'format', e.target.value)}
-                            >
-                              <option value="16:9">16:9 (1920×1080)</option>
-                              <option value="32:9">32:9 (3840×1080)</option>
-                            </select>
-                          </label>
-                          <a
-                            className={styles.iconBtn}
-                            href={link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Abrir Loop + CCLX"
-                          >
-                            <i className="ti ti-external-link" aria-hidden="true" />
-                          </a>
+                        <div className={styles.actions}>
+                          {link && (
+                            <>
+                              <a
+                                className={styles.iconBtn}
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir Loop + CCLX"
+                              >
+                                <i className="ti ti-external-link" aria-hidden="true" />
+                              </a>
+                              <button
+                                className={styles.iconBtn}
+                                onClick={() =>
+                                  navigator.clipboard?.writeText(link).then(() => toast.success('Link copiado.'))
+                                }
+                                disabled={busy}
+                                title="Copiar link"
+                              >
+                                <i className="ti ti-copy" aria-hidden="true" />
+                              </button>
+                            </>
+                          )}
                           <button
                             className={styles.iconBtn}
-                            onClick={() =>
-                              navigator.clipboard?.writeText(link).then(() => toast.success('Link copiado.'))
-                            }
+                            onClick={() => removeLoop(i)}
                             disabled={busy}
-                            title="Copiar link"
+                            title="Eliminar loop"
                           >
-                            <i className="ti ti-copy" aria-hidden="true" />
+                            <i className="ti ti-trash" aria-hidden="true" />
                           </button>
                         </div>
+                      </div>
+                      <div className={styles.userControls}>
+                        <label className={styles.check} title="Igreja cujos eventos aparecem (ou Todas)">
+                          Igreja
+                          <select
+                            className={styles.smallSelect}
+                            value={loop.community}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'community', e.target.value)}
+                          >
+                            <option value="">Todas</option>
+                            {loopChurches.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className={styles.check} title="Loop + CCLX ativo">
+                          <input
+                            type="checkbox"
+                            checked={loop.active}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'active', e.target.checked)}
+                          />
+                          Ativo
+                        </label>
+                        <label className={styles.check} title="Incluir eventos gerais">
+                          <input
+                            type="checkbox"
+                            checked={loop.showGeneral}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'showGeneral', e.target.checked)}
+                          />
+                          Eventos gerais
+                        </label>
+                        <label className={styles.check} title="Nº de semanas a mostrar">
+                          Semanas
+                          <input
+                            type="number"
+                            min="1"
+                            max="52"
+                            className={styles.smallSelect}
+                            value={loop.weeks}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'weeks', Number(e.target.value) || 1)}
+                          />
+                        </label>
+                        <label className={styles.check} title="Formato do ecrã da TV">
+                          Formato
+                          <select
+                            className={styles.smallSelect}
+                            value={loop.format}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'format', e.target.value)}
+                          >
+                            <option value="16:9">16:9 (1920×1080)</option>
+                            <option value="32:9">32:9 (3840×1080)</option>
+                          </select>
+                        </label>
+                        <label className={styles.check} title="Segundos por slide">
+                          Seg./slide
+                          <input
+                            type="number"
+                            min="3"
+                            max="120"
+                            className={styles.smallSelect}
+                            value={loop.secondsPerSlide}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'secondsPerSlide', Number(e.target.value) || 15)}
+                          />
+                        </label>
+                        <label className={styles.check} title="Segundos por slide em destaque">
+                          Seg./slide (destaque)
+                          <input
+                            type="number"
+                            min="3"
+                            max="300"
+                            className={styles.smallSelect}
+                            value={loop.secondsPerSlideFeatured}
+                            disabled={busy}
+                            onChange={(e) => setLoopField(i, 'secondsPerSlideFeatured', Number(e.target.value) || 30)}
+                          />
+                        </label>
                       </div>
                     </li>
                   )
@@ -3139,7 +3225,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             <div className={styles.formActions}>
               <button className={styles.primaryBtn} onClick={handleSaveLoop} disabled={busy}>
                 <i className="ti ti-device-floppy" aria-hidden="true" />
-                <span>Guardar configuração</span>
+                <span>Guardar loops</span>
               </button>
             </div>
           </div>
