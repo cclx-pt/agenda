@@ -8,7 +8,7 @@ import { useChurches, invalidateChurches } from '../hooks/useChurches'
 import { useCategories, invalidateCategories } from '../hooks/useCategories'
 import { useSubcategories, invalidateSubcategories } from '../hooks/useSubcategories'
 import { usePrivacyTags, invalidatePrivacyTags } from '../hooks/usePrivacyTags'
-import { CATEGORY_META, formatDateNumeric, formatDateNumericValue } from '../utils/calendarHelpers'
+import { CATEGORY_META, formatDateNumeric, formatDateNumericValue, seriesCode } from '../utils/calendarHelpers'
 import { CHURCHES, CHURCH_NAMES, DEFAULT_CHURCH } from '../utils/churches'
 import MapPicker from './MapPicker'
 import DateField from './DateField'
@@ -1777,6 +1777,14 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                       title={form.title.trim()}
                     >
                       — {form.title.trim()}
+                    </span>
+                  )}
+                  {form.seriesId && (
+                    <span
+                      className="flex-shrink-0 rounded-sm bg-violet-500 px-1.5 py-0.5 text-[11px] font-extrabold tracking-wide text-white"
+                      title={`Série recorrente #${seriesCode(form.seriesId)}`}
+                    >
+                      #{seriesCode(form.seriesId)}
                     </span>
                   )}
                 </>

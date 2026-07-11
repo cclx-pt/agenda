@@ -1,6 +1,6 @@
 import {
   WEEKDAYS_SHORT, MONTHS_PT,
-  daysInMonth, mondayFirstDay, toDateKey, STATUS_META, API_BADGE, seriesCode,
+  daysInMonth, mondayFirstDay, toDateKey, STATUS_META, API_BADGE,
   isPastDateKey, PAST_DAY_HATCH
 } from '../utils/calendarHelpers'
 import { useEventColors } from '../hooks/useEventColors'
@@ -106,7 +106,6 @@ export default function MonthView({ year, month, eventsByDate, selectedKey, onDa
                       <span className="overflow-hidden text-ellipsis whitespace-nowrap">{evt.title} <span className="opacity-70">({evt.community})</span></span>
                       {st && <i className={`ti ${st.icon} ml-auto flex-shrink-0 text-[9px] opacity-85`} aria-hidden="true" />}
                       {evt.isApi && <span className="ml-auto flex-shrink-0 rounded-sm bg-blue-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={API_BADGE.title}>{API_BADGE.label}</span>}
-                      {evt.seriesId && <span className="ml-auto flex-shrink-0 rounded-sm bg-violet-500 px-1 text-[8px] font-extrabold leading-normal text-white" title={`Série recorrente #${seriesCode(evt.seriesId)}`}>#{seriesCode(evt.seriesId)}</span>}
                     </div>
                   </EventHoverCard>
                 )
