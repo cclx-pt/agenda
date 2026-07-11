@@ -12,25 +12,26 @@ const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 // ativado) os eventos "gerais", nas próximas N semanas. Sem autenticação.
 export const loopRouter = Router()
 
-loopRouter.get('/:church', async (req, res, next) => {
+loopRouter.get('/:slug', async (req, res, next) => {
   try {
-    const church = String(req.params.church || '').trim()
-    if (!church) return res.status(404).json({ error: 'Igreja não indicada.' })
-    const cfg = await settings.getLoopConfigForChurch(church)
-    if (!cfg.active) {
-      return res.json({ active: false, church, weeks: cfg.weeks, format: cfg.format, secondsPerSlide: cfg.secondsPerSlide, secondsPerSlideFeatured: cfg.secondsPerSlideFeatured, events: [] })
+    const slug = String(req.params.slug || '').trim()
+    if (!slug) return res.status(404).json({ error: 'Loop não indicado.' })
+    const cfg = await settings.getLoopBySlug(slug)
+    if (!cfg || !cfg.active) {
+      return res.json({ active: false, church: cfg?.community || slug, weeks: cfg?.weeks ?? 4, format: cfg?.format ?? '16:9', secondsPerSlide: cfg?.secondsPerSlide ?? 15, secondsPerSlideFeatured: cfg?.secondsPerSlideFeatured ?? 30, events: [] })
     }
     const now = new Date()
     const end = new Date(now)
     end.setDate(end.getDate() + cfg.weeks * 7)
     const events = await eventsRepo.listForLoop({
-      church,
+      // community vazia = todas as igrejas (sem filtro por comunidade).
+      church: cfg.community || undefined,
       includeGeneral: cfg.showGeneral,
       from: ymd(now),
       to: ymd(end),
     })
     res.setHeader('Cache-Control', 'public, max-age=120')
-    res.json({ active: true, church, weeks: cfg.weeks, format: cfg.format, secondsPerSlide: cfg.secondsPerSlide, secondsPerSlideFeatured: cfg.secondsPerSlideFeatured, events })
+    res.json({ active: true, church: cfg.community || cfg.name, weeks: cfg.weeks, format: cfg.format, secondsPerSlide: cfg.secondsPerSlide, secondsPerSlideFeatured: cfg.secondsPerSlideFeatured, events })
   } catch (err) {
     next(err)
   }
