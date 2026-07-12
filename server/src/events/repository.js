@@ -148,13 +148,21 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
   }
   // Interseção com o intervalo visível: inclui eventos de vários dias que
   // começam antes de `from` mas ainda decorrem, e que começam até `to`.
+  // A comparação é feita no fuso da igreja (Europe/Lisbon), não no do servidor
+  // (UTC no Vercel): caso contrário um evento que acaba às 00:00 locais (= 23:00
+  // UTC no verão) ficaria "no dia anterior" e desaparecia da vista diária do seu
+  // último dia, apesar de aparecer nas vistas mês/semana/lista.
   if (from) {
     params.push(from)
-    where.push(`COALESCE(end_datetime, start_datetime) >= $${params.length}::date`)
+    where.push(
+      `(COALESCE(end_datetime, start_datetime) AT TIME ZONE '${EVENT_TIME_ZONE}') >= $${params.length}::date`
+    )
   }
   if (to) {
     params.push(to)
-    where.push(`start_datetime < ($${params.length}::date + INTERVAL '1 day')`)
+    where.push(
+      `(start_datetime AT TIME ZONE '${EVENT_TIME_ZONE}') < ($${params.length}::date + INTERVAL '1 day')`
+    )
   }
   if (!includePrivate) {
     where.push('is_private = FALSE')
