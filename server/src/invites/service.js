@@ -91,6 +91,12 @@ const inviteInputSchema = z.object({
   startDatetime: isoDate,
   endDatetime: isoDate,
   location: z.string().trim().max(300).optional().nullable(),
+  mapUrl: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de localização inválido.')
+    .optional()
+    .nullable(),
   metaTitle: z.string().trim().max(200).optional().nullable(),
   metaDescription: z.string().trim().max(300).optional().nullable(),
   metaImageUrl: z
@@ -228,6 +234,7 @@ export async function getForEditor(user, id) {
         startDatetime: ev.startDatetime,
         endDatetime: ev.endDatetime,
         location: ev.location ?? null,
+        mapUrl: ev.mapUrl ?? null,
       }
     }
   }
@@ -372,6 +379,7 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
       startDatetime: invite.startDatetime,
       endDatetime: invite.endDatetime,
       location: invite.location,
+      mapUrl: invite.mapUrl,
       costType: invite.costType,
       costAmount: invite.costAmount,
       costCurrency: invite.costCurrency,
@@ -521,6 +529,7 @@ export async function listSelectableEvents(user) {
       endDatetime: e.endDatetime,
       bannerUrl: e.bannerUrl ?? null,
       location: e.location ?? null,
+      mapUrl: e.mapUrl ?? null,
       community: e.community,
     }))
 }

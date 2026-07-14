@@ -49,6 +49,12 @@ function BannerCard({ block, page, accent }) {
               {location}
             </span>
           ) : null}
+          {inv.mapUrl ? (
+            <a href={inv.mapUrl} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 font-semibold hover:underline" style={{ color: accent }}>
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              Ver no Google Maps
+            </a>
+          ) : null}
         </div>
         {c.shortDescription ? <p className="mt-4 text-foreground">{c.shortDescription}</p> : null}
         <a
@@ -239,8 +245,9 @@ function PaymentCard({ block, page }) {
 function LocationCard({ block, page }) {
   const c = block.content || {}
   const address = c.address || page.invite.location
-  if (!address && !c.directionsUrl) return null
-  const directions = c.directionsUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
+  const mapUrl = page.invite.mapUrl
+  if (!address && !c.directionsUrl && !mapUrl) return null
+  const directions = c.directionsUrl || mapUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">

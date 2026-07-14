@@ -194,7 +194,7 @@ function WorkshopsEditor({ content, onChange }) {
   )
 }
 
-function RsvpEditor({ content, onChange }) {
+export function RsvpEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   const fields = Array.isArray(content.fields) && content.fields.length ? content.fields : DEFAULT_RSVP_FIELDS
   const setFields = (next) => onChange({ ...content, fields: next })

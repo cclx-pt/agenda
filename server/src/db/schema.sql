@@ -461,6 +461,7 @@ CREATE INDEX IF NOT EXISTS idx_invite_payments_guest ON invite_payments (guest_i
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS rsvp_start_datetime TIMESTAMPTZ;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS use_event_banner BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS payment_method TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS map_url TEXT;
 
 -- Bilhetes (tipos) de um convite pago: individual, grupo ou campanha. Cada tipo
 -- tem preço, capacidade (NULL = ilimitado) e, para 'grupo', nº de pessoas por bilhete.

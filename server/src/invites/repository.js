@@ -18,6 +18,7 @@ function mapInvite(row) {
     startDatetime: row.start_datetime ?? null,
     endDatetime: row.end_datetime ?? null,
     location: row.location ?? null,
+    mapUrl: row.map_url ?? null,
     metaTitle: row.meta_title ?? null,
     metaDescription: row.meta_description ?? null,
     metaImageUrl: row.meta_image_url ?? null,
@@ -89,8 +90,8 @@ export async function insert(data, actorId) {
       (id, event_id, slug, title, banner_url, color_theme, start_datetime, end_datetime,
        location, meta_title, meta_description, meta_image_url, cost_type, cost_amount,
        cost_currency, payment_methods, rsvp_enabled, rsvp_deadline, capacity, community,
-       created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+       created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider, map_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
     [
       id,
       data.eventId ?? null,
@@ -117,6 +118,7 @@ export async function insert(data, actorId) {
       data.useEventBanner ?? false,
       data.paymentMethod ?? null,
       data.paymentProvider ?? null,
+      data.mapUrl ?? null,
     ]
   )
   return findById(id)
@@ -182,6 +184,7 @@ export async function update(id, data) {
        rsvp_start_datetime = $20,
        use_event_banner = $21,
        payment_method = $22,
+       map_url = $23,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -207,6 +210,7 @@ export async function update(id, data) {
       toDb(data.rsvpStartDatetime),
       data.useEventBanner ?? false,
       data.paymentMethod ?? null,
+      data.mapUrl ?? null,
     ]
   )
   return findById(id)

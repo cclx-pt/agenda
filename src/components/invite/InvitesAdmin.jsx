@@ -8,7 +8,7 @@ import * as invitesService from '../../services/invitesService'
 import { uploadEventImage } from '../../services/eventsService'
 import DateField from '../DateField'
 import TimeField from '../TimeField'
-import { BlockEditor } from './InviteBlockEditors'
+import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
 
@@ -101,6 +101,13 @@ function formatAnswer(field, value) {
 }
 
 // ── Editor de um convite ─────────────────────────────────────────
+const TAB_LIST = [
+  { id: 'definicoes', label: 'Definições' },
+  { id: 'formulario', label: 'Formulário' },
+  { id: 'pagina', label: 'Página' },
+  { id: 'inscricoes', label: 'Inscrições' },
+]
+
 function InviteEditor({ invite, onBack, onSaved }) {
   const [settings, setSettings] = useState(() => ({
     eventId: invite.eventId ?? '',
@@ -112,6 +119,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     endDate: toDateInput(invite.endDatetime),
     endTime: toTimeInput(invite.endDatetime),
     location: invite.location ?? '',
+    mapUrl: invite.mapUrl ?? '',
     // Banner.
     bannerUrl: invite.bannerUrl ?? '',
     useEventBanner: !!invite.useEventBanner,
@@ -138,6 +146,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [guests, setGuests] = useState(null)
   const [payments, setPayments] = useState(null)
   const [expandedGuest, setExpandedGuest] = useState(null)
+  const [tab, setTab] = useState('definicoes')
 
   // Carrega os eventos publicados/futuros associáveis.
   useEffect(() => {
@@ -171,7 +180,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
             startTime: toTimeInput(ev.startDatetime),
             endDate: toDateInput(ev.endDatetime),
             endTime: toTimeInput(ev.endDatetime),
-            location: s.location.trim() ? s.location : ev.location || '',
+            location: ev.location || s.location,
+            mapUrl: ev.mapUrl || s.mapUrl,
             useEventBanner: ev.bannerUrl ? true : s.useEventBanner,
           }
         : {}),
@@ -194,14 +204,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     }
   }
 
-  // Blocos: reordenar, visibilidade, remover, adicionar, editar conteúdo.
-  const moveBlock = (i, dir) => {
-    const j = i + dir
-    if (j < 0 || j >= blocks.length) return
-    const next = [...blocks]
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setBlocks(next)
-  }
+  // Blocos: visibilidade, remover, adicionar, editar conteúdo (reordenar via movePageBlock).
   const toggleVisible = (i) => setBlocks((b) => b.map((blk, idx) => (idx === i ? { ...blk, visible: !blk.visible } : blk)))
   const removeBlock = (i) => setBlocks((b) => b.filter((_, idx) => idx !== i))
   const setBlockContent = (i, content) => setBlocks((b) => b.map((blk, idx) => (idx === i ? { ...blk, content } : blk)))
@@ -223,6 +226,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     startDatetime: combineDateTime(settings.startDate, settings.startTime),
     endDatetime: settings.endDate ? combineDateTime(settings.endDate, settings.endTime) : null,
     location: settings.location.trim() || null,
+    mapUrl: settings.mapUrl.trim() || null,
     bannerUrl: settings.bannerUrl.trim() || null,
     useEventBanner: settings.useEventBanner,
     metaImageUrl: settings.bannerUrl.trim() || null,
@@ -353,6 +357,26 @@ function InviteEditor({ invite, onBack, onSaved }) {
   })()
   const ticketName = (id) => tickets.find((t) => t.id === id)?.name || ''
 
+  // Formulário de inscrição (bloco rsvp) editado num separador próprio, fora dos blocos.
+  const rsvpIndex = blocks.findIndex((b) => b.type === 'rsvp')
+  const setRsvpContent = (content) => {
+    if (rsvpIndex >= 0) setBlockContent(rsvpIndex, content)
+    else setBlocks((bs) => [...bs, { id: null, type: 'rsvp', visible: true, content }])
+  }
+  // Blocos da PÁGINA (exclui o rsvp, que se configura no separador Formulário).
+  const pageBlocks = blocks.map((b, i) => ({ b, i })).filter(({ b }) => b.type !== 'rsvp')
+  const movePageBlock = (vi, dir) => {
+    const target = vi + dir
+    if (target < 0 || target >= pageBlocks.length) return
+    const a = pageBlocks[vi].i
+    const bIdx = pageBlocks[target].i
+    setBlocks((bs) => {
+      const n = [...bs]
+      ;[n[a], n[bIdx]] = [n[bIdx], n[a]]
+      return n
+    })
+  }
+
   // Exporta as inscrições para CSV (abre no Excel): BOM UTF-8 + separador ';'.
   const exportGuests = () => {
     if (!guests || guests.length === 0) return
@@ -418,6 +442,26 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {TAB_LIST.map((tb) => (
+          <button
+            key={tb.id}
+            type="button"
+            onClick={() => setTab(tb.id)}
+            className={
+              'rounded-t-lg px-3 py-2 text-sm font-semibold transition-colors ' +
+              (tab === tb.id
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground')
+            }
+          >
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'definicoes' ? (
+        <>
       {/* Definições da página */}
       <section className="rounded-xl border border-border bg-card p-4">
         <h3 className="m-0 mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Definições</h3>
@@ -494,8 +538,14 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </div>
 
           <label className={labelCls}>
-            Local
+            Local / morada
             <input className={inputCls} value={settings.location} onChange={setField('location')} />
+          </label>
+
+          <label className={labelCls}>
+            Localização Google (link do Maps)
+            <input className={inputCls} type="url" placeholder="https://maps.google.com/…" value={settings.mapUrl} onChange={setField('mapUrl')} />
+            <span className="text-xs text-muted-foreground">Herdado do evento associado; podes também colar um link do Google Maps.</span>
           </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -622,14 +672,28 @@ function InviteEditor({ invite, onBack, onSaved }) {
           )}
         </section>
       ) : null}
+        </>
+      ) : null}
 
+      {tab === 'formulario' ? (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <h3 className="m-0 mb-1 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>
+          <p className="m-0 mb-3 text-xs text-muted-foreground">
+            Configure aqui os campos que os convidados preenchem — é um assunto à parte dos blocos da página.
+          </p>
+          <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} />
+        </section>
+      ) : null}
+
+      {tab === 'pagina' ? (
+        <>
       {/* Blocos de conteúdo */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Blocos da página</h3>
         </div>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {blocks.map((block, i) => (
+          {pageBlocks.map(({ b: block, i }, vi) => (
             <li key={block.id || `new-${i}`} className="rounded-lg border border-border bg-background">
               <div className="flex items-center gap-2 p-2">
                 <button
@@ -644,10 +708,10 @@ function InviteEditor({ invite, onBack, onSaved }) {
                 <button type="button" onClick={() => toggleVisible(i)} className="rounded p-1 text-muted-foreground hover:bg-accent" aria-label="Alternar visibilidade" title="Mostrar/ocultar">
                   <Eye className={'h-4 w-4 ' + (block.visible ? '' : 'opacity-30')} aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => moveBlock(i, -1)} disabled={i === 0} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Subir">
+                <button type="button" onClick={() => movePageBlock(vi, -1)} disabled={vi === 0} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Subir">
                   <ArrowUp className="h-4 w-4" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => moveBlock(i, 1)} disabled={i === blocks.length - 1} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
+                <button type="button" onClick={() => movePageBlock(vi, 1)} disabled={vi === pageBlocks.length - 1} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
                   <ArrowDown className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button type="button" onClick={() => removeBlock(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover bloco">
@@ -674,7 +738,11 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </button>
         </div>
       </section>
+        </>
+      ) : null}
 
+      {tab === 'inscricoes' ? (
+        <>
       {/* Inscrições */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -792,6 +860,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
             </ul>
           )}
         </section>
+      ) : null}
+        </>
       ) : null}
 
       {/* Barra de ações fixa em baixo */}
