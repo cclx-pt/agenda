@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   Plus, Pencil, Trash2, ExternalLink, Copy, Eye, Send, ArrowLeft, ArrowUp, ArrowDown,
-  Users, Image as ImageIcon, Loader2, ChevronDown, ChevronRight,
+  Users, Image as ImageIcon, Loader2, Download, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { uploadEventImage } from '../../services/eventsService'
@@ -10,6 +10,7 @@ import DateField from '../DateField'
 import TimeField from '../TimeField'
 import { BlockEditor } from './InviteBlockEditors'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
+import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
 const labelCls = 'flex flex-col gap-1 text-sm font-medium text-foreground'
@@ -72,6 +73,33 @@ function fmtEventOpt(iso) {
   return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+const RSVP_STATE_LABEL = { confirmed: 'Confirmado', waitlisted: 'Lista de espera', declined: 'Não vai', pending: 'Pendente' }
+
+// Data + hora (para a lista de inscrições e o Excel).
+function fmtDateTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Formata a resposta de um campo do formulário para leitura/exportação.
+function formatAnswer(field, value) {
+  if (value == null || value === '') return ''
+  if (Array.isArray(value)) {
+    return value
+      .map((c) =>
+        c && typeof c === 'object'
+          ? [c.nome, c.idade ? `${c.idade} anos` : '', c.alergias].filter(Boolean).join(' – ')
+          : String(c)
+      )
+      .filter(Boolean)
+      .join('; ')
+  }
+  if (typeof value === 'boolean' || field?.type === 'checkbox') return value ? 'Sim' : 'Não'
+  return String(value)
+}
+
 // ── Editor de um convite ─────────────────────────────────────────
 function InviteEditor({ invite, onBack, onSaved }) {
   const [settings, setSettings] = useState(() => ({
@@ -109,6 +137,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [addType, setAddType] = useState(ADDABLE_TYPES[0]?.type ?? 'info_extra')
   const [guests, setGuests] = useState(null)
   const [payments, setPayments] = useState(null)
+  const [expandedGuest, setExpandedGuest] = useState(null)
 
   // Carrega os eventos publicados/futuros associáveis.
   useEffect(() => {
@@ -304,6 +333,57 @@ function InviteEditor({ invite, onBack, onSaved }) {
     } finally {
       setBusy(false)
     }
+  }
+
+  // Colunas de respostas do formulário (vista detalhada + Excel). Derivadas da
+  // configuração do bloco RSVP, mais quaisquer chaves órfãs presentes nas respostas.
+  const rsvpBlock = blocks.find((b) => b.type === 'rsvp')
+  const answerFields = getFormFields(rsvpBlock?.content || {}).filter(
+    (f) => f.type !== 'section' && !SYSTEM_KEYS.includes(f.key)
+  )
+  const extraAnswerKeys = (() => {
+    const known = new Set(answerFields.map((f) => f.key))
+    const keys = []
+    for (const g of guests || []) {
+      for (const k of Object.keys(g.extra || {})) {
+        if (!known.has(k) && !keys.includes(k)) keys.push(k)
+      }
+    }
+    return keys
+  })()
+  const ticketName = (id) => tickets.find((t) => t.id === id)?.name || ''
+
+  // Exporta as inscrições para CSV (abre no Excel): BOM UTF-8 + separador ';'.
+  const exportGuests = () => {
+    if (!guests || guests.length === 0) return
+    const cols = [
+      ['Nome', (g) => g.name || ''],
+      ['Email', (g) => g.email || ''],
+      ['Telemóvel', (g) => g.phone || ''],
+      ['Estado', (g) => RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState || ''],
+      ['Pagamento', (g) => (g.paymentState === 'not_applicable' ? '' : PAY_LABEL[g.paymentState] || g.paymentState || '')],
+      ['Bilhete', (g) => ticketName(g.ticketId)],
+      ['Lugares', (g) => g.guestsCount ?? ''],
+      ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
+      ...answerFields.map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),
+      ...extraAnswerKeys.map((k) => [k, (g) => formatAnswer(null, g.extra?.[k])]),
+    ]
+    const cell = (v) => {
+      const s = String(v ?? '')
+      return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines = [cols.map((c) => cell(c[0])).join(';')]
+    for (const g of guests) lines.push(cols.map((c) => cell(c[1](g))).join(';'))
+    const csv = '\uFEFF' + lines.join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inscricoes-${invite.slug}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -597,27 +677,79 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
       {/* Inscrições */}
       <section className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Inscrições</h3>
-          <button type="button" onClick={loadGuests} className={ghostBtn}>
-            <Users className="h-4 w-4" aria-hidden="true" />
-            {guests ? 'Atualizar' : 'Ver inscrições'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {guests && guests.length > 0 ? (
+              <button type="button" onClick={exportGuests} className={ghostBtn}>
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Exportar Excel
+              </button>
+            ) : null}
+            <button type="button" onClick={loadGuests} className={ghostBtn}>
+              <Users className="h-4 w-4" aria-hidden="true" />
+              {guests ? 'Atualizar' : 'Ver inscrições'}
+            </button>
+          </div>
         </div>
         {guests ? (
           guests.length === 0 ? (
             <p className="m-0 mt-3 text-sm text-muted-foreground">Ainda não há inscrições.</p>
           ) : (
-            <ul className="m-0 mt-3 flex list-none flex-col gap-1 p-0">
-              {guests.map((g) => (
-                <li key={g.id} className="flex flex-wrap items-center gap-2 border-b border-border/60 py-1.5 text-sm">
-                  <span className="font-medium text-foreground">{g.name || '(sem nome)'}</span>
-                  {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
-                  <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
-                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">{g.rsvpState}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="m-0 mt-3 text-xs text-muted-foreground">
+                {guests.length} inscrição(ões). Clique num nome para ver as respostas.
+              </p>
+              <ul className="m-0 mt-1 flex list-none flex-col gap-0 p-0">
+                {guests.map((g) => {
+                  const open = expandedGuest === g.id
+                  const entries = [
+                    g.phone ? { label: 'Telemóvel', value: g.phone } : null,
+                    g.ticketId ? { label: 'Bilhete', value: ticketName(g.ticketId) } : null,
+                    g.paymentState && g.paymentState !== 'not_applicable'
+                      ? { label: 'Pagamento', value: PAY_LABEL[g.paymentState] || g.paymentState }
+                      : null,
+                    { label: 'Inscrito em', value: fmtDateTime(g.respondedAt || g.createdAt) },
+                    ...answerFields.map((f) => ({ label: f.label || f.key, value: formatAnswer(f, g.extra?.[f.key]) })),
+                    ...extraAnswerKeys.map((k) => ({ label: k, value: formatAnswer(null, g.extra?.[k]) })),
+                  ].filter((e) => e && e.value !== '' && e.value != null)
+                  return (
+                    <li key={g.id} className="border-b border-border/60">
+                      <div className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedGuest(open ? null : g.id)}
+                          className="inline-flex items-center gap-1 text-left font-medium text-foreground"
+                          aria-expanded={open}
+                        >
+                          {open ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          )}
+                          {g.name || '(sem nome)'}
+                        </button>
+                        {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
+                        <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
+                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                          {RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState}
+                        </span>
+                      </div>
+                      {open ? (
+                        <dl className="m-0 mb-3 grid grid-cols-1 gap-x-4 gap-y-2 pl-5 text-sm sm:grid-cols-2">
+                          {entries.map((e, idx) => (
+                            <div key={idx} className="flex flex-col">
+                              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{e.label}</dt>
+                              <dd className="m-0 whitespace-pre-line text-foreground">{e.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           )
         ) : null}
       </section>

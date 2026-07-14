@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, InfoExtraCard, NarrativeCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
 import { fmtDateRange } from './inviteUtils'
+import {
+  getFormFields, isVisible, initialValues, validateForm, buildSubmission,
+} from './inviteFormFields'
 
 // Mapa tipo → componente (rsvp é tratado à parte: precisa de estado/handlers).
 const BLOCK_COMPONENTS = {
@@ -72,6 +75,7 @@ function StatusCard({ status }) {
 function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
   const c = block.content || {}
   const inv = page.invite
+  const fields = getFormFields(c)
   const [deadlinePassed] = useState(
     () => Boolean(inv.rsvpDeadline) && Date.now() > Date.parse(inv.rsvpDeadline)
   )
@@ -80,8 +84,8 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
   )
   const tickets = (page.tickets || []).filter((t) => !t.soldOut)
   const paidWithTickets = inv.costType !== 'gratuito' && tickets.length > 0
-  const [form, setForm] = useState({ name: '', email: '', phone: '', guestsCount: 1, attend: 'yes', ticketId: '' })
-  const [extra, setExtra] = useState({})
+  const [values, setValues] = useState(() => initialValues(fields))
+  const [ticketId, setTicketId] = useState('')
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
@@ -94,28 +98,34 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
     )
   }
 
-  const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const extraFields = Array.isArray(c.extraFields) ? c.extraFields : []
+  const setVal = (key, v) => setValues((s) => ({ ...s, [key]: v }))
+  const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!form.name.trim()) {
-      toast.error('Indique o seu nome.')
+    const err = validateForm(fields, values)
+    if (err) {
+      toast.error(err)
       return
     }
-    if (paidWithTickets && form.attend === 'yes' && !form.ticketId) {
+    if (paidWithTickets && !ticketId) {
       toast.error('Escolha um bilhete.')
+      return
+    }
+    const { name, email, phone, extra } = buildSubmission(fields, values)
+    if (!name.trim()) {
+      toast.error('Indique o seu nome.')
       return
     }
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {
-        name: form.name.trim(),
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        guestsCount: Number(form.guestsCount) || 1,
-        attend: form.attend === 'yes',
-        ticketId: form.ticketId || null,
+        name,
+        email,
+        phone,
+        guestsCount: 1,
+        attend: true,
+        ticketId: ticketId || null,
         extra: Object.keys(extra).length ? extra : null,
       })
       onSubmitted(res)
@@ -127,7 +137,126 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
     }
   }
 
-  const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
+  // Renderiza um campo do formulário conforme o seu tipo (respeita condicionais).
+  const renderField = (f) => {
+    if (!isVisible(f, values)) return null
+    if (f.type === 'section') {
+      return (
+        <div key={f.key} className="mt-2 border-b border-border pb-1">
+          <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">{f.label}</h3>
+        </div>
+      )
+    }
+    const val = values[f.key]
+    const req = f.required ? <span className="text-destructive"> *</span> : null
+
+    if (f.type === 'children') {
+      const kids = Array.isArray(val) ? val : []
+      const setKids = (next) => setVal(f.key, next)
+      const patchKid = (i, patch) => setKids(kids.map((k, idx) => (idx === i ? { ...k, ...patch } : k)))
+      return (
+        <div key={f.key} className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 p-3">
+          <p className="m-0 text-sm font-medium text-foreground">
+            {f.label}
+            {req}
+          </p>
+          {kids.map((kid, i) => (
+            <div key={i} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
+              <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-3">
+                <input className={inputCls} placeholder="Nome" value={kid.nome ?? ''} onChange={(e) => patchKid(i, { nome: e.target.value })} />
+                <input type="number" min="0" max="18" className={inputCls} placeholder="Idade" value={kid.idade ?? ''} onChange={(e) => patchKid(i, { idade: e.target.value })} />
+                <input className={inputCls} placeholder="Alergias / necessidades" value={kid.alergias ?? ''} onChange={(e) => patchKid(i, { alergias: e.target.value })} />
+              </div>
+              <button type="button" onClick={() => setKids(kids.filter((_, idx) => idx !== i))} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover criança">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setKids([...kids, { nome: '', idade: '', alergias: '' }])}
+            className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-accent"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            Adicionar criança
+          </button>
+        </div>
+      )
+    }
+
+    if (f.type === 'checkbox') {
+      return (
+        <label key={f.key} className="flex items-start gap-2 text-sm text-foreground">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 flex-shrink-0" checked={!!val} onChange={(e) => setVal(f.key, e.target.checked)} />
+          <span>
+            {f.label}
+            {req}
+          </span>
+        </label>
+      )
+    }
+
+    if (f.type === 'select') {
+      return (
+        <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+          <span>
+            {f.label}
+            {req}
+          </span>
+          <select className={inputCls} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)}>
+            <option value="">— Selecione —</option>
+            {(f.options || []).map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+
+    if (f.type === 'radio') {
+      return (
+        <div key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+          <span>
+            {f.label}
+            {req}
+          </span>
+          <div className="flex flex-wrap gap-3">
+            {(f.options || []).map((o) => (
+              <label key={o} className="inline-flex items-center gap-1.5 font-normal">
+                <input type="radio" name={f.key} value={o} checked={val === o} onChange={() => setVal(f.key, o)} />
+                {o}
+              </label>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (f.type === 'textarea') {
+      return (
+        <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+          <span>
+            {f.label}
+            {req}
+          </span>
+          <textarea className={inputCls} rows={2} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
+        </label>
+      )
+    }
+
+    const inputType = f.type === 'email' ? 'email' : f.type === 'tel' ? 'tel' : f.type === 'number' ? 'number' : 'text'
+    return (
+      <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        <span>
+          {f.label}
+          {req}
+        </span>
+        <input type={inputType} className={inputCls} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
+      </label>
+    )
+  }
 
   return (
     <div id="inscricoes" className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -139,14 +268,10 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-            Nome *
-            <input className={inputCls} value={form.name} onChange={setField('name')} required />
-          </label>
           {paidWithTickets ? (
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               Bilhete *
-              <select className={inputCls} value={form.ticketId} onChange={setField('ticketId')}>
+              <select className={inputCls} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
                 <option value="">— Escolha o bilhete —</option>
                 {tickets.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -158,49 +283,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
               </select>
             </label>
           ) : null}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Email
-              <input type="email" className={inputCls} value={form.email} onChange={setField('email')} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Telefone
-              <input className={inputCls} value={form.phone} onChange={setField('phone')} />
-            </label>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Nº de pessoas
-              <input type="number" min="1" max="50" className={inputCls} value={form.guestsCount} onChange={setField('guestsCount')} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Vais estar presente?
-              <select className={inputCls} value={form.attend} onChange={setField('attend')}>
-                <option value="yes">Sim, confirmo</option>
-                <option value="no">Não vou poder ir</option>
-              </select>
-            </label>
-          </div>
-          {extraFields.map((f) => (
-            <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              {f.label}
-              {f.type === 'boolean' ? (
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={!!extra[f.key]}
-                  onChange={(e) => setExtra((x) => ({ ...x, [f.key]: e.target.checked }))}
-                />
-              ) : (
-                <input
-                  type={f.type === 'number' ? 'number' : 'text'}
-                  className={inputCls}
-                  value={extra[f.key] ?? ''}
-                  onChange={(e) => setExtra((x) => ({ ...x, [f.key]: e.target.value }))}
-                />
-              )}
-            </label>
-          ))}
+          {fields.map(renderField)}
           <button
             type="submit"
             disabled={busy}
