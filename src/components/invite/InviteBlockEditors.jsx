@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
 
 // Editores de conteúdo por tipo de bloco (formulários "sem código"). Cada editor
 // recebe { content, onChange } e chama onChange(novoConteudo) a cada alteração.
@@ -195,37 +196,155 @@ function WorkshopsEditor({ content, onChange }) {
 
 function RsvpEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  const fields = Array.isArray(content.fields) && content.fields.length ? content.fields : DEFAULT_RSVP_FIELDS
+  const setFields = (next) => onChange({ ...content, fields: next })
+  const updateField = (i, patch) => setFields(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
+  const removeField = (i) => setFields(fields.filter((_, idx) => idx !== i))
+  const moveField = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= fields.length) return
+    const next = [...fields]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setFields(next)
+  }
+  const addField = () =>
+    setFields([
+      ...fields,
+      { key: deriveKey('Novo campo', fields.map((f) => f.key)), type: 'text', label: 'Novo campo', required: false },
+    ])
+
+  // Campos que podem controlar a visibilidade condicional de outros.
+  const controllers = fields.filter((f) => ['checkbox', 'select', 'radio'].includes(f.type))
+
   return (
-    <div className="flex flex-col gap-2">
-      <label className={labelCls}>
-        Texto do botão
-        <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Confirmar Presença" />
-      </label>
-      <label className={labelCls}>
-        Texto informativo (opcional)
-        <input className={inputCls} value={content.infoText ?? ''} onChange={set('infoText')} placeholder="Vagas limitadas. Inscrições até…" />
-      </label>
-      <div>
-        <p className="m-0 mb-1 text-xs font-semibold text-muted-foreground">Campos adicionais</p>
-        <RowsEditor
-          rows={content.extraFields}
-          onChange={(extraFields) => onChange({ ...content, extraFields })}
-          emptyRow={{ key: '', label: '', type: 'text', required: false }}
-          addLabel="Adicionar campo"
-          render={(row, upd) => (
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-              <input className={inputCls} placeholder="Chave (ex.: acompanhantes)" value={row.key ?? ''} onChange={(e) => upd({ key: e.target.value })} />
-              <input className={inputCls} placeholder="Rótulo" value={row.label ?? ''} onChange={(e) => upd({ label: e.target.value })} />
-              <select className={inputCls} value={row.type ?? 'text'} onChange={(e) => upd({ type: e.target.value })}>
-                <option value="text">Texto</option>
-                <option value="number">Número</option>
-                <option value="boolean">Sim/Não</option>
-              </select>
-            </div>
-          )}
-        />
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className={labelCls}>
+          Texto do botão
+          <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Confirmar Presença" />
+        </label>
+        <label className={labelCls}>
+          Texto informativo (opcional)
+          <input className={inputCls} value={content.infoText ?? ''} onChange={set('infoText')} placeholder="Vagas limitadas. Inscrições até…" />
+        </label>
       </div>
-      <p className="m-0 text-xs text-muted-foreground">O prazo e a capacidade definem-se nas definições do convite.</p>
+
+      <p className="m-0 text-xs font-semibold text-muted-foreground">Campos do formulário</p>
+      <div className="flex flex-col gap-2">
+        {fields.map((f, i) => {
+          const isName = f.key === 'name'
+          const isSystem = SYSTEM_KEYS.includes(f.key)
+          const eligible = controllers.filter((c) => c.key !== f.key)
+          const ctrl = f.visibleWhen?.field ? fields.find((x) => x.key === f.visibleWhen.field) : null
+          return (
+            <div key={f.key || i} className="rounded-lg border border-border bg-background p-2">
+              <div className="flex items-start gap-2">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                    <select className={inputCls} value={f.type} onChange={(e) => updateField(i, { type: e.target.value })} disabled={isSystem} aria-label="Tipo de campo">
+                      {FIELD_TYPES.map((t) => (
+                        <option key={t.type} value={t.type}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className={inputCls + ' sm:col-span-2'}
+                      placeholder={f.type === 'section' ? 'Título da secção' : 'Rótulo do campo'}
+                      value={f.label ?? ''}
+                      onChange={(e) => updateField(i, { label: e.target.value })}
+                    />
+                  </div>
+
+                  {hasOptions(f.type) ? (
+                    <textarea
+                      className={inputCls}
+                      rows={3}
+                      placeholder="Uma opção por linha"
+                      value={(f.options || []).join('\n')}
+                      onChange={(e) => updateField(i, { options: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })}
+                    />
+                  ) : null}
+
+                  {f.type !== 'section' ? (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                        <input type="checkbox" checked={!!f.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
+                        Obrigatório
+                      </label>
+                      {eligible.length > 0 ? (
+                        <div className="inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          Mostrar se
+                          <select
+                            className={inputCls + ' w-auto py-1'}
+                            value={f.visibleWhen?.field || ''}
+                            onChange={(e) => {
+                              const field = e.target.value
+                              if (!field) return updateField(i, { visibleWhen: undefined })
+                              const c = fields.find((x) => x.key === field)
+                              const equals = c?.type === 'checkbox' ? true : c?.options?.[0] ?? ''
+                              return updateField(i, { visibleWhen: { field, equals } })
+                            }}
+                          >
+                            <option value="">— sempre visível —</option>
+                            {eligible.map((c) => (
+                              <option key={c.key} value={c.key}>
+                                {c.label || c.key}
+                              </option>
+                            ))}
+                          </select>
+                          {f.visibleWhen?.field && ctrl?.type === 'checkbox' ? <span>= marcado</span> : null}
+                          {f.visibleWhen?.field && ctrl && ctrl.type !== 'checkbox' ? (
+                            <select
+                              className={inputCls + ' w-auto py-1'}
+                              value={String(f.visibleWhen.equals ?? '')}
+                              onChange={(e) => updateField(i, { visibleWhen: { field: f.visibleWhen.field, equals: e.target.value } })}
+                            >
+                              {(ctrl.options || []).map((o) => (
+                                <option key={o} value={o}>
+                                  {o}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => moveField(i, -1)} disabled={i === 0} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Subir">
+                    <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={() => moveField(i, 1)} disabled={i === fields.length - 1} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
+                    <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeField(i)}
+                    disabled={isName}
+                    className="rounded p-1 text-destructive hover:bg-destructive/10 disabled:opacity-30"
+                    aria-label="Remover campo"
+                    title={isName ? 'Campo obrigatório do sistema' : 'Remover'}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <button type="button" onClick={addField} className={smallBtn}>
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        Adicionar campo
+      </button>
+      <p className="m-0 text-xs text-muted-foreground">
+        O prazo e a capacidade definem-se nas definições do convite. Os campos Nome, Email e Telemóvel ligam-se
+        automaticamente ao registo do convidado; os restantes ficam guardados na inscrição.
+      </p>
     </div>
   )
 }
