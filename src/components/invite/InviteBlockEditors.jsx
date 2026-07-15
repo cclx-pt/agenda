@@ -1,4 +1,4 @@
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Copy } from 'lucide-react'
 import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
 
 // Editores de conteúdo por tipo de bloco (formulários "sem código"). Cada editor
@@ -212,6 +212,11 @@ export function RsvpEditor({ content, onChange }) {
       ...fields,
       { key: deriveKey('Novo campo', fields.map((f) => f.key)), type: 'text', label: 'Novo campo', required: false },
     ])
+  const duplicateField = (i) => {
+    const src = fields[i]
+    const copy = { ...src, key: deriveKey(src.label || 'campo', fields.map((f) => f.key)) }
+    setFields([...fields.slice(0, i + 1), copy, ...fields.slice(i + 1)])
+  }
 
   // Campos que podem controlar a visibilidade condicional de outros.
   const controllers = fields.filter((f) => ['checkbox', 'select', 'radio'].includes(f.type))
@@ -267,6 +272,15 @@ export function RsvpEditor({ content, onChange }) {
                   ) : null}
 
                   {f.type !== 'section' ? (
+                    <>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {['text', 'textarea', 'email', 'tel', 'number'].includes(f.type) ? (
+                        <input className={inputCls} placeholder="Placeholder (opcional)" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} />
+                      ) : (
+                        <span />
+                      )}
+                      <input className={inputCls} placeholder="Ajuda / descrição (opcional)" value={f.help ?? ''} onChange={(e) => updateField(i, { help: e.target.value })} />
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
                         <input type="checkbox" checked={!!f.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
@@ -310,6 +324,7 @@ export function RsvpEditor({ content, onChange }) {
                         </div>
                       ) : null}
                     </div>
+                    </>
                   ) : null}
                 </div>
 
@@ -319,6 +334,9 @@ export function RsvpEditor({ content, onChange }) {
                   </button>
                   <button type="button" onClick={() => moveField(i, 1)} disabled={i === fields.length - 1} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
                     <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={() => duplicateField(i)} className="rounded p-1 text-muted-foreground hover:bg-accent" aria-label="Duplicar campo" title="Duplicar">
+                    <Copy className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     type="button"

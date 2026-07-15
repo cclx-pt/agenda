@@ -17,11 +17,16 @@ export const FIELD_TYPES = [
   { type: 'number', label: 'Número' },
   { type: 'select', label: 'Lista suspensa' },
   { type: 'radio', label: 'Escolha única' },
+  { type: 'multiselect', label: 'Escolha múltipla' },
   { type: 'checkbox', label: 'Confirmação / consentimento' },
   { type: 'children', label: 'Crianças (repetível)' },
 ]
 
-export const hasOptions = (type) => type === 'select' || type === 'radio'
+export const hasOptions = (type) => type === 'select' || type === 'radio' || type === 'multiselect'
+
+// Validação leve no cliente (o backend revalida via zod).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const digitsCount = (s) => (String(s).match(/\d/g) || []).length
 
 // Estrutura predefinida (usada em convites novos ou sem formulário configurado).
 export const DEFAULT_RSVP_FIELDS = [
@@ -117,24 +122,35 @@ export function initialValues(fields) {
   for (const f of fields) {
     if (f.type === 'section') continue
     if (f.type === 'checkbox') v[f.key] = false
-    else if (f.type === 'children') v[f.key] = []
+    else if (f.type === 'children' || f.type === 'multiselect') v[f.key] = []
     else v[f.key] = ''
   }
   return v
 }
 
-// Valida os campos VISÍVEIS e obrigatórios. Devolve a 1ª mensagem de erro ou null.
+// Valida os campos VISÍVEIS e obrigatórios (+ formato de email/telemóvel).
+// Devolve a 1ª mensagem de erro ou null.
 export function validateForm(fields, values) {
   for (const f of fields) {
     if (f.type === 'section' || !isVisible(f, values)) continue
-    if (!f.required) continue
     const val = values[f.key]
-    if (f.type === 'checkbox') {
-      if (!val) return `É necessário confirmar: “${f.label}”.`
-    } else if (f.type === 'children') {
-      if (!Array.isArray(val) || val.length === 0) return `${f.label}: adicione pelo menos uma criança.`
-    } else if (val == null || String(val).trim() === '') {
+    const empty =
+      f.type === 'checkbox'
+        ? !val
+        : f.type === 'children' || f.type === 'multiselect'
+          ? !Array.isArray(val) || val.length === 0
+          : val == null || String(val).trim() === ''
+    if (f.required && empty) {
+      if (f.type === 'checkbox') return `É necessário confirmar: “${f.label}”.`
+      if (f.type === 'children') return `${f.label}: adicione pelo menos uma criança.`
+      if (f.type === 'multiselect') return `Selecione pelo menos uma opção em “${f.label}”.`
       return `O campo “${f.label}” é obrigatório.`
+    }
+    if (!empty && f.type === 'email' && !EMAIL_RE.test(String(val).trim())) {
+      return `Email inválido em “${f.label}”.`
+    }
+    if (!empty && f.type === 'tel' && digitsCount(val) < 9) {
+      return `Telemóvel inválido em “${f.label}” (mín. 9 dígitos).`
     }
   }
   return null
@@ -156,6 +172,9 @@ export function buildSubmission(fields, values) {
     else if (f.type === 'children') {
       const rows = (Array.isArray(val) ? val : []).filter((c) => c.nome || c.idade || c.alergias)
       if (rows.length) extra[f.key] = rows
+    } else if (f.type === 'multiselect') {
+      const arr = Array.isArray(val) ? val : []
+      if (arr.length) extra[f.key] = arr
     } else if (f.type === 'checkbox') {
       extra[f.key] = !!val
     } else if (val != null && String(val).trim() !== '') {

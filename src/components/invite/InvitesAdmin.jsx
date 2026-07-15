@@ -9,6 +9,7 @@ import { uploadEventImage } from '../../services/eventsService'
 import DateField from '../DateField'
 import TimeField from '../TimeField'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
+import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
 
@@ -147,6 +148,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [payments, setPayments] = useState(null)
   const [expandedGuest, setExpandedGuest] = useState(null)
   const [tab, setTab] = useState('definicoes')
+  const [showFormPreview, setShowFormPreview] = useState(false)
 
   // Carrega os eventos publicados/futuros associáveis.
   useEffect(() => {
@@ -375,6 +377,28 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ;[n[a], n[bIdx]] = [n[bIdx], n[a]]
       return n
     })
+  }
+  // Página sintética para a pré-visualização do formulário (sem submeter).
+  const previewPage = {
+    slug: invite.slug,
+    invite: {
+      costType: settings.costType,
+      costAmount: settings.costType === 'gratuito' ? null : Number(settings.costAmount) || null,
+      costCurrency: 'EUR',
+      rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
+      rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
+    },
+    tickets: (tickets || [])
+      .filter((t) => (t.name || '').trim() && t.active !== false)
+      .map((t) => ({
+        id: t.id || t.name,
+        name: t.name,
+        price: t.price === '' || t.price == null ? null : Number(t.price),
+        currency: 'EUR',
+        kind: t.kind,
+        groupSize: t.groupSize ? Number(t.groupSize) : null,
+        soldOut: false,
+      })),
   }
 
   // Exporta as inscrições para CSV (abre no Excel): BOM UTF-8 + separador ';'.
@@ -677,11 +701,30 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
       {tab === 'formulario' ? (
         <section className="rounded-xl border border-border bg-card p-4">
-          <h3 className="m-0 mb-1 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>
+            <button type="button" onClick={() => setShowFormPreview((v) => !v)} className={ghostBtn}>
+              <Eye className="h-4 w-4" aria-hidden="true" />
+              {showFormPreview ? 'Editar campos' : 'Pré-visualizar'}
+            </button>
+          </div>
           <p className="m-0 mb-3 text-xs text-muted-foreground">
             Configure aqui os campos que os convidados preenchem — é um assunto à parte dos blocos da página.
           </p>
-          <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} />
+          {showFormPreview ? (
+            <div className="rounded-xl border border-dashed border-border bg-muted/30 p-3">
+              <RsvpCard
+                block={{ content: rsvpBlock?.content || {} }}
+                page={previewPage}
+                accent={settings.colorTheme || '#1F3864'}
+                guestStatus={null}
+                onSubmitted={() => {}}
+                preview
+              />
+            </div>
+          ) : (
+            <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} />
+          )}
         </section>
       ) : null}
 

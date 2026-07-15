@@ -72,7 +72,7 @@ function StatusCard({ status }) {
   )
 }
 
-function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
+export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, preview = false }) {
   const c = block.content || {}
   const inv = page.invite
   const fields = getFormFields(c)
@@ -115,6 +115,10 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
     const { name, email, phone, extra } = buildSubmission(fields, values)
     if (!name.trim()) {
       toast.error('Indique o seu nome.')
+      return
+    }
+    if (preview) {
+      toast.success('Pré-visualização: o formulário é válido (não é submetido).')
       return
     }
     setBusy(true)
@@ -160,6 +164,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
             {f.label}
             {req}
           </p>
+          {f.help ? <p className="m-0 text-xs font-normal text-muted-foreground">{f.help}</p> : null}
           {kids.map((kid, i) => (
             <div key={i} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
               <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-3">
@@ -191,6 +196,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
           <span>
             {f.label}
             {req}
+            {f.help ? <span className="block text-xs font-normal text-muted-foreground">{f.help}</span> : null}
           </span>
         </label>
       )
@@ -203,6 +209,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
             {f.label}
             {req}
           </span>
+          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
           <select className={inputCls} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)}>
             <option value="">— Selecione —</option>
             {(f.options || []).map((o) => (
@@ -222,10 +229,33 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
             {f.label}
             {req}
           </span>
+          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
           <div className="flex flex-wrap gap-3">
             {(f.options || []).map((o) => (
               <label key={o} className="inline-flex items-center gap-1.5 font-normal">
                 <input type="radio" name={f.key} value={o} checked={val === o} onChange={() => setVal(f.key, o)} />
+                {o}
+              </label>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (f.type === 'multiselect') {
+      const selected = Array.isArray(val) ? val : []
+      const toggle = (o) => setVal(f.key, selected.includes(o) ? selected.filter((x) => x !== o) : [...selected, o])
+      return (
+        <div key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+          <span>
+            {f.label}
+            {req}
+          </span>
+          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
+          <div className="flex flex-col gap-1.5">
+            {(f.options || []).map((o) => (
+              <label key={o} className="inline-flex items-center gap-2 font-normal">
+                <input type="checkbox" className="h-4 w-4" checked={selected.includes(o)} onChange={() => toggle(o)} />
                 {o}
               </label>
             ))}
@@ -241,6 +271,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
             {f.label}
             {req}
           </span>
+          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
           <textarea className={inputCls} rows={2} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
         </label>
       )
@@ -253,6 +284,7 @@ function RsvpCard({ block, page, accent, onSubmitted, guestStatus }) {
           {f.label}
           {req}
         </span>
+        {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
         <input type={inputType} className={inputCls} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
       </label>
     )
