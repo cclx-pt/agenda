@@ -24,6 +24,24 @@ export function fmtDateRange(start, end) {
   return `${fmtDate(start)} – ${fmtDate(end)}`
 }
 
+// Token pessoal (?g=) do URL atual, se existir.
+function currentGuestToken() {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get('g')
+}
+// URL da página dedicada de inscrição (/invite/<slug>/inscricao), preservando ?g=.
+export function inviteRsvpHref(slug) {
+  const g = currentGuestToken()
+  const base = `/invite/${encodeURIComponent(slug)}/inscricao`
+  return g ? `${base}?g=${encodeURIComponent(g)}` : base
+}
+// URL da landing do convite (/invite/<slug>), preservando ?g=.
+export function inviteHomeHref(slug) {
+  const g = currentGuestToken()
+  const base = `/invite/${encodeURIComponent(slug)}`
+  return g ? `${base}?g=${encodeURIComponent(g)}` : base
+}
+
 // Converte um link de YouTube/Vimeo num URL de embed, ou devolve null.
 export function toEmbed(url) {
   if (!url) return null

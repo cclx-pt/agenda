@@ -143,7 +143,7 @@ function formatAnswer(field, value) {
     return value
       .map((c) =>
         c && typeof c === 'object'
-          ? [c.nome, c.idade ? `${c.idade} anos` : '', c.alergias].filter(Boolean).join(' – ')
+          ? [c.nome, c.idade ? `${c.idade} anos` : '', c.telefone, c.email, c.alergias].filter(Boolean).join(' – ')
           : String(c)
       )
       .filter(Boolean)

@@ -29,7 +29,14 @@ const isActionRoute = routePath === '/acao'
 const isLoopRoute = routePath.startsWith('/loop/')
 const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
 const isInviteRoute = routePath.startsWith('/invite/')
-const inviteSlug = isInviteRoute ? decodeURIComponent(routePath.slice('/invite/'.length)) : null
+// /invite/<slug> (landing) ou /invite/<slug>/inscricao (página só de inscrição).
+let inviteSlug = null
+let inviteView = 'landing'
+if (isInviteRoute) {
+  const parts = routePath.slice('/invite/'.length).split('/')
+  inviteSlug = decodeURIComponent(parts[0])
+  if (parts[1] === 'inscricao') inviteView = 'rsvp'
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -42,7 +49,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </I18nProvider>
       ) : isInviteRoute ? (
         <I18nProvider>
-          <InvitePage slug={inviteSlug} />
+          <InvitePage slug={inviteSlug} view={inviteView} />
         </I18nProvider>
       ) : isLogsRoute ? (
         <LogsPage />

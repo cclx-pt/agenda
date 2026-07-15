@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2 } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, InfoExtraCard, NarrativeCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
-import { fmtDateRange } from './inviteUtils'
+import { fmtDateRange, inviteRsvpHref, inviteHomeHref } from './inviteUtils'
 import {
   getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople,
 } from './inviteFormFields'
@@ -72,6 +72,37 @@ function StatusCard({ status }) {
   )
 }
 
+// Contador de vagas disponíveis (aparece quando o convite tem capacidade definida).
+function SpotsCounter({ invite, accent }) {
+  const { capacity, spotsLeft } = invite
+  if (spotsLeft == null || !capacity) return null
+  const taken = Math.max(0, capacity - spotsLeft)
+  const pct = capacity > 0 ? Math.min(100, Math.round((taken / capacity) * 100)) : 0
+  const soldOut = spotsLeft <= 0
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+          <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          {soldOut ? 'Vagas esgotadas' : `${spotsLeft} vaga(s) disponíveis`}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {taken}/{capacity}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={soldOut ? 'h-full rounded-full bg-destructive' : 'h-full rounded-full'}
+          style={{ width: `${pct}%`, backgroundColor: soldOut ? undefined : accent }}
+        />
+      </div>
+      {soldOut ? (
+        <span className="text-xs text-muted-foreground">Novas inscrições entram em lista de espera.</span>
+      ) : null}
+    </div>
+  )
+}
+
 // Rótulo de preço/tipo de um bilhete para as opções do seletor.
 function ticketPriceLabel(t) {
   if (t.kind === 'gratis') return ' — Grátis'
@@ -83,10 +114,11 @@ function ticketPriceLabel(t) {
   return t.price != null && t.price > 0 ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ' — Grátis'
 }
 
-// Secção de inscrição do grupo (aparece quando o bilhete escolhido é de grupo).
+// Secção predefinida de inscrição do grupo (bilhete de grupo): nome, idade e
+// contactos (telefone + email) de cada membro do grupo.
 function GroupMembersSection({ members, setMembers, max, inputCls }) {
-  const add = () => setMembers([...members, { nome: '' }])
-  const patch = (i, v) => setMembers(members.map((m, idx) => (idx === i ? { ...m, nome: v } : m)))
+  const add = () => setMembers([...members, { nome: '', idade: '', telefone: '', email: '' }])
+  const patch = (i, chg) => setMembers(members.map((m, idx) => (idx === i ? { ...m, ...chg } : m)))
   const remove = (i) => setMembers(members.filter((_, idx) => idx !== i))
   const atMax = max && members.length >= max
   return (
@@ -95,11 +127,16 @@ function GroupMembersSection({ members, setMembers, max, inputCls }) {
         Inscrição do grupo
         {max ? <span className="font-normal text-muted-foreground"> · até {max} pessoas</span> : null}
       </p>
-      <p className="m-0 text-xs text-muted-foreground">Indique os membros do grupo.</p>
+      <p className="m-0 text-xs text-muted-foreground">Indique o nome, a idade e o contacto (telefone e email) de cada membro do grupo.</p>
       {members.map((m, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <input className={inputCls} placeholder={`Nome do membro ${i + 1}`} value={m.nome ?? ''} onChange={(e) => patch(i, e.target.value)} />
-          <button type="button" onClick={() => remove(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover membro">
+        <div key={i} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
+          <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-2">
+            <input className={inputCls} placeholder={`Nome do membro ${i + 1}`} value={m.nome ?? ''} onChange={(e) => patch(i, { nome: e.target.value })} />
+            <input type="number" inputMode="numeric" min="0" max="120" className={inputCls} placeholder="Idade" value={m.idade ?? ''} onChange={(e) => patch(i, { idade: e.target.value })} />
+            <input type="tel" inputMode="tel" autoComplete="tel" className={inputCls} placeholder="Telefone" value={m.telefone ?? ''} onChange={(e) => patch(i, { telefone: e.target.value })} />
+            <input type="email" inputMode="email" autoComplete="email" className={inputCls} placeholder="Email" value={m.email ?? ''} onChange={(e) => patch(i, { email: e.target.value })} />
+          </div>
+          <button type="button" onClick={() => remove(i)} className="mt-1 rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover membro">
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -133,7 +170,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState('')
-  const [groupMembers, setGroupMembers] = useState([])
+  const [groupMembers, setGroupMembers] = useState([{ nome: '', idade: '', telefone: '', email: '' }])
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
@@ -405,11 +442,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
-          {inv.spotsLeft != null ? (
-            <p className={inv.spotsLeft <= 0 ? 'm-0 text-sm font-semibold text-destructive' : 'm-0 text-sm font-semibold text-muted-foreground'}>
-              {inv.spotsLeft <= 0 ? 'Vagas esgotadas — a tua inscrição ficará em lista de espera.' : `Restam ${inv.spotsLeft} vaga(s).`}
-            </p>
-          ) : null}
           {hasTickets ? (
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               Bilhete *
@@ -608,7 +640,43 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
   )
 }
 
-export default function InvitePage({ slug }) {
+// Bloco de inscrição na LANDING: contador de vagas + botão que leva à página
+// dedicada de inscrição (em vez do formulário inline).
+function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
+  const c = block.content || {}
+  const [deadlinePassed] = useState(() => Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
+  const [notOpenYet] = useState(() => Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
+  return (
+    <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
+      {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
+      <SpotsCounter invite={invite} accent={accent} />
+      {guestStatus ? (
+        <>
+          <StatusCard status={guestStatus} />
+          <a href={rsvpHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
+            Ver / gerir a minha inscrição
+          </a>
+        </>
+      ) : deadlinePassed ? (
+        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
+      ) : notOpenYet ? (
+        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
+      ) : (
+        <a
+          href={rsvpHref}
+          className="inline-flex w-fit items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+          style={{ backgroundColor: accent }}
+        >
+          <Ticket className="h-4 w-4" aria-hidden="true" />
+          {c.ctaLabel || 'Inscrever-me'}
+        </a>
+      )}
+    </div>
+  )
+}
+
+export default function InvitePage({ slug, view = 'landing' }) {
   const [state, setState] = useState({ loading: true, error: null, page: null })
   const [guestStatus, setGuestStatus] = useState(null)
   const [guestToken, setGuestToken] = useState(
@@ -667,6 +735,42 @@ export default function InvitePage({ slug }) {
     }
   }
 
+  const rsvpHref = inviteRsvpHref(slug)
+  const homeHref = inviteHomeHref(slug)
+
+  // Página dedicada de inscrição (/invite/<slug>/inscricao): cabeçalho compacto,
+  // contador de vagas, formulário e (para pagos) o fluxo de pagamento.
+  if (view === 'rsvp') {
+    const rsvpBlock = page.blocks.find((b) => b.type === 'rsvp') || { id: 'rsvp', type: 'rsvp', content: {} }
+    return (
+      <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>
+        <Toaster position="top-center" richColors />
+        <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4">
+          <a href={homeHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Voltar ao convite
+          </a>
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <h1 className="m-0 text-lg font-bold text-foreground">{page.invite.title}</h1>
+            {fmtDateRange(page.invite.startDatetime, page.invite.endDatetime) ? (
+              <p className="m-0 text-sm text-muted-foreground">{fmtDateRange(page.invite.startDatetime, page.invite.endDatetime)}</p>
+            ) : null}
+          </div>
+          <SpotsCounter invite={page.invite} accent={accent} />
+          <RsvpCard block={rsvpBlock} page={page} accent={accent} guestStatus={guestStatus} onSubmitted={onRsvpSubmitted} />
+          <PaymentFlowCard
+            slug={page.slug}
+            guestToken={guestToken}
+            invite={page.invite}
+            guestStatus={guestStatus}
+            accent={accent}
+            onUpdate={setGuestStatus}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>
       <Toaster position="top-center" richColors />
@@ -680,13 +784,13 @@ export default function InvitePage({ slug }) {
         {page.blocks.map((block) => {
           if (block.type === 'rsvp') {
             return (
-              <RsvpCard
+              <RsvpTeaser
                 key={block.id}
                 block={block}
-                page={page}
+                invite={page.invite}
                 accent={accent}
                 guestStatus={guestStatus}
-                onSubmitted={onRsvpSubmitted}
+                rsvpHref={rsvpHref}
               />
             )
           }

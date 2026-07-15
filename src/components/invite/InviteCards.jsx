@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle,
 } from 'lucide-react'
-import { fmtTime, fmtDateRange, toEmbed, buildIcs } from './inviteUtils'
+import { fmtTime, fmtDateRange, toEmbed, buildIcs, inviteRsvpHref } from './inviteUtils'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 const titleCls = 'mb-4 text-xl font-bold text-foreground'
@@ -58,7 +58,7 @@ function BannerCard({ block, page, accent }) {
         </div>
         {c.shortDescription ? <p className="mt-4 text-foreground">{c.shortDescription}</p> : null}
         <a
-          href="#inscricoes"
+          href={inviteRsvpHref(page.slug)}
           className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
           style={{ backgroundColor: accent }}
         >
