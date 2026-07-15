@@ -4,6 +4,7 @@ import {
   getFormFields,
   deriveKey,
   isVisible,
+  visibleKeys,
   initialValues,
   validateForm,
   validateFields,
@@ -37,6 +38,24 @@ describe('inviteFormFields', () => {
     expect(isVisible(outra, { com: 'Outra igreja' })).toBe(true)
     expect(isVisible(outra, { com: 'Sede' })).toBe(false)
     expect(isVisible({ key: 'z', type: 'text' }, {})).toBe(true)
+  })
+
+  it('visibleKeys aplica herança de secção (um nível)', () => {
+    const fields = [
+      { key: 'tem', type: 'checkbox' },
+      { key: 'sec', type: 'section', visibleWhen: { field: 'tem', equals: true } },
+      { key: 'nome', type: 'text' },
+      { key: 'sec2', type: 'section' },
+      { key: 'fora', type: 'text' },
+    ]
+    const off = visibleKeys(fields, { tem: false })
+    expect(off.has('sec')).toBe(false)
+    expect(off.has('nome')).toBe(false) // herda a secção oculta
+    expect(off.has('fora')).toBe(true) // após nova secção → visível
+    const on = visibleKeys(fields, { tem: true })
+    expect(on.has('sec')).toBe(true)
+    expect(on.has('nome')).toBe(true)
+    expect(on.has('fora')).toBe(true)
   })
 
   it('initialValues gera defaults por tipo (section ignorada)', () => {

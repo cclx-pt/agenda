@@ -464,8 +464,13 @@ function fieldVisible(field, values) {
 // validação do frontend (só verifica presença, não formato) → nunca rejeita uma
 // submissão válida feita pela UI; apenas trava POSTs diretos que saltam o formulário.
 function assertSubmissionValid(fields, values) {
+  let sectionVisible = true
   for (const f of fields) {
-    if (f.type === 'section' || !f.required || !fieldVisible(f, values)) continue
+    if (f.type === 'section') {
+      sectionVisible = fieldVisible(f, values)
+      continue
+    }
+    if (!sectionVisible || !f.required || !fieldVisible(f, values)) continue
     const val = values[f.key]
     let empty
     if (f.type === 'checkbox') empty = !val

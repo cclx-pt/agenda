@@ -272,7 +272,6 @@ export function RsvpEditor({ content, onChange }) {
                   ) : null}
 
                   {f.type !== 'section' ? (
-                    <>
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {['text', 'textarea', 'email', 'tel', 'number'].includes(f.type) ? (
                         <input className={inputCls} placeholder="Placeholder (opcional)" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} />
@@ -283,14 +282,19 @@ export function RsvpEditor({ content, onChange }) {
                       )}
                       <input className={inputCls} placeholder="Ajuda / descrição (opcional)" value={f.help ?? ''} onChange={(e) => updateField(i, { help: e.target.value })} />
                     </div>
+                  ) : null}
+
+                  {f.type !== 'section' || eligible.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
-                        <input type="checkbox" checked={!!f.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
-                        Obrigatório
-                      </label>
+                      {f.type !== 'section' ? (
+                        <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                          <input type="checkbox" checked={!!f.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
+                          Obrigatório
+                        </label>
+                      ) : null}
                       {eligible.length > 0 ? (
                         <div className="inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          Mostrar se
+                          {f.type === 'section' ? 'Mostrar secção se' : 'Mostrar se'}
                           <select
                             className={inputCls + ' w-auto py-1'}
                             value={f.visibleWhen?.field || ''}
@@ -326,7 +330,6 @@ export function RsvpEditor({ content, onChange }) {
                         </div>
                       ) : null}
                     </div>
-                    </>
                   ) : null}
                 </div>
 

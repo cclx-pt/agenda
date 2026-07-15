@@ -60,12 +60,18 @@ export const DEFAULT_RSVP_FIELDS = [
     options: ['Sexta', 'Sábado', 'Domingo', 'Todo o fim de semana'],
   },
   { key: 'tem_criancas', type: 'checkbox', label: 'Vais trazer crianças?' },
+
+  // Secção condicional: só aparece quando "Vais trazer crianças?" está marcado.
+  // Os campos abaixo herdam a visibilidade desta secção (até à secção seguinte).
   {
-    key: 'criancas',
-    type: 'children',
+    key: 'sec_criancas',
+    type: 'section',
     label: 'Crianças',
     visibleWhen: { field: 'tem_criancas', equals: true },
   },
+  { key: 'criancas', type: 'children', label: 'Dados de cada criança' },
+
+  { key: 'sec_info', type: 'section', label: 'Informações adicionais' },
   { key: 'acessibilidade', type: 'textarea', label: 'Tens alguma necessidade de acessibilidade?' },
   { key: 'donativo', type: 'number', label: 'Valor do donativo (caso seja variável)' },
 
@@ -116,6 +122,23 @@ export function isVisible(field, values) {
   return String(values[cond.field] ?? '') === String(cond.equals ?? '')
 }
 
+// Conjunto de chaves de campos VISÍVEIS considerando a HERANÇA DE SECÇÃO: uma
+// secção pode ser condicional (visibleWhen) e os campos que a seguem (até à
+// próxima secção) herdam a sua visibilidade. Um nível só — as secções não aninham.
+export function visibleKeys(fields, values) {
+  const set = new Set()
+  let sectionVisible = true
+  for (const f of fields) {
+    if (f.type === 'section') {
+      sectionVisible = isVisible(f, values)
+      if (sectionVisible) set.add(f.key)
+      continue
+    }
+    if (sectionVisible && isVisible(f, values)) set.add(f.key)
+  }
+  return set
+}
+
 // Estado inicial dos valores para uma lista de campos.
 export function initialValues(fields) {
   const v = {}
@@ -131,8 +154,9 @@ export function initialValues(fields) {
 // Valida os campos VISÍVEIS e obrigatórios (+ formato de email/telemóvel).
 // Devolve a 1ª mensagem de erro ou null.
 export function validateForm(fields, values) {
+  const visible = visibleKeys(fields, values)
   for (const f of fields) {
-    if (f.type === 'section' || !isVisible(f, values)) continue
+    if (f.type === 'section' || !visible.has(f.key)) continue
     const val = values[f.key]
     const empty =
       f.type === 'checkbox'
@@ -159,9 +183,10 @@ export function validateForm(fields, values) {
 // Como validateForm mas devolve um mapa { chave: mensagem } de TODOS os campos
 // inválidos visíveis (para erros inline). Mensagens curtas.
 export function validateFields(fields, values) {
+  const visible = visibleKeys(fields, values)
   const errors = {}
   for (const f of fields) {
-    if (f.type === 'section' || !isVisible(f, values)) continue
+    if (f.type === 'section' || !visible.has(f.key)) continue
     const val = values[f.key]
     const empty =
       f.type === 'checkbox'
@@ -192,12 +217,13 @@ export function validateFields(fields, values) {
 // Reparte os valores em campos de sistema (name/email/phone) + `extra` (o resto),
 // considerando apenas os campos VISÍVEIS.
 export function buildSubmission(fields, values) {
+  const visible = visibleKeys(fields, values)
   const extra = {}
   let name = ''
   let email = null
   let phone = null
   for (const f of fields) {
-    if (f.type === 'section' || !isVisible(f, values)) continue
+    if (f.type === 'section' || !visible.has(f.key)) continue
     const val = values[f.key]
     if (f.key === 'name') name = String(val ?? '').trim()
     else if (f.key === 'email') email = String(val ?? '').trim() || null
@@ -220,9 +246,10 @@ export function buildSubmission(fields, values) {
 // Nº de pessoas que a inscrição representa (1 = o próprio + crianças indicadas nos
 // campos do tipo 'children' visíveis). Alimenta a contagem de capacidade.
 export function countPeople(fields, values) {
+  const visible = visibleKeys(fields, values)
   let n = 1
   for (const f of fields) {
-    if (f.type !== 'children' || !isVisible(f, values)) continue
+    if (f.type !== 'children' || !visible.has(f.key)) continue
     const rows = Array.isArray(values[f.key]) ? values[f.key] : []
     n += rows.filter((c) => c && (c.nome || c.idade || c.alergias)).length
   }

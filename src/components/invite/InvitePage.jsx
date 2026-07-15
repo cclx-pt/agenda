@@ -8,7 +8,7 @@ import {
 } from './InviteCards'
 import { fmtDateRange } from './inviteUtils'
 import {
-  getFormFields, isVisible, initialValues, validateFields, buildSubmission, countPeople,
+  getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople,
 } from './inviteFormFields'
 
 // Mapa tipo → componente (rsvp é tratado à parte: precisa de estado/handlers).
@@ -109,6 +109,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     })
   }
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
+  const visible = visibleKeys(fields, values)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -158,7 +159,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
 
   // Renderiza um campo do formulário conforme o seu tipo (respeita condicionais).
   const renderField = (f) => {
-    if (!isVisible(f, values)) return null
+    if (!visible.has(f.key)) return null
     if (f.type === 'section') {
       return (
         <div key={f.key} className="mt-2 border-b border-border pb-1">
