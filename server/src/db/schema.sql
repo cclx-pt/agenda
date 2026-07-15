@@ -463,25 +463,32 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS use_event_banner BOOLEAN NOT NULL D
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS payment_method TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS map_url TEXT;
 
--- Bilhetes (tipos) de um convite pago: individual, grupo ou campanha. Cada tipo
--- tem preço, capacidade (NULL = ilimitado) e, para 'grupo', nº de pessoas por bilhete.
+-- Bilhetes (tipos) de um convite. Tipos: individual, grátis (0€), oferta
+-- voluntária (valor livre) ou grupo. Cada tipo tem preço, capacidade (NULL =
+-- ilimitado), nº de pessoas por grupo e método de pagamento (bilhetes pagos).
 CREATE TABLE IF NOT EXISTS invite_tickets (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   kind        TEXT NOT NULL DEFAULT 'individual'
-                CHECK (kind IN ('individual', 'grupo', 'campanha')),
+                CHECK (kind IN ('individual', 'gratis', 'voluntaria', 'grupo', 'campanha')),
   price       NUMERIC(10, 2),
   currency    TEXT NOT NULL DEFAULT 'EUR',
   capacity    INTEGER,
   group_size  INTEGER,
   description TEXT,
+  payment_method TEXT,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_invite_tickets_invite ON invite_tickets (invite_id);
+-- Migrações idempotentes (BDs já criadas): novos tipos de bilhete + método por bilhete.
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS payment_method TEXT;
+ALTER TABLE invite_tickets DROP CONSTRAINT IF EXISTS invite_tickets_kind_check;
+ALTER TABLE invite_tickets ADD CONSTRAINT invite_tickets_kind_check
+  CHECK (kind IN ('individual', 'gratis', 'voluntaria', 'grupo', 'campanha'));
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;

@@ -69,6 +69,11 @@ function ticketIsFree(t) {
 function hasPaidTicket(tickets) {
   return (tickets || []).some((t) => (t.name || '').trim() && !ticketIsFree(t))
 }
+// Método de pagamento do primeiro bilhete pago (para o fluxo de pagamento do convite).
+function firstPaidTicketMethod(tickets) {
+  const t = (tickets || []).find((x) => (x.name || '').trim() && !ticketIsFree(x) && x.paymentMethod)
+  return t?.paymentMethod || null
+}
 
 function toDateInput(iso) {
   if (!iso) return ''
@@ -171,8 +176,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
     // Banner.
     bannerUrl: invite.bannerUrl ?? '',
     useEventBanner: !!invite.useEventBanner,
-    // Método de pagamento (o custo é definido pelos bilhetes).
-    paymentMethod: invite.paymentMethod ?? 'mbway',
     // Janela de INSCRIÇÃO.
     rsvpEnabled: invite.rsvpEnabled !== false,
     rsvpStartDate: toDateInput(invite.rsvpStartDatetime),
@@ -269,7 +272,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', price: '', capacity: '', groupSize: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', price: '', capacity: '', groupSize: '', paymentMethod: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -287,7 +290,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     metaDescription: settings.metaDescription.trim() || null,
     costType: hasPaidTicket(tickets) ? 'pago' : 'gratuito',
     costAmount: null,
-    paymentMethod: hasPaidTicket(tickets) ? settings.paymentMethod : null,
+    paymentMethod: firstPaidTicketMethod(tickets),
     rsvpEnabled: settings.rsvpEnabled,
     rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
     rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
@@ -313,6 +316,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
             price: t.kind === 'gratis' ? 0 : t.price === '' || t.price == null ? null : Number(t.price),
             capacity: t.capacity === '' || t.capacity == null ? null : Number(t.capacity),
             groupSize: t.kind === 'grupo' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
+            paymentMethod: ticketIsFree(t) ? null : t.paymentMethod || null,
             active: t.active !== false,
           }))
       )
@@ -722,7 +726,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </button>
         </div>
         <p className="m-0 mb-3 text-xs text-muted-foreground">
-          O custo da inscrição é definido pelos bilhetes. Tipos: individual, grátis (0€), oferta voluntária (valor livre) e grupo (abre a inscrição do grupo no formulário).
+          O custo da inscrição é definido pelos bilhetes. Tipos: individual, grátis (0€), oferta voluntária (valor livre) e grupo (abre a inscrição do grupo no formulário). O método de pagamento define-se em cada bilhete pago.
         </p>
         {tickets.length === 0 ? (
           <p className="m-0 text-sm text-muted-foreground">
@@ -770,6 +774,18 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         No formulário público, escolher este bilhete abre uma secção para inscrever os membros do grupo.
                       </p>
                     ) : null}
+                    {!ticketIsFree(t) ? (
+                      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+                        Método de pagamento
+                        <select className={inputCls} value={t.paymentMethod || ''} onChange={(e) => setTicketField(i, 'paymentMethod', e.target.value)}>
+                          <option value="">— Selecione —</option>
+                          <option value="mbway">MB WAY</option>
+                          <option value="transferencia">Transferência bancária</option>
+                          <option value="referencia">Referência Multibanco</option>
+                        </select>
+                        <span className="text-xs text-muted-foreground">Processamento de pagamento a desenvolver.</span>
+                      </label>
+                    ) : null}
                     <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
                       <input type="checkbox" checked={t.active !== false} onChange={(e) => setTicketField(i, 'active', e.target.checked)} />
                       Ativo
@@ -784,23 +800,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
             ))}
           </ul>
         )}
-
-        {/* Método de pagamento — só quando há bilhetes pagos (pagamento a desenvolver) */}
-        {hasPaidTicket(tickets) ? (
-          <div className="mt-4 border-t border-border pt-3">
-            <label className={labelCls}>
-              Método de pagamento
-              <select className={inputCls} value={settings.paymentMethod} onChange={setField('paymentMethod')}>
-                <option value="mbway">MB WAY</option>
-                <option value="transferencia">Transferência bancária</option>
-                <option value="referencia">Referência Multibanco</option>
-              </select>
-              <span className="text-xs text-muted-foreground">
-                Aparece porque há bilhetes pagos. O processamento de pagamento será desenvolvido mais tarde.
-              </span>
-            </label>
-          </div>
-        ) : null}
       </section>
         </>
       ) : null}

@@ -136,6 +136,7 @@ const ticketSchema = z.object({
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
   groupSize: z.number().int().min(1).max(1000).optional().nullable(),
   description: z.string().trim().max(500).optional().nullable(),
+  paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -415,6 +416,7 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
         currency: t.currency,
         groupSize: t.groupSize,
         description: t.description,
+        paymentMethod: t.paymentMethod ?? null,
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
