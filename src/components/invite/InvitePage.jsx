@@ -72,6 +72,52 @@ function StatusCard({ status }) {
   )
 }
 
+// Rótulo de preço/tipo de um bilhete para as opções do seletor.
+function ticketPriceLabel(t) {
+  if (t.kind === 'gratis') return ' — Grátis'
+  if (t.kind === 'voluntaria') {
+    return t.price != null && t.price > 0
+      ? ` — Oferta voluntária (sugerido ${Number(t.price).toFixed(2)} ${t.currency})`
+      : ' — Oferta voluntária'
+  }
+  return t.price != null && t.price > 0 ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ' — Grátis'
+}
+
+// Secção de inscrição do grupo (aparece quando o bilhete escolhido é de grupo).
+function GroupMembersSection({ members, setMembers, max, inputCls }) {
+  const add = () => setMembers([...members, { nome: '' }])
+  const patch = (i, v) => setMembers(members.map((m, idx) => (idx === i ? { ...m, nome: v } : m)))
+  const remove = (i) => setMembers(members.filter((_, idx) => idx !== i))
+  const atMax = max && members.length >= max
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 p-3">
+      <p className="m-0 text-sm font-semibold text-foreground">
+        Inscrição do grupo
+        {max ? <span className="font-normal text-muted-foreground"> · até {max} pessoas</span> : null}
+      </p>
+      <p className="m-0 text-xs text-muted-foreground">Indique os membros do grupo.</p>
+      {members.map((m, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input className={inputCls} placeholder={`Nome do membro ${i + 1}`} value={m.nome ?? ''} onChange={(e) => patch(i, e.target.value)} />
+          <button type="button" onClick={() => remove(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover membro">
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        disabled={atMax}
+        className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+      >
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        Adicionar membro
+      </button>
+      {atMax ? <span className="text-xs text-muted-foreground">Limite de {max} membros atingido.</span> : null}
+    </div>
+  )
+}
+
 export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, preview = false }) {
   const c = block.content || {}
   const inv = page.invite
@@ -83,10 +129,11 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     () => Boolean(inv.rsvpStartDatetime) && Date.now() < Date.parse(inv.rsvpStartDatetime)
   )
   const tickets = (page.tickets || []).filter((t) => !t.soldOut)
-  const paidWithTickets = inv.costType !== 'gratuito' && tickets.length > 0
+  const hasTickets = tickets.length > 0
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState('')
+  const [groupMembers, setGroupMembers] = useState([])
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
@@ -110,6 +157,9 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   }
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
   const visible = visibleKeys(fields, values)
+  const selectedTicket = tickets.find((t) => t.id === ticketId) || null
+  const isGroup = selectedTicket?.kind === 'grupo'
+  const groupCap = selectedTicket?.groupSize || null
 
   const submit = async (e) => {
     e.preventDefault()
@@ -124,8 +174,13 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       return
     }
     setErrors({})
-    if (paidWithTickets && !ticketId) {
+    if (hasTickets && !ticketId) {
       toast.error('Escolha um bilhete.')
+      return
+    }
+    const cleanGroup = isGroup ? groupMembers.filter((m) => (m.nome || '').trim()) : []
+    if (isGroup && cleanGroup.length === 0) {
+      toast.error('Indique pelo menos um membro do grupo.')
       return
     }
     const { name, email, phone, extra } = buildSubmission(fields, values)
@@ -137,16 +192,19 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       toast.success('Pré-visualização: o formulário é válido (não é submetido).')
       return
     }
+    const finalExtra = { ...extra }
+    if (cleanGroup.length) finalExtra.grupo = cleanGroup
+    const peopleCount = isGroup ? Math.max(1, cleanGroup.length) : countPeople(fields, values)
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {
         name,
         email,
         phone,
-        guestsCount: countPeople(fields, values),
+        guestsCount: peopleCount,
         attend: true,
         ticketId: ticketId || null,
-        extra: Object.keys(extra).length ? extra : null,
+        extra: Object.keys(finalExtra).length ? finalExtra : null,
       })
       onSubmitted(res)
       toast.success('Inscrição registada. Obrigado!')
@@ -352,7 +410,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               {inv.spotsLeft <= 0 ? 'Vagas esgotadas — a tua inscrição ficará em lista de espera.' : `Restam ${inv.spotsLeft} vaga(s).`}
             </p>
           ) : null}
-          {paidWithTickets ? (
+          {hasTickets ? (
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               Bilhete *
               <select className={inputCls} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
@@ -360,12 +418,17 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
                 {tickets.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
-                    {t.price != null ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ''}
-                    {t.kind === 'grupo' && t.groupSize ? ` (${t.groupSize} pessoas)` : ''}
+                    {ticketPriceLabel(t)}
+                    {t.kind === 'grupo' && t.groupSize ? ` (grupo até ${t.groupSize})` : ''}
                   </option>
                 ))}
               </select>
             </label>
+          ) : null}
+
+          {/* Secção de inscrição do grupo (bilhete de grupo) */}
+          {isGroup ? (
+            <GroupMembersSection members={groupMembers} setMembers={setGroupMembers} max={groupCap} inputCls={inputCls} />
           ) : null}
           {fields.map(renderField)}
           <button

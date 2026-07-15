@@ -125,11 +125,12 @@ const inviteInputSchema = z.object({
   community: z.string().trim().max(120).optional().nullable(),
 })
 
-// Bilhete (tipo) de um convite pago.
+// Bilhete (tipo) de um convite. Tipos: individual, grátis (0€), oferta
+// voluntária (valor livre) e grupo (abre secção de inscrição do grupo).
 const ticketSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   name: z.string().trim().min(1, 'Indique o nome do bilhete.').max(120),
-  kind: z.enum(['individual', 'grupo', 'campanha']).optional().default('individual'),
+  kind: z.enum(['individual', 'gratis', 'voluntaria', 'grupo']).optional().default('individual'),
   price: z.number().min(0).max(1000000).optional().nullable(),
   currency: z.string().trim().max(8).optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
@@ -169,6 +170,14 @@ async function assertEventOk(eventId) {
 // Método único → mantém payment_methods coerente (lista de 1) para o conector/payload.
 function normalizePayment(data) {
   data.paymentMethods = data.paymentMethod ? [data.paymentMethod] : null
+}
+
+// Um bilhete é gratuito se for do tipo "grátis" ou (não-voluntária) sem preço > 0.
+function ticketIsFree(t) {
+  if (!t) return true
+  if (t.kind === 'gratis') return true
+  if (t.kind === 'voluntaria') return false
+  return !(Number(t.price) > 0)
 }
 
 // Banner efetivo: o do evento associado (se "usar imagem do evento") ou o próprio.
@@ -422,7 +431,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   }
   const [blocks, tickets, bannerUrl] = await Promise.all([
     repo.listBlocks(invite.id),
-    invite.costType !== 'gratuito' ? repo.listTicketsWithSold(invite.id) : Promise.resolve([]),
+    repo.listTicketsWithSold(invite.id),
     resolveInviteBanner(invite),
   ])
   let guest = null
@@ -540,15 +549,18 @@ export async function submitRsvp(slug, input) {
     })
   }
 
-  // Bilhete (evento pago): valida que pertence ao convite e está ativo.
+  // Bilhete: valida que pertence ao convite e está ativo (grátis ou pago).
   let ticket = null
-  if (invite.costType !== 'gratuito' && data.ticketId) {
+  if (data.ticketId) {
     ticket = await repo.findTicketById(data.ticketId)
     if (!ticket || ticket.inviteId !== invite.id || !ticket.active) {
       throw new InviteError(400, 'Bilhete inválido.')
     }
   }
-  const paymentState = invite.costType === 'gratuito' ? 'not_applicable' : 'pending'
+  // Pagamento (a desenvolver): aplicável se o bilhete escolhido for pago, ou —
+  // sem bilhete — se o convite tiver custo. Bilhetes grátis → não aplicável.
+  const paymentState =
+    (ticket ? !ticketIsFree(ticket) : invite.costType !== 'gratuito') ? 'pending' : 'not_applicable'
 
   // Capacidade: do bilhete escolhido (se houver) ou global do convite. Excedendo → lista de espera.
   let rsvpState = data.attend ? 'confirmed' : 'declined'

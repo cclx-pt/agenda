@@ -44,6 +44,32 @@ const PAY_BADGE = {
   failed: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
 }
 
+// Tipos de bilhete. "grátis" = 0€; "voluntária" = valor livre; "grupo" abre a
+// inscrição do grupo no formulário público.
+const TICKET_KINDS = [
+  { value: 'individual', label: 'Individual' },
+  { value: 'gratis', label: 'Grátis' },
+  { value: 'voluntaria', label: 'Oferta voluntária' },
+  { value: 'grupo', label: 'Grupo' },
+]
+// Normaliza um tipo legado (ex.: 'campanha') para os tipos atuais.
+function normalizeKind(kind) {
+  if (kind === 'individual' || kind === 'gratis' || kind === 'voluntaria' || kind === 'grupo') return kind
+  if (kind === 'campanha') return 'grupo'
+  return 'individual'
+}
+// Um bilhete é gratuito se for do tipo "grátis" ou (não-voluntária) sem preço > 0.
+function ticketIsFree(t) {
+  if (t.kind === 'gratis') return true
+  if (t.kind === 'voluntaria') return false
+  const p = Number(t.price)
+  return !Number.isFinite(p) || p <= 0
+}
+// Há pelo menos um bilhete pago (com nome preenchido)?
+function hasPaidTicket(tickets) {
+  return (tickets || []).some((t) => (t.name || '').trim() && !ticketIsFree(t))
+}
+
 function toDateInput(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -145,9 +171,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     // Banner.
     bannerUrl: invite.bannerUrl ?? '',
     useEventBanner: !!invite.useEventBanner,
-    // Custo / pagamento (método único).
-    costType: invite.costType ?? 'gratuito',
-    costAmount: invite.costAmount ?? '',
+    // Método de pagamento (o custo é definido pelos bilhetes).
     paymentMethod: invite.paymentMethod ?? 'mbway',
     // Janela de INSCRIÇÃO.
     rsvpEnabled: invite.rsvpEnabled !== false,
@@ -158,7 +182,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     capacity: invite.capacity ?? '',
     metaDescription: invite.metaDescription ?? '',
   }))
-  const [tickets, setTickets] = useState(() => invite.tickets || [])
+  const [tickets, setTickets] = useState(() => (invite.tickets || []).map((t) => ({ ...t, kind: normalizeKind(t.kind) })))
   // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
   const [events, setEvents] = useState(() => (invite.event ? [invite.event] : []))
   const [blocks, setBlocks] = useState(() => invite.blocks || [])
@@ -261,9 +285,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     useEventBanner: settings.useEventBanner,
     metaImageUrl: settings.bannerUrl.trim() || null,
     metaDescription: settings.metaDescription.trim() || null,
-    costType: settings.costType,
-    costAmount: settings.costType === 'gratuito' ? null : Number(settings.costAmount) || null,
-    paymentMethod: settings.costType === 'gratuito' ? null : settings.paymentMethod,
+    costType: hasPaidTicket(tickets) ? 'pago' : 'gratuito',
+    costAmount: null,
+    paymentMethod: hasPaidTicket(tickets) ? settings.paymentMethod : null,
     rsvpEnabled: settings.rsvpEnabled,
     rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
     rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
@@ -278,22 +302,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
     setBusy(true)
     try {
       await invitesService.updateInvite(invite.id, buildSettingsPayload())
-      if (settings.costType !== 'gratuito') {
-        await invitesService.saveTickets(
-          invite.id,
-          tickets
-            .filter((t) => (t.name || '').trim())
-            .map((t) => ({
-              id: t.id || null,
-              name: t.name.trim(),
-              kind: t.kind || 'individual',
-              price: t.price === '' || t.price == null ? null : Number(t.price),
-              capacity: t.capacity === '' || t.capacity == null ? null : Number(t.capacity),
-              groupSize: t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize),
-              active: t.active !== false,
-            }))
-        )
-      }
+      await invitesService.saveTickets(
+        invite.id,
+        tickets
+          .filter((t) => (t.name || '').trim())
+          .map((t) => ({
+            id: t.id || null,
+            name: t.name.trim(),
+            kind: normalizeKind(t.kind),
+            price: t.kind === 'gratis' ? 0 : t.price === '' || t.price == null ? null : Number(t.price),
+            capacity: t.capacity === '' || t.capacity == null ? null : Number(t.capacity),
+            groupSize: t.kind === 'grupo' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
+            active: t.active !== false,
+          }))
+      )
       const updated = await invitesService.saveInviteBlocks(
         invite.id,
         blocks.map((b) => ({
@@ -339,7 +361,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     try {
       const [g, p] = await Promise.all([
         invitesService.listInviteGuests(invite.id),
-        settings.costType !== 'gratuito' ? invitesService.listInvitePayments(invite.id) : Promise.resolve([]),
+        hasPaidTicket(tickets) ? invitesService.listInvitePayments(invite.id) : Promise.resolve([]),
       ])
       setGuests(g)
       setPayments(p)
@@ -416,8 +438,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const previewPage = {
     slug: invite.slug,
     invite: {
-      costType: settings.costType,
-      costAmount: settings.costType === 'gratuito' ? null : Number(settings.costAmount) || null,
+      costType: hasPaidTicket(tickets) ? 'pago' : 'gratuito',
+      costAmount: null,
       costCurrency: 'EUR',
       rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
       rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
@@ -647,38 +669,10 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <span className="text-xs text-muted-foreground">Herdado do evento associado; podes também colar um link do Google Maps.</span>
           </label>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className={labelCls}>
-              Cor do tema
-              <input type="color" className="h-10 w-full rounded-lg border border-input bg-background" value={settings.colorTheme} onChange={setField('colorTheme')} />
-            </label>
-            <label className={labelCls}>
-              Custo
-              <select className={inputCls} value={settings.costType} onChange={setField('costType')}>
-                <option value="gratuito">Gratuito</option>
-                <option value="pago">Pago</option>
-                <option value="voluntario">Oferta voluntária</option>
-              </select>
-            </label>
-          </div>
-
-          {settings.costType !== 'gratuito' ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className={labelCls}>
-                Valor por omissão (€)
-                <input type="number" min="0" step="0.01" className={inputCls} value={settings.costAmount} onChange={setField('costAmount')} />
-                <span className="text-xs text-muted-foreground">Usado quando não há bilhetes; com bilhetes, o preço vem do bilhete.</span>
-              </label>
-              <label className={labelCls}>
-                Método de pagamento
-                <select className={inputCls} value={settings.paymentMethod} onChange={setField('paymentMethod')}>
-                  <option value="mbway">MB WAY</option>
-                  <option value="transferencia">Transferência bancária</option>
-                  <option value="referencia">Referência Multibanco</option>
-                </select>
-              </label>
-            </div>
-          ) : null}
+          <label className={labelCls}>
+            Cor do tema
+            <input type="color" className="h-10 w-full rounded-lg border border-input bg-background" value={settings.colorTheme} onChange={setField('colorTheme')} />
+          </label>
 
           {/* Datas de INSCRIÇÃO (janela) */}
           <p className="m-0 mt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Datas das inscrições</p>
@@ -718,59 +712,96 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </div>
       </section>
 
-      {/* Bilhetes (eventos pagos) */}
-      {settings.costType !== 'gratuito' ? (
-        <section className="rounded-xl border border-border bg-card p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Bilhetes</h3>
-            <button type="button" onClick={addTicket} className={ghostBtn}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Adicionar bilhete
-            </button>
-          </div>
-          {tickets.length === 0 ? (
-            <p className="m-0 text-sm text-muted-foreground">
-              Sem bilhetes. Adicione tipos (individual, grupo, campanha…); sem bilhetes usa-se o valor por omissão.
-            </p>
-          ) : (
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {tickets.map((t, i) => (
-                <li key={t.id || `new-${i}`} className="rounded-lg border border-border bg-background p-2">
-                  <div className="flex items-start gap-2">
-                    <div className="flex flex-1 flex-col gap-1.5">
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                        <input className={inputCls} placeholder="Nome (ex.: Adulto, Família)" value={t.name} onChange={(e) => setTicketField(i, 'name', e.target.value)} />
-                        <select className={inputCls} value={t.kind} onChange={(e) => setTicketField(i, 'kind', e.target.value)}>
-                          <option value="individual">Individual</option>
-                          <option value="grupo">Grupo</option>
-                          <option value="campanha">Campanha</option>
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-                        <input type="number" min="0" step="0.01" className={inputCls} placeholder="Preço (€)" value={t.price} onChange={(e) => setTicketField(i, 'price', e.target.value)} />
-                        <input type="number" min="1" className={inputCls} placeholder="Capacidade" value={t.capacity} onChange={(e) => setTicketField(i, 'capacity', e.target.value)} />
-                        {t.kind === 'grupo' ? (
-                          <input type="number" min="1" className={inputCls} placeholder="Pessoas/bilhete" value={t.groupSize} onChange={(e) => setTicketField(i, 'groupSize', e.target.value)} />
-                        ) : (
-                          <span />
-                        )}
-                      </div>
-                      <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
-                        <input type="checkbox" checked={t.active !== false} onChange={(e) => setTicketField(i, 'active', e.target.checked)} />
-                        Ativo
-                        {t.sold != null ? <span className="text-xs text-muted-foreground">· vendidos: {t.sold}</span> : null}
-                      </label>
+      {/* Bilhetes — definem o tipo e o custo da inscrição */}
+      <section className="rounded-xl border border-border bg-card p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Bilhetes</h3>
+          <button type="button" onClick={addTicket} className={ghostBtn}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Adicionar bilhete
+          </button>
+        </div>
+        <p className="m-0 mb-3 text-xs text-muted-foreground">
+          O custo da inscrição é definido pelos bilhetes. Tipos: individual, grátis (0€), oferta voluntária (valor livre) e grupo (abre a inscrição do grupo no formulário).
+        </p>
+        {tickets.length === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">
+            Sem bilhetes — a inscrição é gratuita. Adicione bilhetes para definir tipos e custos.
+          </p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {tickets.map((t, i) => (
+              <li key={t.id || `new-${i}`} className="rounded-lg border border-border bg-background p-2">
+                <div className="flex items-start gap-2">
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      <input className={inputCls} placeholder="Nome (ex.: Adulto, Família)" value={t.name} onChange={(e) => setTicketField(i, 'name', e.target.value)} />
+                      <select className={inputCls} value={t.kind} onChange={(e) => setTicketField(i, 'kind', e.target.value)}>
+                        {TICKET_KINDS.map((k) => (
+                          <option key={k.value} value={k.value}>
+                            {k.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <button type="button" onClick={() => removeTicket(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover bilhete">
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                      {t.kind === 'gratis' ? (
+                        <input className={inputCls + ' text-muted-foreground'} value="Grátis (0€)" disabled readOnly />
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className={inputCls}
+                          placeholder={t.kind === 'voluntaria' ? 'Valor sugerido (€)' : 'Preço (€)'}
+                          value={t.price}
+                          onChange={(e) => setTicketField(i, 'price', e.target.value)}
+                        />
+                      )}
+                      <input type="number" min="1" className={inputCls} placeholder="Capacidade" value={t.capacity} onChange={(e) => setTicketField(i, 'capacity', e.target.value)} />
+                      {t.kind === 'grupo' ? (
+                        <input type="number" min="1" className={inputCls} placeholder="Pessoas por grupo" value={t.groupSize} onChange={(e) => setTicketField(i, 'groupSize', e.target.value)} />
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                    {t.kind === 'grupo' ? (
+                      <p className="m-0 text-xs text-muted-foreground">
+                        No formulário público, escolher este bilhete abre uma secção para inscrever os membros do grupo.
+                      </p>
+                    ) : null}
+                    <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                      <input type="checkbox" checked={t.active !== false} onChange={(e) => setTicketField(i, 'active', e.target.checked)} />
+                      Ativo
+                      {t.sold != null ? <span className="text-xs text-muted-foreground">· vendidos: {t.sold}</span> : null}
+                    </label>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
+                  <button type="button" onClick={() => removeTicket(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover bilhete">
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Método de pagamento — só quando há bilhetes pagos (pagamento a desenvolver) */}
+        {hasPaidTicket(tickets) ? (
+          <div className="mt-4 border-t border-border pt-3">
+            <label className={labelCls}>
+              Método de pagamento
+              <select className={inputCls} value={settings.paymentMethod} onChange={setField('paymentMethod')}>
+                <option value="mbway">MB WAY</option>
+                <option value="transferencia">Transferência bancária</option>
+                <option value="referencia">Referência Multibanco</option>
+              </select>
+              <span className="text-xs text-muted-foreground">
+                Aparece porque há bilhetes pagos. O processamento de pagamento será desenvolvido mais tarde.
+              </span>
+            </label>
+          </div>
+        ) : null}
+      </section>
         </>
       ) : null}
 
@@ -940,8 +971,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
         ) : null}
       </section>
 
-      {/* Pagamentos (só para eventos pagos) */}
-      {settings.costType !== 'gratuito' && payments ? (
+      {/* Pagamentos (só quando há bilhetes pagos) */}
+      {hasPaidTicket(tickets) && payments ? (
         <section className="rounded-xl border border-border bg-card p-4">
           <h3 className="m-0 mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Pagamentos</h3>
           {payments.length === 0 ? (
