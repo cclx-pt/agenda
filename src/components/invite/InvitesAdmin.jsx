@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import {
   Plus, Pencil, Trash2, ExternalLink, Copy, Eye, Send, ArrowLeft, ArrowUp, ArrowDown,
   Users, Image as ImageIcon, Loader2, Download, ChevronDown, ChevronRight,
+  Calendar as CalendarIcon, MapPin,
 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { uploadEventImage } from '../../services/eventsService'
@@ -74,6 +75,26 @@ function fmtEventOpt(iso) {
   return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+// Data + hora do evento associado (para o cartão de "output" do evento).
+function fmtEventWhen(start, end) {
+  if (!start) return ''
+  const ds = new Date(start)
+  if (Number.isNaN(ds.getTime())) return ''
+  const dOpts = { day: '2-digit', month: '2-digit', year: 'numeric' }
+  const tOpts = { hour: '2-digit', minute: '2-digit' }
+  const sDate = ds.toLocaleDateString('pt-PT', dOpts)
+  let out = `${sDate} · ${ds.toLocaleTimeString('pt-PT', tOpts)}`
+  if (end) {
+    const de = new Date(end)
+    if (!Number.isNaN(de.getTime())) {
+      const eTime = de.toLocaleTimeString('pt-PT', tOpts)
+      const eDate = de.toLocaleDateString('pt-PT', dOpts)
+      out += eDate === sDate ? ` – ${eTime}` : ` → ${eDate} · ${eTime}`
+    }
+  }
+  return out
+}
+
 const RSVP_STATE_LABEL = { confirmed: 'Confirmado', waitlisted: 'Lista de espera', declined: 'Não vai', pending: 'Pendente' }
 
 // Data + hora (para a lista de inscrições e o Excel).
@@ -138,7 +159,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
     metaDescription: invite.metaDescription ?? '',
   }))
   const [tickets, setTickets] = useState(() => invite.tickets || [])
-  const [events, setEvents] = useState([])
+  // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
+  const [events, setEvents] = useState(() => (invite.event ? [invite.event] : []))
   const [blocks, setBlocks] = useState(() => invite.blocks || [])
   const [openBlock, setOpenBlock] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -150,13 +172,18 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [tab, setTab] = useState('definicoes')
   const [showFormPreview, setShowFormPreview] = useState(false)
 
-  // Carrega os eventos publicados/futuros associáveis.
+  // Carrega os eventos associáveis (atuais/futuros), preservando o evento já
+  // associado que possa estar fora dessa lista (ex.: já decorreu).
   useEffect(() => {
     let alive = true
     invitesService
       .getSelectableEvents()
       .then((evs) => {
-        if (alive) setEvents(evs)
+        if (!alive) return
+        setEvents((prev) => {
+          const extra = prev.filter((p) => !evs.some((e) => e.id === p.id))
+          return [...evs, ...extra]
+        })
       })
       .catch(() => {})
     return () => {
@@ -169,7 +196,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     setSettings((s) => ({ ...s, [k]: v }))
   }
 
-  // Associa (ou desassocia) um evento: herda título, datas do evento, local e banner.
+  // Associa (ou desassocia) um evento: herda título, datas, local, mapa e imagem.
   const pickEvent = (eventId) => {
     const ev = events.find((x) => x.id === eventId)
     setSettings((s) => ({
@@ -184,6 +211,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
             endTime: toTimeInput(ev.endDatetime),
             location: ev.location || s.location,
             mapUrl: ev.mapUrl || s.mapUrl,
+            bannerUrl: ev.bannerUrl || s.bannerUrl,
             useEventBanner: ev.bannerUrl ? true : s.useEventBanner,
           }
         : {}),
@@ -440,6 +468,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     URL.revokeObjectURL(url)
   }
 
+  // Evento do calendário atualmente associado (para o cartão de "output").
+  const selectedEvent = events.find((e) => e.id === settings.eventId) || null
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -508,9 +539,47 @@ function InviteEditor({ invite, onBack, onSaved }) {
               ))}
             </select>
             <span className="text-xs text-muted-foreground">
-              Escolha um evento futuro do calendário para herdar o título, as datas e a imagem. As datas do evento e das inscrições são independentes.
+              Escolha um evento atual ou futuro do calendário para herdar o título, as datas e a imagem. Cada convite liga-se a um único evento. As datas do evento e das inscrições são independentes.
             </span>
           </label>
+
+          {/* Evento escolhido — mostrado como "output" (só leitura) */}
+          {selectedEvent ? (
+            <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              {selectedEvent.bannerUrl ? (
+                <img src={selectedEvent.bannerUrl} alt="" className="h-16 w-24 flex-shrink-0 rounded-md object-cover" />
+              ) : (
+                <div className="flex h-16 w-24 flex-shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <CalendarIcon className="h-5 w-5" aria-hidden="true" />
+                </div>
+              )}
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                  <CalendarIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  Evento do calendário
+                </span>
+                <span className="truncate text-sm font-bold text-foreground">{selectedEvent.title}</span>
+                {fmtEventWhen(selectedEvent.startDatetime, selectedEvent.endDatetime) ? (
+                  <span className="text-xs text-muted-foreground">
+                    {fmtEventWhen(selectedEvent.startDatetime, selectedEvent.endDatetime)}
+                  </span>
+                ) : null}
+                {selectedEvent.location ? (
+                  <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                    {selectedEvent.location}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => pickEvent('')}
+                className="flex-shrink-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+              >
+                Desassociar
+              </button>
+            </div>
+          ) : null}
 
           <label className={labelCls}>
             Título *
