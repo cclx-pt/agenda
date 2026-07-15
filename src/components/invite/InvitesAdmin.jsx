@@ -154,13 +154,6 @@ function formatAnswer(field, value) {
 }
 
 // ── Editor de um convite ─────────────────────────────────────────
-const TAB_LIST = [
-  { id: 'definicoes', label: 'Definições' },
-  { id: 'formulario', label: 'Formulário' },
-  { id: 'pagina', label: 'Página' },
-  { id: 'inscricoes', label: 'Inscrições' },
-]
-
 function InviteEditor({ invite, onBack, onSaved }) {
   const [settings, setSettings] = useState(() => ({
     eventId: invite.eventId ?? '',
@@ -176,7 +169,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     // Banner.
     bannerUrl: invite.bannerUrl ?? '',
     useEventBanner: !!invite.useEventBanner,
-    // Janela de INSCRIÇÃO.
+    // Modo de inscrição + janela.
+    registrationMode: invite.registrationMode ?? 'internal',
+    registrationUrl: invite.registrationUrl ?? '',
     rsvpEnabled: invite.rsvpEnabled !== false,
     rsvpStartDate: toDateInput(invite.rsvpStartDatetime),
     rsvpStartTime: toTimeInput(invite.rsvpStartDatetime),
@@ -292,6 +287,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
     costAmount: null,
     paymentMethod: firstPaidTicketMethod(tickets),
     rsvpEnabled: settings.rsvpEnabled,
+    registrationMode: settings.registrationMode,
+    registrationUrl: settings.registrationMode === 'external' ? settings.registrationUrl.trim() || null : null,
     rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
     rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
     capacity: settings.capacity ? Number(settings.capacity) : null,
@@ -340,6 +337,15 @@ function InviteEditor({ invite, onBack, onSaved }) {
   }
 
   const changeStatus = async (status) => {
+    // Inscrições internas exigem pelo menos um tipo de bilhete antes de publicar.
+    if (
+      status === 'publicado' &&
+      settings.registrationMode === 'internal' &&
+      !tickets.some((t) => (t.name || '').trim())
+    ) {
+      toast.error('Cria pelo menos um tipo de bilhete antes de publicar (inscrições internas).')
+      return
+    }
     setBusy(true)
     try {
       const updated = await invitesService.setInviteStatus(invite.id, status)
@@ -497,6 +503,31 @@ function InviteEditor({ invite, onBack, onSaved }) {
   // Evento do calendário atualmente associado (para o cartão de "output").
   const selectedEvent = events.find((e) => e.id === settings.eventId) || null
 
+  // Modo de inscrição → separadores dinâmicos + roteiro (semáforo de conclusão).
+  const isInternal = settings.registrationMode === 'internal'
+  const hasAnyTicket = tickets.some((t) => (t.name || '').trim())
+  const tabs = [
+    { id: 'definicoes', label: 'Definições' },
+    ...(isInternal ? [{ id: 'bilhetes', label: 'Bilhetes' }, { id: 'inscricao', label: 'Inscrição' }] : []),
+    { id: 'pagina', label: 'Página' },
+    ...(isInternal ? [{ id: 'inscricoes', label: 'Inscrições' }] : []),
+  ]
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'definicoes'
+  const roadmap = [
+    { label: 'Definições', tabId: 'definicoes', done: Boolean(settings.title.trim()) },
+    ...(isInternal
+      ? [
+          { label: 'Bilhete', tabId: 'bilhetes', done: hasAnyTicket },
+          { label: 'Inscrição', tabId: 'inscricao', done: hasAnyTicket && settings.rsvpEnabled },
+        ]
+      : []),
+    ...(settings.registrationMode === 'external'
+      ? [{ label: 'Inscrição', tabId: 'definicoes', done: Boolean(settings.registrationUrl.trim()) }]
+      : []),
+    { label: 'Página', tabId: 'pagina', done: pageBlocks.length > 0 },
+    ...(isInternal ? [{ label: 'Inscrições', tabId: 'inscricoes', done: invite.status === 'publicado' }] : []),
+  ]
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -529,15 +560,32 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </div>
       </div>
 
+      {/* Roteiro: semáforo de conclusão por etapa */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
+        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Roteiro</span>
+        {roadmap.map((step, i) => (
+          <button
+            key={`${step.tabId}-${i}`}
+            type="button"
+            onClick={() => setTab(step.tabId)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+            title={step.done ? 'Concluído' : 'Por concluir'}
+          >
+            <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${step.done ? 'bg-emerald-500' : 'bg-amber-400'}`} aria-hidden="true" />
+            {step.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-1 border-b border-border">
-        {TAB_LIST.map((tb) => (
+        {tabs.map((tb) => (
           <button
             key={tb.id}
             type="button"
             onClick={() => setTab(tb.id)}
             className={
               'rounded-t-lg px-3 py-2 text-sm font-semibold transition-colors ' +
-              (tab === tb.id
+              (activeTab === tb.id
                 ? 'border-b-2 border-primary text-foreground'
                 : 'text-muted-foreground hover:text-foreground')
             }
@@ -547,9 +595,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
         ))}
       </div>
 
-      {tab === 'definicoes' ? (
-        <>
-      {/* Definições da página */}
+      {activeTab === 'definicoes' ? (
       <section className="rounded-xl border border-border bg-card p-4">
         <h3 className="m-0 mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Definições</h3>
         <div className="flex flex-col gap-3">
@@ -673,41 +719,25 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <span className="text-xs text-muted-foreground">Herdado do evento associado; podes também colar um link do Google Maps.</span>
           </label>
 
+          {/* Modo de inscrição */}
           <label className={labelCls}>
-            Cor do tema
-            <input type="color" className="h-10 w-full rounded-lg border border-input bg-background" value={settings.colorTheme} onChange={setField('colorTheme')} />
+            Inscrições
+            <select className={inputCls} value={settings.registrationMode} onChange={setField('registrationMode')}>
+              <option value="none">Sem inscrição</option>
+              <option value="external">Com inscrição externa (link)</option>
+              <option value="internal">Com inscrição interna (nesta página)</option>
+            </select>
+            <span className="text-xs text-muted-foreground">
+              Interna: bilhetes + formulário nesta plataforma (separadores próprios). Externa: encaminha para um link. Sem inscrição: só página informativa.
+            </span>
           </label>
 
-          {/* Datas de INSCRIÇÃO (janela) */}
-          <p className="m-0 mt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Datas das inscrições</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {settings.registrationMode === 'external' ? (
             <label className={labelCls}>
-              Abertura
-              <DateField className={inputCls} value={settings.rsvpStartDate} onChange={(v) => setSettings((s) => ({ ...s, rsvpStartDate: v }))} ariaLabel="Abertura das inscrições" />
+              Link de inscrição externa
+              <input className={inputCls} type="url" placeholder="https://…" value={settings.registrationUrl} onChange={setField('registrationUrl')} />
             </label>
-            <label className={labelCls}>
-              Hora de abertura
-              <TimeField className={inputCls} value={settings.rsvpStartTime} onChange={(v) => setSettings((s) => ({ ...s, rsvpStartTime: v }))} ariaLabel="Hora de abertura" />
-            </label>
-            <label className={labelCls}>
-              Fecho
-              <DateField className={inputCls} value={settings.rsvpEndDate} onChange={(v) => setSettings((s) => ({ ...s, rsvpEndDate: v }))} ariaLabel="Fecho das inscrições" />
-            </label>
-            <label className={labelCls}>
-              Hora de fecho
-              <TimeField className={inputCls} value={settings.rsvpEndTime} onChange={(v) => setSettings((s) => ({ ...s, rsvpEndTime: v }))} ariaLabel="Hora de fecho" />
-            </label>
-          </div>
-
-          <label className={labelCls}>
-            Capacidade total (lugares)
-            <input type="number" min="1" className={inputCls} value={settings.capacity} onChange={setField('capacity')} />
-          </label>
-
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-            <input type="checkbox" checked={settings.rsvpEnabled} onChange={setField('rsvpEnabled')} />
-            Inscrições abertas
-          </label>
+          ) : null}
 
           <label className={labelCls}>
             Descrição (partilha / Open Graph)
@@ -715,8 +745,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </label>
         </div>
       </section>
+      ) : null}
 
-      {/* Bilhetes — definem o tipo e o custo da inscrição */}
+      {activeTab === 'bilhetes' ? (
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Bilhetes</h3>
@@ -801,10 +832,47 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </ul>
         )}
       </section>
-        </>
       ) : null}
 
-      {tab === 'formulario' ? (
+      {activeTab === 'inscricao' ? (
+        <>
+        <section className="rounded-xl border border-border bg-card p-4">
+          <h3 className="m-0 mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Inscrições</h3>
+          <div className="flex flex-col gap-3">
+            {!hasAnyTicket ? (
+              <p className="m-0 rounded-lg bg-amber-100 p-2 text-xs text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                As inscrições precisam de pelo menos um tipo de bilhete. Cria bilhetes no separador “Bilhetes”.
+              </p>
+            ) : null}
+            <p className="m-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">Datas das inscrições</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className={labelCls}>
+                Abertura
+                <DateField className={inputCls} value={settings.rsvpStartDate} onChange={(v) => setSettings((s) => ({ ...s, rsvpStartDate: v }))} ariaLabel="Abertura das inscrições" />
+              </label>
+              <label className={labelCls}>
+                Hora de abertura
+                <TimeField className={inputCls} value={settings.rsvpStartTime} onChange={(v) => setSettings((s) => ({ ...s, rsvpStartTime: v }))} ariaLabel="Hora de abertura" />
+              </label>
+              <label className={labelCls}>
+                Fecho
+                <DateField className={inputCls} value={settings.rsvpEndDate} onChange={(v) => setSettings((s) => ({ ...s, rsvpEndDate: v }))} ariaLabel="Fecho das inscrições" />
+              </label>
+              <label className={labelCls}>
+                Hora de fecho
+                <TimeField className={inputCls} value={settings.rsvpEndTime} onChange={(v) => setSettings((s) => ({ ...s, rsvpEndTime: v }))} ariaLabel="Hora de fecho" />
+              </label>
+            </div>
+            <label className={labelCls}>
+              Capacidade total (lugares)
+              <input type="number" min="1" className={inputCls} value={settings.capacity} onChange={setField('capacity')} />
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+              <input type="checkbox" checked={settings.rsvpEnabled} onChange={setField('rsvpEnabled')} />
+              Inscrições abertas
+            </label>
+          </div>
+        </section>
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
             <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>
@@ -831,9 +899,10 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} />
           )}
         </section>
+        </>
       ) : null}
 
-      {tab === 'pagina' ? (
+      {activeTab === 'pagina' ? (
         <>
       {/* Blocos de conteúdo */}
       <section className="rounded-xl border border-border bg-card p-4">
@@ -889,7 +958,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </>
       ) : null}
 
-      {tab === 'inscricoes' ? (
+      {activeTab === 'inscricoes' ? (
         <>
       {/* Inscrições */}
       <section className="rounded-xl border border-border bg-card p-4">

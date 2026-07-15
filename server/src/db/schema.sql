@@ -462,6 +462,9 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS rsvp_start_datetime TIMESTAMPTZ;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS use_event_banner BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS payment_method TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS map_url TEXT;
+-- Modo de inscrição: 'none' (só página), 'external' (link) ou 'internal' (bilhetes + formulário aqui).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_mode TEXT NOT NULL DEFAULT 'internal';
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_url TEXT;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual, grátis (0€), oferta
 -- voluntária (valor livre) ou grupo. Cada tipo tem preço, capacidade (NULL =

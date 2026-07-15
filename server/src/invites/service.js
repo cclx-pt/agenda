@@ -116,6 +116,13 @@ const inviteInputSchema = z.object({
   // sincronizado internamente para o conector.
   paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
   rsvpEnabled: z.boolean().optional(),
+  registrationMode: z.enum(['none', 'external', 'internal']).optional(),
+  registrationUrl: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de inscrição inválido.')
+    .optional()
+    .nullable(),
   // Datas de INSCRIÇÃO (janela): abertura e fecho. As datas do EVENTO são
   // start/endDatetime (herdadas do evento associado ou manuais).
   rsvpStartDatetime: isoDate,
@@ -397,6 +404,8 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
       costAmount: invite.costAmount,
       costCurrency: invite.costCurrency,
       paymentMethod: invite.paymentMethod,
+      registrationMode: invite.registrationMode,
+      registrationUrl: invite.registrationUrl,
       rsvpEnabled: invite.rsvpEnabled,
       // Datas de INSCRIÇÃO (janela).
       rsvpStartDatetime: invite.rsvpStartDatetime,
@@ -521,6 +530,9 @@ export async function submitRsvp(slug, input) {
   const invite = await repo.findBySlug(slug)
   if (!invite || invite.status !== 'publicado') {
     throw new InviteError(404, 'Convite não encontrado.')
+  }
+  if (invite.registrationMode && invite.registrationMode !== 'internal') {
+    throw new InviteError(409, 'Este convite não tem inscrições internas.')
   }
   if (!invite.rsvpEnabled) {
     throw new InviteError(409, 'As inscrições não estão abertas para este convite.')

@@ -57,14 +57,18 @@ function BannerCard({ block, page, accent }) {
           ) : null}
         </div>
         {c.shortDescription ? <p className="mt-4 text-foreground">{c.shortDescription}</p> : null}
-        <a
-          href={inviteRsvpHref(page.slug)}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-          style={{ backgroundColor: accent }}
-        >
-          <Ticket className="h-4 w-4" aria-hidden="true" />
-          {c.ctaLabel || 'Inscrever-me'}
-        </a>
+        {(inv.registrationMode || 'internal') !== 'none' ? (
+          <a
+            href={(inv.registrationMode || 'internal') === 'external' ? inv.registrationUrl || '#' : inviteRsvpHref(page.slug)}
+            target={(inv.registrationMode || 'internal') === 'external' ? '_blank' : undefined}
+            rel={(inv.registrationMode || 'internal') === 'external' ? 'noreferrer' : undefined}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            <Ticket className="h-4 w-4" aria-hidden="true" />
+            {c.ctaLabel || 'Inscrever-me'}
+          </a>
+        ) : null}
       </div>
     </div>
   )

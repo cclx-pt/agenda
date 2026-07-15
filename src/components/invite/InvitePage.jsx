@@ -646,6 +646,26 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
   const c = block.content || {}
   const [deadlinePassed] = useState(() => Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
   const [notOpenYet] = useState(() => Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
+  const mode = invite.registrationMode || 'internal'
+  if (mode === 'none') return null
+  if (mode === 'external') {
+    return (
+      <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
+        {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
+        <a
+          href={invite.registrationUrl || '#'}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex w-fit items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+          style={{ backgroundColor: accent }}
+        >
+          <Ticket className="h-4 w-4" aria-hidden="true" />
+          {c.ctaLabel || 'Inscrever-me'}
+        </a>
+      </div>
+    )
+  }
   return (
     <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
@@ -741,6 +761,31 @@ export default function InvitePage({ slug, view = 'landing' }) {
   // Página dedicada de inscrição (/invite/<slug>/inscricao): cabeçalho compacto,
   // contador de vagas, formulário e (para pagos) o fluxo de pagamento.
   if (view === 'rsvp') {
+    const mode = page.invite.registrationMode || 'internal'
+    if (mode !== 'internal') {
+      return (
+        <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>
+          <Toaster position="top-center" richColors />
+          <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4">
+            <a href={homeHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Voltar ao convite
+            </a>
+            <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+              <h1 className="m-0 text-lg font-bold text-foreground">{page.invite.title}</h1>
+              {mode === 'external' ? (
+                <a href={page.invite.registrationUrl || '#'} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ backgroundColor: accent }}>
+                  <Ticket className="h-4 w-4" aria-hidden="true" />
+                  Ir para a inscrição
+                </a>
+              ) : (
+                <p className="m-0 mt-2 text-sm text-muted-foreground">Este convite não tem inscrições.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
     const rsvpBlock = page.blocks.find((b) => b.type === 'rsvp') || { id: 'rsvp', type: 'rsvp', content: {} }
     return (
       <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>

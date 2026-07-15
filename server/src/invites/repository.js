@@ -29,6 +29,8 @@ function mapInvite(row) {
     paymentMethod: row.payment_method ?? null,
     paymentProvider: row.payment_provider ?? null,
     rsvpEnabled: !!row.rsvp_enabled,
+    registrationMode: row.registration_mode ?? 'internal',
+    registrationUrl: row.registration_url ?? null,
     rsvpStartDatetime: row.rsvp_start_datetime ?? null,
     rsvpDeadline: row.rsvp_deadline ?? null,
     useEventBanner: !!row.use_event_banner,
@@ -90,8 +92,9 @@ export async function insert(data, actorId) {
       (id, event_id, slug, title, banner_url, color_theme, start_datetime, end_datetime,
        location, meta_title, meta_description, meta_image_url, cost_type, cost_amount,
        cost_currency, payment_methods, rsvp_enabled, rsvp_deadline, capacity, community,
-       created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider, map_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
+       created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider, map_url,
+       registration_mode, registration_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
     [
       id,
       data.eventId ?? null,
@@ -119,6 +122,8 @@ export async function insert(data, actorId) {
       data.paymentMethod ?? null,
       data.paymentProvider ?? null,
       data.mapUrl ?? null,
+      data.registrationMode ?? 'internal',
+      data.registrationUrl ?? null,
     ]
   )
   return findById(id)
@@ -185,6 +190,8 @@ export async function update(id, data) {
        use_event_banner = $21,
        payment_method = $22,
        map_url = $23,
+       registration_mode = $24,
+       registration_url = $25,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -211,6 +218,8 @@ export async function update(id, data) {
       data.useEventBanner ?? false,
       data.paymentMethod ?? null,
       data.mapUrl ?? null,
+      data.registrationMode ?? 'internal',
+      data.registrationUrl ?? null,
     ]
   )
   return findById(id)
