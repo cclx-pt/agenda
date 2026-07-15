@@ -8,7 +8,7 @@ import {
 } from './InviteCards'
 import { fmtDateRange } from './inviteUtils'
 import {
-  getFormFields, isVisible, initialValues, validateForm, buildSubmission,
+  getFormFields, isVisible, initialValues, validateFields, buildSubmission,
 } from './inviteFormFields'
 
 // Mapa tipo → componente (rsvp é tratado à parte: precisa de estado/handlers).
@@ -85,6 +85,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const tickets = (page.tickets || []).filter((t) => !t.soldOut)
   const paidWithTickets = inv.costType !== 'gratuito' && tickets.length > 0
   const [values, setValues] = useState(() => initialValues(fields))
+  const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -98,16 +99,30 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     )
   }
 
-  const setVal = (key, v) => setValues((s) => ({ ...s, [key]: v }))
+  const setVal = (key, v) => {
+    setValues((s) => ({ ...s, [key]: v }))
+    setErrors((e) => {
+      if (!e[key]) return e
+      const n = { ...e }
+      delete n[key]
+      return n
+    })
+  }
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
 
   const submit = async (e) => {
     e.preventDefault()
-    const err = validateForm(fields, values)
-    if (err) {
-      toast.error(err)
+    const errs = validateFields(fields, values)
+    if (Object.keys(errs).length) {
+      setErrors(errs)
+      const firstKey = fields.find((f) => errs[f.key])?.key
+      if (firstKey && typeof document !== 'undefined') {
+        document.getElementById(`f_${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      toast.error('Corrige os campos assinalados.')
       return
     }
+    setErrors({})
     if (paidWithTickets && !ticketId) {
       toast.error('Escolha um bilhete.')
       return
@@ -152,24 +167,29 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       )
     }
     const val = values[f.key]
+    const err = errors[f.key]
     const req = f.required ? <span className="text-destructive"> *</span> : null
+    const help = f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null
+    const errMsg = err ? <span className="text-xs font-normal text-destructive">{err}</span> : null
+    const fieldCls = inputCls + (err ? ' border-destructive' : '')
 
     if (f.type === 'children') {
       const kids = Array.isArray(val) ? val : []
       const setKids = (next) => setVal(f.key, next)
       const patchKid = (i, patch) => setKids(kids.map((k, idx) => (idx === i ? { ...k, ...patch } : k)))
       return (
-        <div key={f.key} className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 p-3">
+        <div key={f.key} id={`f_${f.key}`} className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 p-3">
           <p className="m-0 text-sm font-medium text-foreground">
             {f.label}
             {req}
           </p>
           {f.help ? <p className="m-0 text-xs font-normal text-muted-foreground">{f.help}</p> : null}
+          {err ? <p className="m-0 text-xs font-normal text-destructive">{err}</p> : null}
           {kids.map((kid, i) => (
             <div key={i} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
               <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-3">
                 <input className={inputCls} placeholder="Nome" value={kid.nome ?? ''} onChange={(e) => patchKid(i, { nome: e.target.value })} />
-                <input type="number" min="0" max="18" className={inputCls} placeholder="Idade" value={kid.idade ?? ''} onChange={(e) => patchKid(i, { idade: e.target.value })} />
+                <input type="number" inputMode="numeric" min="0" max="18" className={inputCls} placeholder="Idade" value={kid.idade ?? ''} onChange={(e) => patchKid(i, { idade: e.target.value })} />
                 <input className={inputCls} placeholder="Alergias / necessidades" value={kid.alergias ?? ''} onChange={(e) => patchKid(i, { alergias: e.target.value })} />
               </div>
               <button type="button" onClick={() => setKids(kids.filter((_, idx) => idx !== i))} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover criança">
@@ -191,12 +211,21 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
 
     if (f.type === 'checkbox') {
       return (
-        <label key={f.key} className="flex items-start gap-2 text-sm text-foreground">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 flex-shrink-0" checked={!!val} onChange={(e) => setVal(f.key, e.target.checked)} />
+        <label key={f.key} id={`f_${f.key}`} className="flex items-start gap-2 text-sm text-foreground">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 flex-shrink-0" checked={!!val} aria-invalid={!!err} aria-required={!!f.required} onChange={(e) => setVal(f.key, e.target.checked)} />
           <span>
             {f.label}
             {req}
+            {f.link ? (
+              <>
+                {' '}
+                <a href={f.link} target="_blank" rel="noreferrer" className="underline" style={{ color: accent }}>
+                  (ler)
+                </a>
+              </>
+            ) : null}
             {f.help ? <span className="block text-xs font-normal text-muted-foreground">{f.help}</span> : null}
+            {err ? <span className="block text-xs font-normal text-destructive">{err}</span> : null}
           </span>
         </label>
       )
@@ -204,13 +233,13 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
 
     if (f.type === 'select') {
       return (
-        <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        <label key={f.key} id={`f_${f.key}`} className="flex flex-col gap-1 text-sm font-medium text-foreground">
           <span>
             {f.label}
             {req}
           </span>
-          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
-          <select className={inputCls} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)}>
+          {help}
+          <select className={fieldCls} value={val ?? ''} aria-invalid={!!err} aria-required={!!f.required} onChange={(e) => setVal(f.key, e.target.value)}>
             <option value="">— Selecione —</option>
             {(f.options || []).map((o) => (
               <option key={o} value={o}>
@@ -218,18 +247,19 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               </option>
             ))}
           </select>
+          {errMsg}
         </label>
       )
     }
 
     if (f.type === 'radio') {
       return (
-        <div key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
-          <span>
+        <fieldset key={f.key} id={`f_${f.key}`} className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0 text-sm font-medium text-foreground">
+          <legend className="float-left p-0">
             {f.label}
             {req}
-          </span>
-          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
+          </legend>
+          {help}
           <div className="flex flex-wrap gap-3">
             {(f.options || []).map((o) => (
               <label key={o} className="inline-flex items-center gap-1.5 font-normal">
@@ -238,7 +268,8 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               </label>
             ))}
           </div>
-        </div>
+          {errMsg}
+        </fieldset>
       )
     }
 
@@ -246,12 +277,12 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       const selected = Array.isArray(val) ? val : []
       const toggle = (o) => setVal(f.key, selected.includes(o) ? selected.filter((x) => x !== o) : [...selected, o])
       return (
-        <div key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
-          <span>
+        <fieldset key={f.key} id={`f_${f.key}`} className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0 text-sm font-medium text-foreground">
+          <legend className="float-left p-0">
             {f.label}
             {req}
-          </span>
-          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
+          </legend>
+          {help}
           <div className="flex flex-col gap-1.5">
             {(f.options || []).map((o) => (
               <label key={o} className="inline-flex items-center gap-2 font-normal">
@@ -260,32 +291,47 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               </label>
             ))}
           </div>
-        </div>
+          {errMsg}
+        </fieldset>
       )
     }
 
     if (f.type === 'textarea') {
       return (
-        <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        <label key={f.key} id={`f_${f.key}`} className="flex flex-col gap-1 text-sm font-medium text-foreground">
           <span>
             {f.label}
             {req}
           </span>
-          {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
-          <textarea className={inputCls} rows={2} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
+          {help}
+          <textarea className={fieldCls} rows={2} placeholder={f.placeholder ?? ''} value={val ?? ''} aria-invalid={!!err} aria-required={!!f.required} onChange={(e) => setVal(f.key, e.target.value)} />
+          {errMsg}
         </label>
       )
     }
 
     const inputType = f.type === 'email' ? 'email' : f.type === 'tel' ? 'tel' : f.type === 'number' ? 'number' : 'text'
+    const autoComplete = f.key === 'name' ? 'name' : f.key === 'email' ? 'email' : f.key === 'phone' ? 'tel' : undefined
+    const inputMode = f.type === 'tel' ? 'tel' : f.type === 'number' ? 'numeric' : f.type === 'email' ? 'email' : undefined
     return (
-      <label key={f.key} className="flex flex-col gap-1 text-sm font-medium text-foreground">
+      <label key={f.key} id={`f_${f.key}`} className="flex flex-col gap-1 text-sm font-medium text-foreground">
         <span>
           {f.label}
           {req}
         </span>
-        {f.help ? <span className="text-xs font-normal text-muted-foreground">{f.help}</span> : null}
-        <input type={inputType} className={inputCls} placeholder={f.placeholder ?? ''} value={val ?? ''} onChange={(e) => setVal(f.key, e.target.value)} />
+        {help}
+        <input
+          type={inputType}
+          inputMode={inputMode}
+          autoComplete={autoComplete}
+          aria-invalid={!!err}
+          aria-required={!!f.required}
+          className={fieldCls}
+          placeholder={f.placeholder ?? ''}
+          value={val ?? ''}
+          onChange={(e) => setVal(f.key, e.target.value)}
+        />
+        {errMsg}
       </label>
     )
   }

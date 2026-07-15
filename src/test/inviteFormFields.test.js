@@ -6,6 +6,7 @@ import {
   isVisible,
   initialValues,
   validateForm,
+  validateFields,
   buildSubmission,
   hasOptions,
   SYSTEM_KEYS,
@@ -121,6 +122,21 @@ describe('inviteFormFields', () => {
     expect(out.extra.dias).toEqual(['Sex', 'Sáb'])
     expect(out.extra.ok).toBe(true)
     expect(out.extra.kids).toEqual([{ nome: 'Zé', idade: '5', alergias: '' }])
+  })
+
+  it('validateFields devolve um mapa de erros por campo (para erros inline)', () => {
+    const fields = [
+      { key: 'name', type: 'text', label: 'Nome', required: true },
+      { key: 'email', type: 'email', label: 'Email' },
+      { key: 'ok', type: 'checkbox', label: 'Aceito', required: true },
+      { key: 'dias', type: 'multiselect', label: 'Dias', required: true, options: ['Sex'] },
+    ]
+    const errs = validateFields(fields, { name: '', email: 'mau', ok: false, dias: [] })
+    expect(errs.name).toBe('Campo obrigatório.')
+    expect(errs.email).toBe('Email inválido.')
+    expect(errs.ok).toMatch(/confirmar/)
+    expect(errs.dias).toMatch(/Selecione/)
+    expect(validateFields(fields, { name: 'Ana', email: 'a@b.pt', ok: true, dias: ['Sex'] })).toEqual({})
   })
 
   it('hasOptions cobre select/radio/multiselect', () => {

@@ -276,6 +276,8 @@ export function RsvpEditor({ content, onChange }) {
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {['text', 'textarea', 'email', 'tel', 'number'].includes(f.type) ? (
                         <input className={inputCls} placeholder="Placeholder (opcional)" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} />
+                      ) : f.type === 'checkbox' ? (
+                        <input className={inputCls} placeholder="Link (opcional, ex. política de privacidade)" value={f.link ?? ''} onChange={(e) => updateField(i, { link: e.target.value })} />
                       ) : (
                         <span />
                       )}

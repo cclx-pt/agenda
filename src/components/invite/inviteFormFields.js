@@ -156,6 +156,39 @@ export function validateForm(fields, values) {
   return null
 }
 
+// Como validateForm mas devolve um mapa { chave: mensagem } de TODOS os campos
+// inválidos visíveis (para erros inline). Mensagens curtas.
+export function validateFields(fields, values) {
+  const errors = {}
+  for (const f of fields) {
+    if (f.type === 'section' || !isVisible(f, values)) continue
+    const val = values[f.key]
+    const empty =
+      f.type === 'checkbox'
+        ? !val
+        : f.type === 'children' || f.type === 'multiselect'
+          ? !Array.isArray(val) || val.length === 0
+          : val == null || String(val).trim() === ''
+    if (f.required && empty) {
+      errors[f.key] =
+        f.type === 'checkbox'
+          ? 'É necessário confirmar.'
+          : f.type === 'children'
+            ? 'Adicione pelo menos uma criança.'
+            : f.type === 'multiselect'
+              ? 'Selecione pelo menos uma opção.'
+              : 'Campo obrigatório.'
+      continue
+    }
+    if (!empty && f.type === 'email' && !EMAIL_RE.test(String(val).trim())) {
+      errors[f.key] = 'Email inválido.'
+    } else if (!empty && f.type === 'tel' && digitsCount(val) < 9) {
+      errors[f.key] = 'Telemóvel inválido (mín. 9 dígitos).'
+    }
+  }
+  return errors
+}
+
 // Reparte os valores em campos de sistema (name/email/phone) + `extra` (o resto),
 // considerando apenas os campos VISÍVEIS.
 export function buildSubmission(fields, values) {
