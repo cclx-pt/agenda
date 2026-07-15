@@ -268,7 +268,13 @@ function InviteEditor({ invite, onBack, onSaved }) {
       }
       const updated = await invitesService.saveInviteBlocks(
         invite.id,
-        blocks.map((b) => ({ type: b.type, visible: b.visible, content: b.content }))
+        blocks.map((b) => ({
+          type: b.type,
+          visible: b.visible,
+          // Materializa os campos do formulário no bloco rsvp para o backend poder
+          // validar obrigatórios/consentimentos server-side.
+          content: b.type === 'rsvp' ? { ...b.content, fields: getFormFields(b.content) } : b.content,
+        }))
       )
       toast.success('Convite guardado.')
       onSaved?.(updated)

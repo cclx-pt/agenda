@@ -216,3 +216,15 @@ export function buildSubmission(fields, values) {
   }
   return { name, email, phone, extra }
 }
+
+// Nº de pessoas que a inscrição representa (1 = o próprio + crianças indicadas nos
+// campos do tipo 'children' visíveis). Alimenta a contagem de capacidade.
+export function countPeople(fields, values) {
+  let n = 1
+  for (const f of fields) {
+    if (f.type !== 'children' || !isVisible(f, values)) continue
+    const rows = Array.isArray(values[f.key]) ? values[f.key] : []
+    n += rows.filter((c) => c && (c.nome || c.idade || c.alergias)).length
+  }
+  return n
+}

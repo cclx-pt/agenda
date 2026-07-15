@@ -8,6 +8,7 @@ import {
   validateForm,
   validateFields,
   buildSubmission,
+  countPeople,
   hasOptions,
   SYSTEM_KEYS,
 } from '../components/invite/inviteFormFields'
@@ -144,6 +145,19 @@ describe('inviteFormFields', () => {
     expect(hasOptions('radio')).toBe(true)
     expect(hasOptions('multiselect')).toBe(true)
     expect(hasOptions('text')).toBe(false)
+  })
+
+  it('countPeople conta o próprio + crianças visíveis', () => {
+    const fields = [
+      { key: 'tem', type: 'checkbox' },
+      { key: 'kids', type: 'children', visibleWhen: { field: 'tem', equals: true } },
+    ]
+    expect(countPeople(fields, { tem: false, kids: [] })).toBe(1)
+    expect(countPeople(fields, { tem: true, kids: [{ nome: 'A' }, { nome: 'B' }] })).toBe(3)
+    // crianças ocultas (tem=false) não contam mesmo que existam linhas
+    expect(countPeople(fields, { tem: false, kids: [{ nome: 'A' }] })).toBe(1)
+    // linhas vazias não contam
+    expect(countPeople(fields, { tem: true, kids: [{ nome: '', idade: '', alergias: '' }] })).toBe(1)
   })
 
   it('DEFAULT_RSVP_FIELDS inclui campos de sistema e consentimentos obrigatórios', () => {

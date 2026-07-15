@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { waitUntil } from '@vercel/functions'
 import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
+import { config } from '../config.js'
+import { sendRsvpConfirmationEmail } from '../auth/email.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -365,7 +368,7 @@ function guestStatusPayload(guest) {
   }
 }
 
-function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = null, tickets = [] } = {}) {
+function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = null, tickets = [], spotsLeft = null } = {}) {
   const banner = bannerUrl ?? invite.bannerUrl
   return {
     slug: invite.slug,
@@ -389,6 +392,7 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
       rsvpStartDatetime: invite.rsvpStartDatetime,
       rsvpDeadline: invite.rsvpDeadline,
       capacity: invite.capacity,
+      spotsLeft,
     },
     meta: buildMeta(invite, banner),
     // Bilhetes ativos (só relevante para eventos pagos).
@@ -426,7 +430,12 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
     const g = await repo.findGuestByToken(guestToken)
     if (g && g.inviteId === invite.id) guest = g
   }
-  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets }) }
+  let spotsLeft = null
+  if (invite.capacity) {
+    const taken = await repo.countConfirmedSeats(invite.id)
+    spotsLeft = Math.max(0, invite.capacity - taken)
+  }
+  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets, spotsLeft }) }
 }
 
 // Metadados Open Graph leves (para crawlers/pré-visualização de link).
@@ -441,6 +450,53 @@ export async function getMeta(slug) {
 
 export function recordView(inviteId, meta) {
   return repo.recordView(inviteId, meta).catch(() => {})
+}
+
+// Visibilidade condicional de um campo (espelha o frontend inviteFormFields.isVisible).
+function fieldVisible(field, values) {
+  const cond = field.visibleWhen
+  if (!cond || !cond.field) return true
+  return String(values[cond.field] ?? '') === String(cond.equals ?? '')
+}
+
+// Defesa no servidor: valida os campos OBRIGATÓRIOS visíveis (incl. consentimentos)
+// contra o formulário configurado no bloco rsvp. É estritamente MAIS FRACA que a
+// validação do frontend (só verifica presença, não formato) → nunca rejeita uma
+// submissão válida feita pela UI; apenas trava POSTs diretos que saltam o formulário.
+function assertSubmissionValid(fields, values) {
+  for (const f of fields) {
+    if (f.type === 'section' || !f.required || !fieldVisible(f, values)) continue
+    const val = values[f.key]
+    let empty
+    if (f.type === 'checkbox') empty = !val
+    else if (f.type === 'children' || f.type === 'multiselect') empty = !Array.isArray(val) || val.length === 0
+    else empty = val == null || String(val).trim() === ''
+    if (empty) {
+      throw new InviteError(
+        400,
+        f.type === 'checkbox' ? `É necessário confirmar: "${f.label}".` : `O campo "${f.label}" é obrigatório.`
+      )
+    }
+  }
+}
+
+// Envia (em background) a confirmação de inscrição ao convidado com o link pessoal.
+function notifyGuestConfirmation(invite, guest, status) {
+  if (!guest?.email) return
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
+  const p = sendRsvpConfirmationEmail(guest.email, {
+    name: guest.name,
+    eventTitle: invite.title,
+    when: invite.startDatetime,
+    statusMessage: status?.message ?? '',
+    link,
+  }).catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
+  try {
+    waitUntil(p)
+  } catch {
+    /* fora do runtime Vercel: o processo persistente conclui o envio */
+  }
 }
 
 // ── RSVP (convidado, sem sessão) ─────────────────────────────────
@@ -460,6 +516,24 @@ export async function submitRsvp(slug, input) {
     throw new InviteError(410, 'O prazo de inscrição terminou.')
   }
   const data = rsvpSchema.parse(input)
+
+  // Validação server-side contra o formulário configurado (obrigatórios/consentimentos).
+  // Só corre quando o bloco rsvp tem campos explícitos; fail-open na leitura dos blocos.
+  let formFields
+  try {
+    const rsvpBlockForValidation = (await repo.listBlocks(invite.id)).find((b) => b.type === 'rsvp')
+    formFields = rsvpBlockForValidation?.content?.fields
+  } catch {
+    formFields = null
+  }
+  if (Array.isArray(formFields) && formFields.length) {
+    assertSubmissionValid(formFields, {
+      ...(data.extra || {}),
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+    })
+  }
 
   // Bilhete (evento pago): valida que pertence ao convite e está ativo.
   let ticket = null
@@ -509,7 +583,9 @@ export async function submitRsvp(slug, input) {
       extra: data.extra ?? null,
     })
   }
-  return { token: guest.token, status: guestStatusPayload(guest) }
+  const status = guestStatusPayload(guest)
+  notifyGuestConfirmation(invite, guest, status)
+  return { token: guest.token, status }
 }
 
 // ── Eventos associáveis + bilhetes (organizador) ─────────────────

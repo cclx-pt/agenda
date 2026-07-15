@@ -8,7 +8,7 @@ import {
 } from './InviteCards'
 import { fmtDateRange } from './inviteUtils'
 import {
-  getFormFields, isVisible, initialValues, validateFields, buildSubmission,
+  getFormFields, isVisible, initialValues, validateFields, buildSubmission, countPeople,
 } from './inviteFormFields'
 
 // Mapa tipo → componente (rsvp é tratado à parte: precisa de estado/handlers).
@@ -142,7 +142,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
         name,
         email,
         phone,
-        guestsCount: 1,
+        guestsCount: countPeople(fields, values),
         attend: true,
         ticketId: ticketId || null,
         extra: Object.keys(extra).length ? extra : null,
@@ -346,6 +346,11 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
+          {inv.spotsLeft != null ? (
+            <p className={inv.spotsLeft <= 0 ? 'm-0 text-sm font-semibold text-destructive' : 'm-0 text-sm font-semibold text-muted-foreground'}>
+              {inv.spotsLeft <= 0 ? 'Vagas esgotadas — a tua inscrição ficará em lista de espera.' : `Restam ${inv.spotsLeft} vaga(s).`}
+            </p>
+          ) : null}
           {paidWithTickets ? (
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               Bilhete *

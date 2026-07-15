@@ -69,6 +69,53 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;')
 }
 
+// Confirmação de inscrição enviada ao convidado, com o link pessoal (?g=) para
+// consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
+export async function sendRsvpConfirmationEmail(to, { name, eventTitle, when, statusMessage, link }) {
+  const title = eventTitle || 'Evento'
+  const subject = `Inscrição registada — ${title}`
+  let whenText = ''
+  if (when) {
+    const d = new Date(when)
+    if (!Number.isNaN(d.getTime())) {
+      whenText = d.toLocaleString('pt-PT', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Lisbon',
+      })
+    }
+  }
+  const text =
+    `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
+    (whenText ? `\nQuando: ${whenText}` : '') +
+    (statusMessage ? `\n\n${statusMessage}` : '') +
+    `\n\nConsulta o estado da tua inscrição aqui:\n${link}\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#111827">
+      <h2 style="color:#1f3864;margin:0 0 12px">Inscrição registada</h2>
+      <p style="margin:0 0 8px">${name ? `Olá ${escapeHtml(name)},` : 'Olá,'}</p>
+      <p style="margin:0 0 8px">Recebemos a tua inscrição em <strong>${escapeHtml(title)}</strong>.</p>
+      ${whenText ? `<p style="margin:0 0 8px;color:#6b7280">${escapeHtml(whenText)}</p>` : ''}
+      ${statusMessage ? `<p style="margin:12px 0;padding:12px;background:#f3f4f6;border-radius:8px">${escapeHtml(statusMessage)}</p>` : ''}
+      <p style="margin:16px 0">
+        <a href="${escapeHtml(link)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ver a minha inscrição</a>
+      </p>
+      <p style="margin:8px 0;color:#6b7280;font-size:13px">Guarda este link — é pessoal e mostra sempre o estado atual.</p>
+      <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Agenda CCLX</p>
+    </div>`
+
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Confirmação de inscrição para: ${to}\n[email:mock] Link: ${link}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
 // Texto por estado do evento (aprovado/rejeitado/eliminado).
 const EVENT_STATUS_COPY = {
   aprovado: {
