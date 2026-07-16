@@ -226,7 +226,7 @@ export function RsvpEditor({ content, onChange }) {
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className={labelCls}>
           Texto do botão
-          <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Confirmar Presença" />
+          <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Inscrever-me" />
         </label>
         <label className={labelCls}>
           Texto informativo (opcional)
@@ -372,19 +372,11 @@ export function RsvpEditor({ content, onChange }) {
   )
 }
 
-function LocationEditor({ content, onChange }) {
-  const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+function LocationEditor() {
   return (
-    <div className="flex flex-col gap-2">
-      <label className={labelCls}>
-        Morada
-        <input className={inputCls} value={content.address ?? ''} onChange={set('address')} />
-      </label>
-      <label className={labelCls}>
-        Link de direções (opcional)
-        <input className={inputCls} value={content.directionsUrl ?? ''} onChange={set('directionsUrl')} placeholder="https://maps.google.com/…" />
-      </label>
-    </div>
+    <p className="m-0 text-sm text-muted-foreground">
+      A morada e o link do mapa são herdados da página de detalhe (Definições): edita-os em “Local / morada” e “Localização Google (link do Maps)”.
+    </p>
   )
 }
 

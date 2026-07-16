@@ -212,7 +212,7 @@ export async function create(user, input) {
   // Semeia um bloco banner mínimo para a página não nascer vazia.
   await repo.replaceBlocks(invite.id, [
     { type: 'banner', visible: true, content: {} },
-    { type: 'rsvp', visible: true, content: { ctaLabel: 'Confirmar Presença' } },
+    { type: 'rsvp', visible: true, content: { ctaLabel: 'Inscrever-me' } },
     { type: 'pagamento', visible: true, content: {} },
     { type: 'partilha', visible: true, content: {} },
   ])

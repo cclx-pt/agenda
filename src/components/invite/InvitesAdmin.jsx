@@ -13,6 +13,7 @@ import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
+import { Switch } from '@/components/ui/switch'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
 const labelCls = 'flex flex-col gap-1 text-sm font-medium text-foreground'
@@ -867,9 +868,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
               Capacidade total (lugares)
               <input type="number" min="1" className={inputCls} value={settings.capacity} onChange={setField('capacity')} />
             </label>
-            <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-              <input type="checkbox" checked={settings.rsvpEnabled} onChange={setField('rsvpEnabled')} />
-              Inscrições abertas
+            <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
+              <Switch checked={settings.rsvpEnabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, rsvpEnabled: v }))} />
+              Inscrições {settings.rsvpEnabled ? 'abertas' : 'fechadas'}
             </label>
           </div>
         </section>

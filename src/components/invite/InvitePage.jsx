@@ -50,6 +50,12 @@ function applyMeta(meta) {
   set('property', 'og:type', 'website')
 }
 
+// Rótulo do botão de inscrição. O antigo default "Confirmar Presença" passa a "Inscrever-me".
+function ctaText(content) {
+  const l = (content?.ctaLabel || '').trim()
+  return l && l !== 'Confirmar Presença' ? l : 'Inscrever-me'
+}
+
 const STATUS_STYLE = {
   confirmed: 'border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300',
   waitlisted: 'border-amber-500/40 bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
@@ -470,7 +476,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
             style={{ backgroundColor: accent }}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Ticket className="h-4 w-4" aria-hidden="true" />}
-            {c.ctaLabel || 'Confirmar Presença'}
+            {ctaText(c)}
           </button>
         </form>
       )}
@@ -661,7 +667,7 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
           style={{ backgroundColor: accent }}
         >
           <Ticket className="h-4 w-4" aria-hidden="true" />
-          {c.ctaLabel || 'Inscrever-me'}
+          {ctaText(c)}
         </a>
       </div>
     )
@@ -689,7 +695,7 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
           style={{ backgroundColor: accent }}
         >
           <Ticket className="h-4 w-4" aria-hidden="true" />
-          {c.ctaLabel || 'Inscrever-me'}
+          {ctaText(c)}
         </a>
       )}
     </div>

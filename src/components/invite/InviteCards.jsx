@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle,
 } from 'lucide-react'
-import { fmtTime, fmtDateRange, toEmbed, buildIcs, inviteRsvpHref } from './inviteUtils'
+import { fmtTime, fmtDateRange, toEmbed, buildIcs } from './inviteUtils'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 const titleCls = 'mb-4 text-xl font-bold text-foreground'
@@ -57,18 +57,6 @@ function BannerCard({ block, page, accent }) {
           ) : null}
         </div>
         {c.shortDescription ? <p className="mt-4 text-foreground">{c.shortDescription}</p> : null}
-        {(inv.registrationMode || 'internal') !== 'none' ? (
-          <a
-            href={(inv.registrationMode || 'internal') === 'external' ? inv.registrationUrl || '#' : inviteRsvpHref(page.slug)}
-            target={(inv.registrationMode || 'internal') === 'external' ? '_blank' : undefined}
-            rel={(inv.registrationMode || 'internal') === 'external' ? 'noreferrer' : undefined}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            <Ticket className="h-4 w-4" aria-hidden="true" />
-            {c.ctaLabel || 'Inscrever-me'}
-          </a>
-        ) : null}
       </div>
     </div>
   )
@@ -246,12 +234,12 @@ function PaymentCard({ block, page }) {
   )
 }
 
-function LocationCard({ block, page }) {
-  const c = block.content || {}
-  const address = c.address || page.invite.location
+function LocationCard({ page }) {
+  // Morada e link do mapa herdados da página de detalhe (Definições).
+  const address = page.invite.location
   const mapUrl = page.invite.mapUrl
-  if (!address && !c.directionsUrl && !mapUrl) return null
-  const directions = c.directionsUrl || mapUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
+  if (!address && !mapUrl) return null
+  const directions = mapUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
