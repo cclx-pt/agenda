@@ -71,7 +71,10 @@ function escapeHtml(s) {
 
 // Confirmação de inscrição enviada ao convidado, com o link pessoal (?g=) para
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
-export async function sendRsvpConfirmationEmail(to, { name, eventTitle, when, statusMessage, link }) {
+export async function sendRsvpConfirmationEmail(
+  to,
+  { name, eventTitle, when, location, statusMessage, link, paymentPending = false, paymentLink }
+) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
   let whenText = ''
@@ -88,21 +91,37 @@ export async function sendRsvpConfirmationEmail(to, { name, eventTitle, when, st
       })
     }
   }
+  const payUrl = paymentLink || link
   const text =
     `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
     (whenText ? `\nQuando: ${whenText}` : '') +
+    (location ? `\nLocal: ${location}` : '') +
     (statusMessage ? `\n\n${statusMessage}` : '') +
-    `\n\nConsulta o estado da tua inscrição aqui:\n${link}\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
+    `\n\nVê o convite e o estado da tua inscrição aqui:\n${link}` +
+    (paymentPending
+      ? `\n\nFalta concluir o pagamento. É OBRIGATÓRIO carregar o comprovativo de pagamento aqui:\n${payUrl}`
+      : '') +
+    `\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
   const html = `
     <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#111827">
       <h2 style="color:#1f3864;margin:0 0 12px">Inscrição registada</h2>
       <p style="margin:0 0 8px">${name ? `Olá ${escapeHtml(name)},` : 'Olá,'}</p>
       <p style="margin:0 0 8px">Recebemos a tua inscrição em <strong>${escapeHtml(title)}</strong>.</p>
-      ${whenText ? `<p style="margin:0 0 8px;color:#6b7280">${escapeHtml(whenText)}</p>` : ''}
+      ${whenText ? `<p style="margin:0 0 4px;color:#6b7280"><strong>Quando:</strong> ${escapeHtml(whenText)}</p>` : ''}
+      ${location ? `<p style="margin:0 0 8px;color:#6b7280"><strong>Local:</strong> ${escapeHtml(location)}</p>` : ''}
       ${statusMessage ? `<p style="margin:12px 0;padding:12px;background:#f3f4f6;border-radius:8px">${escapeHtml(statusMessage)}</p>` : ''}
       <p style="margin:16px 0">
-        <a href="${escapeHtml(link)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ver a minha inscrição</a>
+        <a href="${escapeHtml(link)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ver o convite</a>
       </p>
+      ${
+        paymentPending
+          ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
+        <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
+        <p style="margin:0 0 10px;color:#92400e;font-size:14px">O comprovativo de pagamento é <strong>obrigatório</strong> para confirmarmos a tua inscrição.</p>
+        <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Carregar comprovativo de pagamento</a>
+      </div>`
+          : ''
+      }
       <p style="margin:8px 0;color:#6b7280;font-size:13px">Guarda este link — é pessoal e mostra sempre o estado atual.</p>
       <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Agenda CCLX</p>
     </div>`

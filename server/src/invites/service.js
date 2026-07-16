@@ -356,10 +356,11 @@ function buildMeta(invite, bannerUrl) {
   }
 }
 
-// Estado do convidado (calculado, não persistido como bloco). `hasPayment` = o
-// bilhete escolhido tem método de pagamento (→ reserva pendente de pagamento).
-function guestStatusPayload(guest, hasPayment = false) {
+// Estado do convidado (calculado, não persistido como bloco). `paymentMethod` = o
+// método do bilhete escolhido (mbway/transferencia/referencia); null se grátis.
+function guestStatusPayload(guest, paymentMethod = null) {
   if (!guest) return null
+  const hasPayment = !!paymentMethod
   let nextAction = 'none'
   let message = ''
   if (guest.rsvpState === 'confirmed') {
@@ -383,12 +384,19 @@ function guestStatusPayload(guest, hasPayment = false) {
   return {
     rsvpState: guest.rsvpState,
     paymentState: guest.paymentState,
+    paymentMethod: paymentMethod ?? null,
+    phone: guest.phone ?? null,
     nextAction,
     message,
   }
 }
 
-function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = null, tickets = [], spotsLeft = null } = {}) {
+function renderPayload(
+  invite,
+  blocks,
+  guest,
+  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null } = {}
+) {
   const banner = bannerUrl ?? invite.bannerUrl
   return {
     slug: invite.slug,
@@ -407,6 +415,9 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
       costAmount: invite.costAmount,
       costCurrency: invite.costCurrency,
       paymentMethod: invite.paymentMethod,
+      // Igreja + evento associado (para o fluxo de pagamento MB WAY / JotForm).
+      community: community ?? invite.community ?? null,
+      eventId: invite.eventId ?? null,
       registrationMode: invite.registrationMode,
       registrationUrl: invite.registrationUrl,
       rsvpEnabled: invite.rsvpEnabled,
@@ -434,7 +445,7 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
     guestStatus: guestStatusPayload(
       guest,
-      !!(guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod)
+      (guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod) || null
     ),
   }
 }
@@ -446,11 +457,14 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   if (!invite || invite.status === 'rascunho') {
     throw new InviteError(404, 'Convite não encontrado.')
   }
-  const [blocks, tickets, bannerUrl] = await Promise.all([
+  const [blocks, tickets, connectedEvent] = await Promise.all([
     repo.listBlocks(invite.id),
     repo.listTicketsWithSold(invite.id),
-    resolveInviteBanner(invite),
+    invite.eventId ? eventsRepo.findById(invite.eventId).catch(() => null) : Promise.resolve(null),
   ])
+  const bannerUrl =
+    invite.useEventBanner && connectedEvent?.bannerUrl ? connectedEvent.bannerUrl : invite.bannerUrl
+  const community = invite.community || connectedEvent?.community || null
   let guest = null
   if (guestToken) {
     const g = await repo.findGuestByToken(guestToken)
@@ -461,7 +475,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
     const taken = await repo.countConfirmedSeats(invite.id)
     spotsLeft = Math.max(0, invite.capacity - taken)
   }
-  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets, spotsLeft }) }
+  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets, spotsLeft, community }) }
 }
 
 // Metadados Open Graph leves (para crawlers/pré-visualização de link).
@@ -516,12 +530,16 @@ function notifyGuestConfirmation(invite, guest, status) {
   if (!guest?.email) return
   const base = (config.appUrl || '').replace(/\/+$/, '')
   const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
+  const paymentLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
   const p = sendRsvpConfirmationEmail(guest.email, {
     name: guest.name,
     eventTitle: invite.title,
     when: invite.startDatetime,
+    location: invite.location ?? null,
     statusMessage: status?.message ?? '',
     link,
+    paymentPending: status?.paymentState === 'pending',
+    paymentLink,
   }).catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
   try {
     waitUntil(p)
@@ -620,7 +638,7 @@ export async function submitRsvp(slug, input) {
       extra: data.extra ?? null,
     })
   }
-  const status = guestStatusPayload(guest, !!ticket?.paymentMethod)
+  const status = guestStatusPayload(guest, ticket?.paymentMethod ?? null)
   notifyGuestConfirmation(invite, guest, status)
   let spotsLeft = null
   if (invite.capacity) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users, Smartphone, ExternalLink } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, InfoExtraCard, NarrativeCard, SpeakersCard, AgendaCard, WorkshopsCard,
@@ -490,6 +490,134 @@ const PAYMENT_METHOD_LABEL = {
   referencia: 'Referência Multibanco',
 }
 
+// URL do formulário JotForm que processa os pagamentos MB WAY.
+const JOTFORM_MBWAY_URL = 'https://form.jotform.com/240093000783346'
+
+// Constrói o URL do JotForm com os campos pré-preenchidos.
+function buildJotformUrl({ local, mobile, eventId, eventName }) {
+  const p = new URLSearchParams()
+  p.set('local', local || 'Porto')
+  p.set('tipoDe77', 'Eventos')
+  p.set('telemovelassociado', mobile || '')
+  p.set('refdataid', eventId || '')
+  p.set('eventid', eventName || '')
+  return `${JOTFORM_MBWAY_URL}?${p.toString()}`
+}
+
+// Fluxo MB WAY: confirmar telemóvel → abrir o JotForm (nova aba) → janela de
+// espera com confirmação (fica "em validação" para o organizador confirmar).
+function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
+  const [mobile, setMobile] = useState(() => guestStatus?.phone || '')
+  const [stage, setStage] = useState('confirm') // 'confirm' | 'waiting'
+  const [uploading, setUploading] = useState(false)
+  const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
+
+  const openPayment = () => {
+    const clean = (mobile || '').replace(/\D/g, '')
+    if (clean.length < 9) {
+      toast.error('Indica um número de telemóvel válido.')
+      return
+    }
+    const url = buildJotformUrl({
+      local: invite.community,
+      mobile: clean,
+      eventId: invite.eventId || slug,
+      eventName: invite.title,
+    })
+    window.open(url, '_blank', 'noopener,noreferrer')
+    setStage('waiting')
+  }
+
+  // Confirmação do pagamento MB WAY = carregar o comprovativo (obrigatório) →
+  // fica "em validação" para o organizador confirmar.
+  const onReceipt = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const p = await invitesService.uploadReceipt(slug, guestToken, file)
+      onUpdate?.({ ...guestStatus, paymentState: p.status })
+      toast.success('Comprovativo enviado. Aguarda validação.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
+        <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        Pagamento — MB WAY
+      </h2>
+      {stage === 'confirm' ? (
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-sm text-muted-foreground">
+            Confirma o número de telemóvel associado ao MB WAY. Podes alterá-lo se necessário.
+          </p>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold text-foreground">Telemóvel MB WAY</span>
+            <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+              <Smartphone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                placeholder="9XX XXX XXX"
+                className="w-full bg-transparent text-foreground outline-none"
+              />
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={openPayment}
+            className="inline-flex w-fit items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            Pagar com MB WAY
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3 rounded-lg bg-muted p-4">
+            <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <p className="m-0 text-sm text-foreground">
+              Confirma o pagamento na app <strong>MB WAY</strong> no teu telemóvel. Depois de pagares com
+              sucesso, carrega aqui o comprovativo para confirmarmos a tua inscrição.
+            </p>
+          </div>
+          <label
+            className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Upload className="h-4 w-4" aria-hidden="true" />
+            )}
+            {uploading ? 'A enviar…' : 'Carregar comprovativo (obrigatório)'}
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+          </label>
+          <button
+            type="button"
+            onClick={openPayment}
+            className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline"
+            style={{ color: accent }}
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            Reabrir pagamento MB WAY
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Fluxo de pagamento do convidado (aparece só para eventos pagos, a quem já se
 // inscreveu). Escolha do método → instruções (IBAN/referência) → comprovativo.
 function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
@@ -533,6 +661,21 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
         <h2 className="m-0 mb-1 text-lg font-bold text-foreground">Pagamento</h2>
         <p className="m-0 text-sm text-muted-foreground">Comprovativo recebido. Aguarda validação do organizador.</p>
       </div>
+    )
+  }
+
+  // MB WAY: fluxo dedicado (confirmar telemóvel → JotForm → confirmar pagamento).
+  const payMethod = guestStatus.paymentMethod || invite.paymentMethod || null
+  if (payMethod === 'mbway') {
+    return (
+      <MbwayFlow
+        slug={slug}
+        guestToken={guestToken}
+        invite={invite}
+        guestStatus={guestStatus}
+        accent={accent}
+        onUpdate={onUpdate}
+      />
     )
   }
 
