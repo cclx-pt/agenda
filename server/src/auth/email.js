@@ -99,7 +99,7 @@ export async function sendRsvpConfirmationEmail(
     (statusMessage ? `\n\n${statusMessage}` : '') +
     `\n\nVê o convite e o estado da tua inscrição aqui:\n${link}` +
     (paymentPending
-      ? `\n\nFalta concluir o pagamento. É OBRIGATÓRIO carregar o comprovativo de pagamento aqui:\n${payUrl}`
+      ? `\n\nFalta concluir o pagamento. Conclui o pagamento e carrega o comprovativo (obrigatório) aqui:\n${payUrl}`
       : '') +
     `\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
   const html = `
@@ -117,8 +117,8 @@ export async function sendRsvpConfirmationEmail(
         paymentPending
           ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
         <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
-        <p style="margin:0 0 10px;color:#92400e;font-size:14px">O comprovativo de pagamento é <strong>obrigatório</strong> para confirmarmos a tua inscrição.</p>
-        <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Carregar comprovativo de pagamento</a>
+        <p style="margin:0 0 10px;color:#92400e;font-size:14px">Conclui o pagamento e carrega o comprovativo (<strong>obrigatório</strong>) para confirmarmos a tua inscrição.</p>
+        <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ir para o pagamento</a>
       </div>`
           : ''
       }
