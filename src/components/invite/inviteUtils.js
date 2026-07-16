@@ -42,6 +42,18 @@ export function inviteHomeHref(slug) {
   return g ? `${base}?g=${encodeURIComponent(g)}` : base
 }
 
+// Rótulo de preço/tipo de um bilhete (lista "Custo" + seletor).
+export function ticketPrice(t) {
+  if (!t) return ''
+  if (t.kind === 'gratis') return 'Grátis'
+  if (t.kind === 'voluntaria') {
+    return t.price != null && t.price > 0
+      ? `Oferta voluntária (sugerido ${Number(t.price).toFixed(2)} ${t.currency || 'EUR'})`
+      : 'Oferta voluntária'
+  }
+  return t.price != null && t.price > 0 ? `${Number(t.price).toFixed(2)} ${t.currency || 'EUR'}` : 'Grátis'
+}
+
 // Converte um link de YouTube/Vimeo num URL de embed, ou devolve null.
 export function toEmbed(url) {
   if (!url) return null

@@ -356,15 +356,18 @@ function buildMeta(invite, bannerUrl) {
   }
 }
 
-// Estado do convidado (calculado, não persistido como bloco).
-function guestStatusPayload(guest) {
+// Estado do convidado (calculado, não persistido como bloco). `hasPayment` = o
+// bilhete escolhido tem método de pagamento (→ reserva pendente de pagamento).
+function guestStatusPayload(guest, hasPayment = false) {
   if (!guest) return null
   let nextAction = 'none'
   let message = ''
   if (guest.rsvpState === 'confirmed') {
     if (guest.paymentState === 'pending') {
       nextAction = 'pay'
-      message = 'A tua presença está confirmada. Falta concluir o pagamento.'
+      message = hasPayment
+        ? 'A tua presença está reservada. Falta concluir o pagamento para poderes confirmar.'
+        : 'A tua presença está confirmada. Falta concluir o pagamento.'
     } else if (guest.paymentState === 'awaiting_validation') {
       message = 'Inscrição confirmada. Aguardamos a validação do teu comprovativo.'
     } else if (guest.paymentState === 'paid') {
@@ -429,7 +432,10 @@ function renderPayload(invite, blocks, guest, { preview = false, bannerUrl = nul
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
-    guestStatus: guestStatusPayload(guest),
+    guestStatus: guestStatusPayload(
+      guest,
+      !!(guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod)
+    ),
   }
 }
 
@@ -614,9 +620,14 @@ export async function submitRsvp(slug, input) {
       extra: data.extra ?? null,
     })
   }
-  const status = guestStatusPayload(guest)
+  const status = guestStatusPayload(guest, !!ticket?.paymentMethod)
   notifyGuestConfirmation(invite, guest, status)
-  return { token: guest.token, status }
+  let spotsLeft = null
+  if (invite.capacity) {
+    const taken = await repo.countConfirmedSeats(invite.id)
+    spotsLeft = Math.max(0, invite.capacity - taken)
+  }
+  return { token: guest.token, status, spotsLeft }
 }
 
 // ── Eventos associáveis + bilhetes (organizador) ─────────────────

@@ -752,6 +752,10 @@ export default function InvitePage({ slug, view = 'landing' }) {
 
   const onRsvpSubmitted = (res) => {
     setGuestStatus(res.status)
+    // Atualiza o contador de vagas de imediato (sem recarregar).
+    if (res.spotsLeft != null) {
+      setState((s) => (s.page ? { ...s, page: { ...s.page, invite: { ...s.page.invite, spotsLeft: res.spotsLeft } } } : s))
+    }
     // Atualiza o URL com o token pessoal para futuras visitas (sem recarregar).
     if (res.token) {
       setGuestToken(res.token)

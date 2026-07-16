@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle,
 } from 'lucide-react'
-import { fmtTime, fmtDateRange, toEmbed, buildIcs } from './inviteUtils'
+import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice } from './inviteUtils'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 const titleCls = 'mb-4 text-xl font-bold text-foreground'
@@ -201,6 +201,7 @@ const METHOD_LABEL = { mbway: 'MB WAY', transferencia: 'Transferência bancária
 function PaymentCard({ block, page }) {
   const inv = page.invite
   const c = block.content || {}
+  const tickets = page.tickets || []
   const costType = c.costType || inv.costType || 'gratuito'
   const amount = c.fixedAmount ?? inv.costAmount
   const currency = inv.costCurrency || 'EUR'
@@ -211,25 +212,40 @@ function PaymentCard({ block, page }) {
         <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         Custo
       </h2>
-      {costType === 'gratuito' ? (
+      {tickets.length > 0 ? (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {tickets.map((t) => (
+            <li key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-semibold text-foreground">{t.name}</span>
+                {t.kind === 'grupo' && t.groupSize ? (
+                  <span className="text-xs text-muted-foreground">Grupo até {t.groupSize} pessoas</span>
+                ) : null}
+                {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
+              </span>
+              <span className="whitespace-nowrap text-sm font-bold text-foreground">
+                {t.soldOut ? <span className="text-destructive">Esgotado</span> : ticketPrice(t)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : costType === 'gratuito' ? (
         <p className="m-0 text-lg font-bold text-emerald-600 dark:text-emerald-400">Gratuito</p>
       ) : (
-        <>
-          <p className="m-0 text-lg font-bold text-foreground">
-            {amount != null ? `${Number(amount).toFixed(2)} ${currency}` : COST_LABEL[costType]}
-            {costType === 'voluntario' ? <span className="text-sm font-normal text-muted-foreground"> (sugerido)</span> : null}
-          </p>
-          {methods.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {methods.map((m) => (
-                <span key={m} className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-                  {METHOD_LABEL[m] || m}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </>
+        <p className="m-0 text-lg font-bold text-foreground">
+          {amount != null ? `${Number(amount).toFixed(2)} ${currency}` : COST_LABEL[costType]}
+          {costType === 'voluntario' ? <span className="text-sm font-normal text-muted-foreground"> (sugerido)</span> : null}
+        </p>
       )}
+      {methods.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {methods.map((m) => (
+            <span key={m} className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+              {METHOD_LABEL[m] || m}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
