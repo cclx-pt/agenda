@@ -1240,6 +1240,18 @@ export default function InvitesAdmin() {
                   <span className={`rounded-full px-2 py-[3px] text-[11px] font-bold uppercase ${STATUS_BADGE[inv.status]}`}>
                     {STATUS_LABEL[inv.status]}
                   </span>
+                  {inv.registrationMode === 'internal' ? (
+                    <span
+                      className={
+                        'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
+                        (inv.rsvpEnabled
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400')
+                      }
+                    >
+                      {inv.rsvpEnabled ? 'Inscrições abertas' : 'Inscrições fechadas'}
+                    </span>
+                  ) : null}
                 </div>
                 <span className="text-xs text-muted-foreground">/invite/{inv.slug}</span>
               </div>
