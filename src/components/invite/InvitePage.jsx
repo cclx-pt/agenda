@@ -512,19 +512,22 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
   const [uploading, setUploading] = useState(false)
   const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 
-  const openPayment = () => {
-    const clean = (mobile || '').replace(/\D/g, '')
-    if (clean.length < 9) {
+  const cleanMobile = (mobile || '').replace(/\D/g, '')
+  const jotformUrl = buildJotformUrl({
+    local: guestStatus?.jotformCommunity,
+    mobile: cleanMobile,
+    eventId: invite.eventId || slug,
+    eventName: invite.title,
+  })
+
+  // Abre o JotForm numa NOVA página (link real com target=_blank → nunca é
+  // bloqueado como popup); valida o telemóvel antes de navegar.
+  const onPayClick = (e) => {
+    if (cleanMobile.length < 9) {
+      e.preventDefault()
       toast.error('Indica um número de telemóvel válido.')
       return
     }
-    const url = buildJotformUrl({
-      local: guestStatus?.jotformCommunity,
-      mobile: clean,
-      eventId: invite.eventId || slug,
-      eventName: invite.title,
-    })
-    window.open(url, '_blank', 'noopener,noreferrer')
     setStage('waiting')
   }
 
@@ -572,15 +575,17 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
               />
             </span>
           </label>
-          <button
-            type="button"
-            onClick={openPayment}
+          <a
+            href={jotformUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onPayClick}
             className="inline-flex w-fit items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
             style={{ backgroundColor: accent }}
           >
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Pagar com MB WAY
-          </button>
+          </a>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -603,15 +608,16 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             {uploading ? 'A enviar…' : 'Carregar comprovativo (obrigatório)'}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
-          <button
-            type="button"
-            onClick={openPayment}
+          <a
+            href={jotformUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline"
             style={{ color: accent }}
           >
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Reabrir pagamento MB WAY
-          </button>
+          </a>
         </div>
       )}
     </div>
