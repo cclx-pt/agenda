@@ -36,6 +36,7 @@ function mapInvite(row) {
     useEventBanner: !!row.use_event_banner,
     capacity: row.capacity ?? null,
     community: row.community ?? null,
+    jotformCommunity: row.jotform_community ?? null,
     status: row.status,
     publishedAt: row.published_at ?? null,
     createdBy: row.created_by ?? null,
@@ -93,8 +94,8 @@ export async function insert(data, actorId) {
        location, meta_title, meta_description, meta_image_url, cost_type, cost_amount,
        cost_currency, payment_methods, rsvp_enabled, rsvp_deadline, capacity, community,
        created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider, map_url,
-       registration_mode, registration_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+       registration_mode, registration_url, jotform_community)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
     [
       id,
       data.eventId ?? null,
@@ -124,6 +125,7 @@ export async function insert(data, actorId) {
       data.mapUrl ?? null,
       data.registrationMode ?? 'internal',
       data.registrationUrl ?? null,
+      data.jotformCommunity ?? null,
     ]
   )
   return findById(id)
@@ -192,6 +194,7 @@ export async function update(id, data) {
        map_url = $23,
        registration_mode = $24,
        registration_url = $25,
+       jotform_community = $26,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -220,6 +223,7 @@ export async function update(id, data) {
       data.mapUrl ?? null,
       data.registrationMode ?? 'internal',
       data.registrationUrl ?? null,
+      data.jotformCommunity ?? null,
     ]
   )
   return findById(id)

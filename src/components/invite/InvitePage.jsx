@@ -519,7 +519,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
       return
     }
     const url = buildJotformUrl({
-      local: invite.community,
+      local: guestStatus?.jotformCommunity,
       mobile: clean,
       eventId: invite.eventId || slug,
       eventName: invite.title,

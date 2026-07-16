@@ -64,6 +64,32 @@ const isoDate = z
 const COST_TYPES = ['gratuito', 'pago', 'voluntario']
 const PAYMENT_METHODS = ['mbway', 'transferencia', 'referencia']
 
+// Opções da comunidade no formulário JotForm do MB WAY (o conjunto do JotForm, que
+// não é 1:1 com as igrejas: Moita+Barreiro juntas, "Outra" como fallback).
+const JOTFORM_COMMUNITIES = ['Sede', 'Açores', 'Almada', 'Moita & Barreiro', 'Caldas da Rainha', 'Coruche', 'Porto', 'Outra']
+const CHURCH_TO_JOTFORM = {
+  Sede: 'Sede',
+  Açores: 'Açores',
+  Almada: 'Almada',
+  Barreiro: 'Moita & Barreiro',
+  Moita: 'Moita & Barreiro',
+  'Caldas Da Rainha': 'Caldas da Rainha',
+  Coruche: 'Coruche',
+  Porto: 'Porto',
+}
+// Igreja/comunidade → valor do JotForm. Vazio → null (cai para o próximo);
+// conhecido → mapeado; desconhecido não-vazio → 'Outra'.
+function churchToJotform(value) {
+  if (!value) return null
+  return CHURCH_TO_JOTFORM[value] || 'Outra'
+}
+// Comunidade final para o JotForm: override do convite → resposta do inscrito no
+// formulário (campo `comunidade`) → igreja do evento → 'Outra'.
+function resolveJotformCommunity(invite, guest, community) {
+  if (invite.jotformCommunity) return invite.jotformCommunity
+  return churchToJotform(guest?.extra?.comunidade) || churchToJotform(community) || 'Outra'
+}
+
 // Tipos de bloco conhecidos (allowlist; o conteúdo é JSONB flexível por tipo).
 const BLOCK_TYPES = [
   'cabecalho',
@@ -130,6 +156,7 @@ const inviteInputSchema = z.object({
   useEventBanner: z.boolean().optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
   community: z.string().trim().max(120).optional().nullable(),
+  jotformCommunity: z.enum(JOTFORM_COMMUNITIES).nullable().optional(),
 })
 
 // Bilhete (tipo) de um convite. Tipos: individual, grátis (0€), oferta
@@ -398,6 +425,10 @@ function renderPayload(
   { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
+  const guestTicketMethod =
+    (guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod) || null
+  const guestStatus = guestStatusPayload(guest, guestTicketMethod)
+  if (guestStatus) guestStatus.jotformCommunity = resolveJotformCommunity(invite, guest, community)
   return {
     slug: invite.slug,
     status: invite.status,
@@ -443,10 +474,7 @@ function renderPayload(
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
-    guestStatus: guestStatusPayload(
-      guest,
-      (guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod) || null
-    ),
+    guestStatus,
   }
 }
 

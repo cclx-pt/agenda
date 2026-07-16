@@ -372,6 +372,7 @@ CREATE TABLE IF NOT EXISTS invites (
   rsvp_deadline    TIMESTAMPTZ,
   capacity         INTEGER,
   community        TEXT,
+  jotform_community TEXT,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'publicado', 'fechado')),
   published_at     TIMESTAMPTZ,
@@ -465,6 +466,8 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS map_url TEXT;
 -- Modo de inscrição: 'none' (só página), 'external' (link) ou 'internal' (bilhetes + formulário aqui).
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_mode TEXT NOT NULL DEFAULT 'internal';
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_url TEXT;
+-- Comunidade enviada ao JotForm do MB WAY (conjunto do JotForm; NULL = automático).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS jotform_community TEXT;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual, grátis (0€), oferta
 -- voluntária (valor livre) ou grupo. Cada tipo tem preço, capacidade (NULL =
