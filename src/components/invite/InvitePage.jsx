@@ -494,13 +494,13 @@ const PAYMENT_METHOD_LABEL = {
 const JOTFORM_MBWAY_URL = 'https://form.jotform.com/240093000783346'
 
 // Constrói o URL do JotForm com os campos pré-preenchidos.
-function buildJotformUrl({ local, mobile, eventId, eventName }) {
+function buildJotformUrl({ local, mobile, eventId, ticketId }) {
   const p = new URLSearchParams()
   p.set('local', local || 'Porto')
   p.set('tipoDe77', 'Eventos')
   p.set('telemovelassociado', mobile || '')
   p.set('refdataid', eventId || '')
-  p.set('eventid', eventName || '')
+  p.set('eventid', ticketId || '')
   return `${JOTFORM_MBWAY_URL}?${p.toString()}`
 }
 
@@ -517,7 +517,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
     local: guestStatus?.jotformCommunity,
     mobile: cleanMobile,
     eventId: invite.eventId || slug,
-    eventName: invite.title,
+    ticketId: guestStatus?.ticketId,
   })
 
   // Abre o JotForm numa NOVA página (link real com target=_blank → nunca é

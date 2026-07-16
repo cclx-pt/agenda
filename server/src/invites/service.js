@@ -90,6 +90,18 @@ function resolveJotformCommunity(invite, guest, community) {
   return churchToJotform(guest?.extra?.comunidade) || churchToJotform(community) || 'Outra'
 }
 
+// URL do formulário JotForm do MB WAY (espelha o frontend). eventid = id do bilhete (único).
+const JOTFORM_MBWAY_URL = 'https://form.jotform.com/240093000783346'
+function buildJotformUrl({ local, mobile, eventId, ticketId }) {
+  const p = new URLSearchParams()
+  p.set('local', local || 'Porto')
+  p.set('tipoDe77', 'Eventos')
+  p.set('telemovelassociado', mobile || '')
+  p.set('refdataid', eventId || '')
+  p.set('eventid', ticketId || '')
+  return `${JOTFORM_MBWAY_URL}?${p.toString()}`
+}
+
 // Tipos de bloco conhecidos (allowlist; o conteúdo é JSONB flexível por tipo).
 const BLOCK_TYPES = [
   'cabecalho',
@@ -413,6 +425,7 @@ function guestStatusPayload(guest, paymentMethod = null) {
     paymentState: guest.paymentState,
     paymentMethod: paymentMethod ?? null,
     phone: guest.phone ?? null,
+    ticketId: guest.ticketId ?? null,
     nextAction,
     message,
   }
@@ -558,7 +571,18 @@ function notifyGuestConfirmation(invite, guest, status) {
   if (!guest?.email) return
   const base = (config.appUrl || '').replace(/\/+$/, '')
   const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
-  const paymentLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
+  // Página onde se paga (MB WAY/IBAN/ref) E se carrega o comprovativo.
+  const receiptLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
+  // Link de pagamento: MB WAY → direto ao JotForm (pré-preenchido); outros → a página.
+  const payUrl =
+    status?.paymentMethod === 'mbway'
+      ? buildJotformUrl({
+          local: resolveJotformCommunity(invite, guest, invite.community),
+          mobile: guest.phone,
+          eventId: invite.eventId || invite.slug,
+          ticketId: guest.ticketId,
+        })
+      : receiptLink
   const p = sendRsvpConfirmationEmail(guest.email, {
     name: guest.name,
     eventTitle: invite.title,
@@ -567,7 +591,8 @@ function notifyGuestConfirmation(invite, guest, status) {
     statusMessage: status?.message ?? '',
     link,
     paymentPending: status?.paymentState === 'pending',
-    paymentLink,
+    payUrl,
+    receiptLink,
   }).catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
   try {
     waitUntil(p)

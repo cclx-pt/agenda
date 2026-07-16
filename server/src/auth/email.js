@@ -73,7 +73,7 @@ function escapeHtml(s) {
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(
   to,
-  { name, eventTitle, when, location, statusMessage, link, paymentPending = false, paymentLink }
+  { name, eventTitle, when, location, statusMessage, link, paymentPending = false, payUrl, receiptLink }
 ) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
@@ -91,7 +91,8 @@ export async function sendRsvpConfirmationEmail(
       })
     }
   }
-  const payUrl = paymentLink || link
+  const payHref = payUrl || link
+  const receiptHref = receiptLink || link
   const text =
     `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
     (whenText ? `\nQuando: ${whenText}` : '') +
@@ -99,7 +100,7 @@ export async function sendRsvpConfirmationEmail(
     (statusMessage ? `\n\n${statusMessage}` : '') +
     `\n\nVê o convite e o estado da tua inscrição aqui:\n${link}` +
     (paymentPending
-      ? `\n\nFalta concluir o pagamento. Conclui o pagamento e carrega o comprovativo (obrigatório) aqui:\n${payUrl}`
+      ? `\n\nFalta concluir o pagamento:\n- Pagar: ${payHref}\n- Anexar o comprovativo (obrigatório): ${receiptHref}`
       : '') +
     `\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
   const html = `
@@ -117,8 +118,9 @@ export async function sendRsvpConfirmationEmail(
         paymentPending
           ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
         <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
-        <p style="margin:0 0 10px;color:#92400e;font-size:14px">Conclui o pagamento e carrega o comprovativo (<strong>obrigatório</strong>) para confirmarmos a tua inscrição.</p>
-        <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ir para o pagamento</a>
+        <p style="margin:0 0 10px;color:#92400e;font-size:14px">Paga e depois anexa o comprovativo (<strong>obrigatório</strong>) para confirmarmos a tua inscrição.</p>
+        <a href="${escapeHtml(payHref)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:0 8px 8px 0">Pagar</a>
+        <a href="${escapeHtml(receiptHref)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>
       </div>`
           : ''
       }
