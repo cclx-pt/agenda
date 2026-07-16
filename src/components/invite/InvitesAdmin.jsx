@@ -899,10 +899,17 @@ function InviteEditor({ invite, onBack, onSaved }) {
               Capacidade total (lugares)
               <input type="number" min="1" className={inputCls} value={settings.capacity} onChange={setField('capacity')} />
             </label>
-            <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
-              <Switch checked={settings.rsvpEnabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, rsvpEnabled: v }))} />
-              Inscrições {settings.rsvpEnabled ? 'abertas' : 'fechadas'}
-            </label>
+            <div className="flex flex-col gap-1">
+              <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
+                <Switch checked={settings.rsvpEnabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, rsvpEnabled: v }))} />
+                Inscrições {settings.rsvpEnabled ? 'abertas' : 'fechadas'}
+              </label>
+              {settings.rsvpEnabled && invite.status !== 'publicado' ? (
+                <span className="text-xs text-amber-700 dark:text-amber-400">
+                  As inscrições só abrem depois de publicar o convite.
+                </span>
+              ) : null}
+            </div>
           </div>
         </section>
         <section className="rounded-xl border border-border bg-card p-4">
@@ -1244,12 +1251,12 @@ export default function InvitesAdmin() {
                     <span
                       className={
                         'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
-                        (inv.rsvpEnabled
+                        (inv.status === 'publicado' && inv.rsvpEnabled
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400')
                       }
                     >
-                      {inv.rsvpEnabled ? 'Inscrições abertas' : 'Inscrições fechadas'}
+                      {inv.status === 'publicado' && inv.rsvpEnabled ? 'Inscrições abertas' : 'Inscrições fechadas'}
                     </span>
                   ) : null}
                 </div>
