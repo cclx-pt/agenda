@@ -209,12 +209,16 @@ const rsvpSchema = z.object({
 
 // ── Auxiliares de evento associado e pagamento ───────────────────
 
-// Valida que o evento associado existe (se indicado). A herança de título/datas
-// é feita no frontend; a origem do banner resolve-se na leitura (resolveInviteBanner).
-async function assertEventOk(eventId) {
+// Valida que o evento associado existe (se indicado) e que ainda não está ligado a
+// outro convite (regra 1 evento ↔ 1 convite). `exceptId` exclui o próprio convite
+// nas atualizações. A herança de título/datas é feita no frontend; o banner resolve-se
+// na leitura (resolveInviteBanner).
+async function assertEventOk(eventId, exceptId = null) {
   if (!eventId) return
   const ev = await eventsRepo.findById(eventId)
   if (!ev) throw new InviteError(400, 'Evento associado não encontrado.')
+  const taken = await repo.findByEventId(eventId, exceptId)
+  if (taken) throw new InviteError(409, 'Este evento já tem um convite associado.')
 }
 
 // Método único → mantém payment_methods coerente (lista de 1) para o conector/payload.
@@ -314,7 +318,10 @@ export async function update(user, id, input) {
   if (!canAccessChurch(user, data.community)) {
     throw new InviteError(403, 'Sem acesso a esta igreja.')
   }
-  await assertEventOk(data.eventId)
+  // Só (re)valida o evento quando muda — não bloqueia gravar um convite já ligado.
+  if ((existing.eventId ?? null) !== (data.eventId ?? null)) {
+    await assertEventOk(data.eventId, id)
+  }
   normalizePayment(data)
   await repo.update(id, data)
   return getForEditor(user, id)
@@ -712,9 +719,15 @@ export async function submitRsvp(slug, input) {
 export async function listSelectableEvents(user) {
   ensureCanManage(user)
   const today = new Date().toISOString().slice(0, 10)
-  const events = await eventsRepo.list({ status: 'publicado', from: today })
+  const [events, linkedEventIds] = await Promise.all([
+    eventsRepo.list({ status: 'publicado', from: today }),
+    repo.listLinkedEventIds(),
+  ])
+  // 1 evento ↔ 1 convite: esconde eventos já associados a um convite. O evento do
+  // convite em edição é re-incluído no frontend (a partir de `invite.event`).
+  const linked = new Set(linkedEventIds)
   return events
-    .filter((e) => canAccessChurch(user, e.community))
+    .filter((e) => !linked.has(e.id) && canAccessChurch(user, e.community))
     .map((e) => ({
       id: e.id,
       title: e.title,

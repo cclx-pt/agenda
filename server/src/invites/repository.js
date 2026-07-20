@@ -141,6 +141,22 @@ export async function findBySlug(slug) {
   return mapInvite(rows[0])
 }
 
+// Convite associado a um evento — garante 1 evento ↔ 1 convite. `exceptId` exclui
+// o próprio convite (usado nas atualizações).
+export async function findByEventId(eventId, exceptId = null) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invites WHERE event_id = $1 AND ($2::uuid IS NULL OR id <> $2) LIMIT 1',
+    [eventId, exceptId]
+  )
+  return mapInvite(rows[0])
+}
+
+// Ids de eventos já associados a um convite (para os excluir do seletor de eventos).
+export async function listLinkedEventIds() {
+  const { rows } = await pool.query('SELECT event_id FROM invites WHERE event_id IS NOT NULL')
+  return rows.map((r) => r.event_id)
+}
+
 export async function list({ status, community, createdBy } = {}) {
   const where = []
   const params = []
