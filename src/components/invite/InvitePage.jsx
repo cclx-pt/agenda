@@ -3,7 +3,7 @@ import { toast, Toaster } from 'sonner'
 import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users, Smartphone, ExternalLink } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
-  BannerCard, InfoExtraCard, NarrativeCard, SpeakersCard, AgendaCard, WorkshopsCard,
+  BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
 import { fmtDateRange, inviteRsvpHref, inviteHomeHref } from './inviteUtils'
@@ -15,8 +15,10 @@ import {
 const BLOCK_COMPONENTS = {
   banner: BannerCard,
   cabecalho: BannerCard,
+  overview: OverviewCard,
   info_extra: InfoExtraCard,
   convite_narrativo: NarrativeCard,
+  good_to_know: GoodToKnowCard,
   oradores: SpeakersCard,
   agenda: AgendaCard,
   workshops: WorkshopsCard,

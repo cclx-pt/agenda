@@ -106,8 +106,10 @@ function buildJotformUrl({ local, mobile, eventId, ticketId }) {
 const BLOCK_TYPES = [
   'cabecalho',
   'banner',
+  'overview',
   'info_extra',
   'convite_narrativo',
+  'good_to_know',
   'oradores',
   'agenda',
   'workshops',
