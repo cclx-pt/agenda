@@ -5,6 +5,7 @@ import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
 import { config } from '../config.js'
 import { sendRsvpConfirmationEmail } from '../auth/email.js'
+import { getActivePaymentMethods } from '../settings/service.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -62,7 +63,14 @@ const isoDate = z
   .nullable()
 
 const COST_TYPES = ['gratuito', 'pago', 'voluntario']
-const PAYMENT_METHODS = ['mbway', 'transferencia', 'referencia']
+// Chave de método de pagamento (slug): os 3 integrados + os personalizados
+// criados na Administração de convites. Validamos o FORMATO; a existência é
+// garantida pela lista gerida em Definições e pela UI (só oferece métodos ativos).
+const paymentMethodKeySchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9-]*$/, 'Método de pagamento inválido.')
+  .max(40)
 
 // Opções da comunidade no formulário JotForm do MB WAY (o conjunto do JotForm, que
 // não é 1:1 com as igrejas: Moita+Barreiro juntas, "Outra" como fallback).
@@ -151,10 +159,10 @@ const inviteInputSchema = z.object({
   costType: z.enum(COST_TYPES).optional(),
   costAmount: z.number().min(0).max(1000000).optional().nullable(),
   costCurrency: z.string().trim().max(8).optional(),
-  paymentMethods: z.array(z.enum(PAYMENT_METHODS)).optional().nullable(),
+  paymentMethods: z.array(paymentMethodKeySchema).optional().nullable(),
   // Método de pagamento ÚNICO (substitui a lista). Mantemos payment_methods
   // sincronizado internamente para o conector.
-  paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
+  paymentMethod: paymentMethodKeySchema.optional().nullable(),
   rsvpEnabled: z.boolean().optional(),
   registrationMode: z.enum(['none', 'external', 'internal']).optional(),
   registrationUrl: z
@@ -185,8 +193,8 @@ const ticketSchema = z.object({
   groupSize: z.number().int().min(1).max(1000).optional().nullable(),
   partyType: z.enum(['single', 'family', 'group']).optional().default('single'),
   description: z.string().trim().max(500).optional().nullable(),
-  paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
-  paymentMethods: z.array(z.enum(PAYMENT_METHODS)).max(10).optional().nullable(),
+  paymentMethod: paymentMethodKeySchema.optional().nullable(),
+  paymentMethods: z.array(paymentMethodKeySchema).max(10).optional().nullable(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -392,8 +400,13 @@ export async function getPreview(user, id) {
     throw new InviteError(403, 'Sem acesso a este convite.')
   }
   const blocks = await repo.listBlocks(id)
-  const [tickets, bannerUrl] = await Promise.all([repo.listTicketsWithSold(id), resolveInviteBanner(invite)])
-  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets })
+  const [tickets, bannerUrl, activeMethods] = await Promise.all([
+    repo.listTicketsWithSold(id),
+    resolveInviteBanner(invite),
+    getActivePaymentMethods().catch(() => []),
+  ])
+  const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
+  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets, paymentMethodLabels })
 }
 
 // ── Leitura pública ──────────────────────────────────────────────
@@ -461,7 +474,7 @@ function renderPayload(
   invite,
   blocks,
   guest,
-  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null } = {}
+  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null, paymentMethodLabels = {} } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
@@ -484,6 +497,9 @@ function renderPayload(
       costAmount: invite.costAmount,
       costCurrency: invite.costCurrency,
       paymentMethod: invite.paymentMethod,
+      // Rótulos públicos dos métodos de pagamento ativos (chave → nome), para
+      // mostrar os métodos personalizados com o nome escolhido no Admin.
+      paymentMethodLabels,
       // Igreja + evento associado (para o fluxo de pagamento MB WAY / JotForm).
       community: community ?? invite.community ?? null,
       eventId: invite.eventId ?? null,
@@ -543,7 +559,18 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
     const taken = await repo.countConfirmedSeats(invite.id)
     spotsLeft = Math.max(0, invite.capacity - taken)
   }
-  return { invite, payload: renderPayload(invite, blocks, guest, { bannerUrl, tickets, spotsLeft, community }) }
+  const activeMethods = await getActivePaymentMethods().catch(() => [])
+  const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
+  return {
+    invite,
+    payload: renderPayload(invite, blocks, guest, {
+      bannerUrl,
+      tickets,
+      spotsLeft,
+      community,
+      paymentMethodLabels,
+    }),
+  }
 }
 
 // Metadados Open Graph leves (para crawlers/pré-visualização de link).

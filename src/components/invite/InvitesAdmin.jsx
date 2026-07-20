@@ -3,12 +3,14 @@ import { toast } from 'sonner'
 import {
   Plus, Pencil, Trash2, ExternalLink, Copy, Eye, Send, ArrowLeft, ArrowUp, ArrowDown,
   Users, Image as ImageIcon, Loader2, Download, ChevronDown, ChevronRight,
-  Calendar as CalendarIcon, MapPin,
+  Calendar as CalendarIcon, MapPin, CreditCard,
 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { uploadEventImage, getPaymentMethods } from '../../services/eventsService'
 import DateField from '../DateField'
 import TimeField from '../TimeField'
+import PaymentMethodsAdmin from '../PaymentMethodsAdmin'
+import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
@@ -896,7 +898,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         Métodos de pagamento
                         {paymentMethodOptions.length === 0 ? (
                           <span className="text-xs font-normal text-muted-foreground">
-                            Sem métodos ativos. Ative-os em Admin → Métodos de pagamento.
+                            Sem métodos ativos. Ative-os em “Métodos de pagamento” (no topo da lista de convites).
                           </span>
                         ) : (
                           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -1233,10 +1235,13 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
 // ── Lista + criação ──────────────────────────────────────────────
 export default function InvitesAdmin() {
+  const { hasRole } = useAuth()
+  const isAdmin = hasRole('admin')
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [managing, setManaging] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -1307,6 +1312,21 @@ export default function InvitesAdmin() {
     }
   }
 
+  if (managing) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="m-0 text-base font-bold text-foreground">Métodos de pagamento</h3>
+          <button type="button" onClick={() => setManaging(false)} className={ghostBtn}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Voltar aos convites
+          </button>
+        </div>
+        <PaymentMethodsAdmin />
+      </div>
+    )
+  }
+
   if (editingId && editing) {
     return (
       <InviteEditor
@@ -1323,14 +1343,22 @@ export default function InvitesAdmin() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="m-0 text-sm text-muted-foreground">
           Páginas de convite públicas e partilháveis, com blocos de conteúdo, inscrições e partilha.
         </p>
-        <button type="button" onClick={createInvite} disabled={busy} className={primaryBtn}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Novo convite
-        </button>
+        <div className="flex flex-shrink-0 gap-2">
+          {isAdmin ? (
+            <button type="button" onClick={() => setManaging(true)} disabled={busy} className={ghostBtn}>
+              <CreditCard className="h-4 w-4" aria-hidden="true" />
+              Métodos de pagamento
+            </button>
+          ) : null}
+          <button type="button" onClick={createInvite} disabled={busy} className={primaryBtn}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Novo convite
+          </button>
+        </div>
       </div>
 
       {loading ? (

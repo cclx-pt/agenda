@@ -130,33 +130,83 @@ export async function updateBranding(input, actorId) {
   return { logoUrl, subcategoryColors }
 }
 
-// ── Métodos de pagamento (geridos no Admin) ──────────────
-// app_settings key 'payment_methods' = [{ key, label, active }]. O conjunto de
-// CHAVES é fixo (mbway/transferencia/referencia) porque cada uma tem
-// comportamento próprio no código (MB WAY salta para o JotForm); o admin só
-// ativa/desativa e renomeia. A lista ativa alimenta a configuração dos bilhetes.
+// ── Métodos de pagamento (geridos na Administração de convites) ──
+// app_settings key 'payment_methods' = [{ key, label, active, builtin }].
+// Há 3 métodos INTEGRADOS (mbway/transferencia/referencia) com comportamento
+// próprio no código (MB WAY → JotForm; transferência/referência → conector
+// manual): não se podem eliminar nem mudar a chave, mas renomeiam-se e
+// ativam/desativam. Além destes, o admin pode CRIAR métodos personalizados
+// (nome à escolha), que funcionam como pagamento manual (o convidado segue as
+// instruções e carrega o comprovativo). A lista ativa alimenta a configuração
+// dos bilhetes dos convites.
 const PAYMENT_METHODS_KEY = 'payment_methods'
-export const PAYMENT_METHOD_DEFAULTS = [
-  { key: 'mbway', label: 'MB WAY', active: true },
-  { key: 'transferencia', label: 'Transferência bancária', active: true },
-  { key: 'referencia', label: 'Referência Multibanco', active: true },
+const BUILTIN_PAYMENT_METHODS = [
+  { key: 'mbway', label: 'MB WAY' },
+  { key: 'transferencia', label: 'Transferência bancária' },
+  { key: 'referencia', label: 'Referência Multibanco' },
 ]
+const BUILTIN_PAYMENT_KEYS = new Set(BUILTIN_PAYMENT_METHODS.map((m) => m.key))
+const MAX_PAYMENT_METHODS = 24
 
-// Funde os defaults (chaves/ordem fixas) com o guardado (label/active).
-function normalizePaymentMethods(stored) {
-  const byKey = new Map()
-  if (Array.isArray(stored)) {
-    for (const m of stored) if (m && typeof m.key === 'string') byKey.set(m.key, m)
-  }
-  return PAYMENT_METHOD_DEFAULTS.map((d) => {
-    const s = byKey.get(d.key)
-    const label = s && typeof s.label === 'string' && s.label.trim() ? s.label.trim().slice(0, 60) : d.label
-    const active = s ? s.active !== false : d.active
-    return { key: d.key, label, active }
-  })
+// Compat: export antigo (defaults dos métodos integrados, todos ativos).
+export const PAYMENT_METHOD_DEFAULTS = BUILTIN_PAYMENT_METHODS.map((m) => ({
+  ...m,
+  active: true,
+  builtin: true,
+}))
+
+// Gera uma chave (slug) estável e válida a partir de um nome/chave. Garante que
+// começa por uma letra (prefixo 'm-') para não colidir com o formato dos slugs.
+export function paymentMethodKey(value) {
+  const slug = String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  if (!slug) return ''
+  return /^[a-z]/.test(slug) ? slug : `m-${slug}`
 }
 
-/** Lista completa de métodos de pagamento (com flag ativo/inativo) para o Admin. */
+// Funde os métodos INTEGRADOS (label/active editáveis, chave fixa, no topo) com
+// os PERSONALIZADOS guardados, gerando chaves únicas e válidas.
+function normalizePaymentMethods(stored) {
+  const list = Array.isArray(stored) ? stored : []
+  const byKey = new Map()
+  for (const m of list) if (m && typeof m.key === 'string') byKey.set(m.key, m)
+
+  const result = []
+  const used = new Set()
+  // 1) Integrados — sempre presentes, ordem fixa.
+  for (const b of BUILTIN_PAYMENT_METHODS) {
+    const s = byKey.get(b.key)
+    const label = s && typeof s.label === 'string' && s.label.trim() ? s.label.trim().slice(0, 60) : b.label
+    const active = s ? s.active !== false : true
+    result.push({ key: b.key, label, active, builtin: true })
+    used.add(b.key)
+  }
+  // 2) Personalizados — qualquer entrada com chave não-integrada e nome válido.
+  for (const m of list) {
+    if (!m || typeof m !== 'object') continue
+    if (m.key && BUILTIN_PAYMENT_KEYS.has(m.key)) continue // já tratado acima
+    const label = typeof m.label === 'string' ? m.label.trim().slice(0, 60) : ''
+    if (!label) continue // sem nome não é um método válido
+    let key = paymentMethodKey(m.key || label)
+    if (!key) continue
+    if (used.has(key)) {
+      let i = 2
+      while (used.has(`${key}-${i}`)) i += 1
+      key = `${key}-${i}`
+    }
+    used.add(key)
+    result.push({ key, label, active: m.active !== false, builtin: false })
+    if (result.length >= MAX_PAYMENT_METHODS) break
+  }
+  return result
+}
+
+/** Lista completa de métodos de pagamento (integrados + personalizados) para o Admin. */
 export async function getPaymentMethods() {
   return normalizePaymentMethods(await repo.get(PAYMENT_METHODS_KEY))
 }
@@ -166,7 +216,7 @@ export async function getActivePaymentMethods() {
   return (await getPaymentMethods()).filter((m) => m.active)
 }
 
-/** Valida e persiste os métodos de pagamento (admin). Chaves fixas; edita label + ativo. */
+/** Valida e persiste os métodos de pagamento (admin). Integrados fixos; personalizados CRUD. */
 export async function updatePaymentMethods(input, actorId) {
   const next = normalizePaymentMethods(Array.isArray(input) ? input : [])
   await repo.set(PAYMENT_METHODS_KEY, next, actorId)

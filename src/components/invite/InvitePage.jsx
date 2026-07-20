@@ -558,7 +558,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
                     checked={effectiveMethod === m}
                     onChange={() => setPaymentChoice(m)}
                   />
-                  {PAYMENT_METHOD_LABEL[m] || m}
+                  {payLabel(page.invite, m)}
                 </label>
               ))}
             </fieldset>
@@ -583,6 +583,12 @@ const PAYMENT_METHOD_LABEL = {
   mbway: 'MB WAY',
   transferencia: 'Transferência bancária',
   referencia: 'Referência Multibanco',
+}
+
+// Nome público de um método de pagamento: usa o rótulo configurado no Admin
+// (inclui os personalizados), com fallback para os integrados e para a chave.
+function payLabel(invite, method) {
+  return invite?.paymentMethodLabels?.[method] || PAYMENT_METHOD_LABEL[method] || method
 }
 
 // URL do formulário JotForm que processa os pagamentos MB WAY.
@@ -834,7 +840,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
                   className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: accent }}
                 >
-                  {PAYMENT_METHOD_LABEL[m] || m}
+                  {payLabel(invite, m)}
                 </button>
               ))}
             </div>
@@ -884,6 +890,26 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
           <p className="m-0 text-xs text-muted-foreground">
             Pague no homebanking ou Multibanco. Confirmamos a inscrição assim que recebermos o pagamento.
           </p>
+        </div>
+      ) : instr.type === 'custom' ? (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-sm text-muted-foreground">
+            {instr.note || 'Siga as instruções do organizador para concluir o pagamento e depois carregue o comprovativo.'}
+          </p>
+          {instr.amount != null ? (
+            <div className={rowCls}>
+              <span className="text-muted-foreground">Valor</span>
+              <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
+            </div>
+          ) : null}
+          <label
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {uploading ? 'A enviar…' : 'Carregar comprovativo'}
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+          </label>
         </div>
       ) : null}
     </div>

@@ -320,7 +320,7 @@ function PaymentCard({ block, page }) {
         <div className="mt-3 flex flex-wrap gap-2">
           {methods.map((m) => (
             <span key={m} className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-              {METHOD_LABEL[m] || m}
+              {inv.paymentMethodLabels?.[m] || METHOD_LABEL[m] || m}
             </span>
           ))}
         </div>

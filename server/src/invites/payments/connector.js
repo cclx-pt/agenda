@@ -45,7 +45,13 @@ export class ConnectorError extends Error {
 // ── Conector "manual" (por omissão) ──────────────────────────────
 const manualConnector = {
   name: 'manual',
+  // Métodos integrados que o conector manual mostra por omissão.
   supportedMethods: ['transferencia', 'referencia'],
+  // Suporta qualquer método EXCETO MB WAY (que precisa de fornecedor real): os
+  // métodos personalizados criados no Admin usam o fluxo manual genérico.
+  supports(method) {
+    return method !== 'mbway'
+  },
 
   async createCharge({ method, amount, currency }) {
     if (method === 'transferencia') {
@@ -73,10 +79,25 @@ const manualConnector = {
         instructions: { type: 'reference', entity, reference, amount, currency },
       }
     }
-    throw new ConnectorError(
-      'Método indisponível. Configure um conector de pagamento para MB WAY.',
-      'METHOD_UNSUPPORTED'
-    )
+    if (method === 'mbway') {
+      throw new ConnectorError(
+        'Método indisponível. Configure um conector de pagamento para MB WAY.',
+        'METHOD_UNSUPPORTED'
+      )
+    }
+    // Método personalizado (criado no Admin): pagamento manual genérico — o
+    // convidado segue as instruções do organizador e carrega o comprovativo;
+    // o organizador valida manualmente → 'paid'.
+    return {
+      status: 'pending',
+      instructions: {
+        type: 'custom',
+        method,
+        amount,
+        currency,
+        note: 'Siga as instruções do organizador para concluir o pagamento e depois carregue o comprovativo.',
+      },
+    }
   },
 
   // O conector manual não confirma automaticamente (validação é do organizador).

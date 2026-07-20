@@ -17,8 +17,15 @@ function canAccessChurch(user, community) {
   return ch === null || ch.includes(community)
 }
 
-const METHODS = ['mbway', 'transferencia', 'referencia']
-const initiateSchema = z.object({ method: z.enum(METHODS) })
+// Chave do método (slug): integrados + personalizados. O conector decide se o
+// suporta (ver connector.supports / supportedMethods).
+const initiateSchema = z.object({
+  method: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9-]*$/, 'Método de pagamento inválido.')
+    .max(40),
+})
 
 // Mapeia o estado do PAGAMENTO para o estado do CONVIDADO (invite_guests.payment_state).
 function guestStateFor(paymentStatus) {
@@ -74,7 +81,11 @@ export async function initiate(slug, guestToken, input) {
 
   const { method } = initiateSchema.parse(input)
   const connector = getConnector(invite.paymentProvider || DEFAULT_PROVIDER)
-  if (!connector.supportedMethods.includes(method)) {
+  const supported =
+    typeof connector.supports === 'function'
+      ? connector.supports(method)
+      : connector.supportedMethods.includes(method)
+  if (!supported) {
     throw new InviteError(409, 'Método de pagamento indisponível de momento.')
   }
   const amount = await chargeAmount(invite, guest)
