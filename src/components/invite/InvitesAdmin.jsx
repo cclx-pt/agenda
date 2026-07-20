@@ -45,19 +45,31 @@ const PAY_BADGE = {
   failed: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
 }
 
-// Tipos de bilhete. "grátis" = 0€; "voluntária" = valor livre; "grupo" abre a
-// inscrição do grupo no formulário público.
+// Tipo de PREÇO do bilhete: Pago (com valor), Grátis (0€) ou Doação (valor à
+// escolha do doador). A composição (individual/família/grupo) é um campo à parte.
 const TICKET_KINDS = [
-  { value: 'individual', label: 'Individual' },
+  { value: 'individual', label: 'Pago' },
   { value: 'gratis', label: 'Grátis' },
-  { value: 'voluntaria', label: 'Oferta voluntária' },
-  { value: 'grupo', label: 'Grupo' },
+  { value: 'voluntaria', label: 'Doação' },
 ]
-// Normaliza um tipo legado (ex.: 'campanha') para os tipos atuais.
+// Composição do bilhete: individual, família ou grupo. Família/grupo abrem a lista
+// de membros (nome, idade e observações se < 11) no formulário de inscrição.
+const PARTY_TYPES = [
+  { value: 'single', label: 'Individual' },
+  { value: 'family', label: 'Família' },
+  { value: 'group', label: 'Grupo' },
+]
+// Normaliza o tipo de preço; tipos legados de composição ('grupo'/'campanha') → pago.
 function normalizeKind(kind) {
-  if (kind === 'individual' || kind === 'gratis' || kind === 'voluntaria' || kind === 'grupo') return kind
-  if (kind === 'campanha') return 'grupo'
+  if (kind === 'individual' || kind === 'gratis' || kind === 'voluntaria') return kind
   return 'individual'
+}
+// Composição efetiva de um bilhete (deriva de tipos legados baseados no kind).
+function normalizePartyType(t) {
+  // Legado: bilhetes com kind 'grupo'/'campanha' são grupo (o party_type ainda é o default 'single').
+  if (t.kind === 'grupo' || t.kind === 'campanha') return 'group'
+  if (t.partyType === 'family' || t.partyType === 'group') return t.partyType
+  return 'single'
 }
 // Um bilhete é gratuito se for do tipo "grátis" ou (não-voluntária) sem preço > 0.
 function ticketIsFree(t) {
@@ -150,7 +162,7 @@ function formatAnswer(field, value) {
     return value
       .map((c) =>
         c && typeof c === 'object'
-          ? [c.nome, c.idade ? `${c.idade} anos` : '', c.telefone, c.email, c.alergias].filter(Boolean).join(' – ')
+          ? [c.nome, c.idade ? `${c.idade} anos` : '', c.telefone, c.email, c.alergias, c.observacoes].filter(Boolean).join(' – ')
           : String(c)
       )
       .filter(Boolean)
@@ -158,6 +170,12 @@ function formatAnswer(field, value) {
   }
   if (typeof value === 'boolean' || field?.type === 'checkbox') return value ? 'Sim' : 'Não'
   return String(value)
+}
+
+// Formata um valor de doação (€) para leitura/exportação; vazio se não aplicável.
+function fmtDonation(v) {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? `${n.toFixed(2)} EUR` : ''
 }
 
 // ── Editor de um convite ─────────────────────────────────────────
@@ -189,7 +207,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     // Comunidade no JotForm (MB WAY); '' = automático.
     jotformCommunity: invite.jotformCommunity ?? '',
   }))
-  const [tickets, setTickets] = useState(() => (invite.tickets || []).map((t) => ({ ...t, kind: normalizeKind(t.kind) })))
+  const [tickets, setTickets] = useState(() =>
+    (invite.tickets || []).map((t) => ({ ...t, partyType: normalizePartyType(t), kind: normalizeKind(t.kind) }))
+  )
   // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
   const [events, setEvents] = useState(() => (invite.event ? [invite.event] : []))
   const [blocks, setBlocks] = useState(() => invite.blocks || [])
@@ -276,7 +296,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', price: '', capacity: '', groupSize: '', paymentMethod: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethod: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -320,9 +340,11 @@ function InviteEditor({ invite, onBack, onSaved }) {
             id: t.id || null,
             name: t.name.trim(),
             kind: normalizeKind(t.kind),
+            partyType: normalizePartyType(t),
             price: t.kind === 'gratis' ? 0 : t.price === '' || t.price == null ? null : Number(t.price),
             capacity: t.capacity === '' || t.capacity == null ? null : Number(t.capacity),
-            groupSize: t.kind === 'grupo' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
+            groupSize:
+              normalizePartyType(t) !== 'single' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
             paymentMethod: ticketIsFree(t) ? null : t.paymentMethod || null,
             active: t.active !== false,
           }))
@@ -425,6 +447,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
   )
   const extraAnswerKeys = (() => {
     const known = new Set(answerFields.map((f) => f.key))
+    known.add('donationAmount') // apresentado numa coluna própria "Doação"
+    known.add('membros') // lista de membros (família/grupo) — coluna própria
+    known.add('tipoInscricao') // individual/família/grupo — coluna própria
     const keys = []
     for (const g of guests || []) {
       for (const k of Object.keys(g.extra || {})) {
@@ -472,6 +497,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
         price: t.price === '' || t.price == null ? null : Number(t.price),
         currency: 'EUR',
         kind: t.kind,
+        partyType: normalizePartyType(t),
         groupSize: t.groupSize ? Number(t.groupSize) : null,
         soldOut: false,
       })),
@@ -487,6 +513,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ['Estado', (g) => RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState || ''],
       ['Pagamento', (g) => (g.paymentState === 'not_applicable' ? '' : PAY_LABEL[g.paymentState] || g.paymentState || '')],
       ['Bilhete', (g) => ticketName(g.ticketId)],
+      ['Tipo de inscrição', (g) => g.extra?.tipoInscricao || ''],
+      ['Membros', (g) => formatAnswer(null, g.extra?.membros)],
+      ['Doação (€)', (g) => fmtDonation(g.extra?.donationAmount)],
       ['Lugares', (g) => g.guestsCount ?? ''],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
       ...answerFields.map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),
@@ -767,7 +796,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
           </button>
         </div>
         <p className="m-0 mb-3 text-xs text-muted-foreground">
-          O custo da inscrição é definido pelos bilhetes. Tipos: individual, grátis (0€), oferta voluntária (valor livre) e grupo (abre a inscrição do grupo no formulário). O método de pagamento define-se em cada bilhete pago.
+          O custo da inscrição é definido pelos bilhetes. Preço: pago (com valor), grátis (0€) ou doação (valor à escolha). Tipo de inscrição: individual, família ou grupo (família/grupo abrem a lista de membros no formulário). O método de pagamento define-se em cada bilhete pago.
         </p>
         {tickets.length === 0 ? (
           <p className="m-0 text-sm text-muted-foreground">
@@ -789,6 +818,16 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         ))}
                       </select>
                     </div>
+                    <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                      Tipo de inscrição
+                      <select className={inputCls} value={normalizePartyType(t)} onChange={(e) => setTicketField(i, 'partyType', e.target.value)}>
+                        {PARTY_TYPES.map((p) => (
+                          <option key={p.value} value={p.value}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                       {t.kind === 'gratis' ? (
                         <input className={inputCls + ' text-muted-foreground'} value="Grátis (0€)" disabled readOnly />
@@ -804,15 +843,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         />
                       )}
                       <input type="number" min="1" className={inputCls} placeholder="Capacidade" value={t.capacity} onChange={(e) => setTicketField(i, 'capacity', e.target.value)} />
-                      {t.kind === 'grupo' ? (
-                        <input type="number" min="1" className={inputCls} placeholder="Pessoas por grupo" value={t.groupSize} onChange={(e) => setTicketField(i, 'groupSize', e.target.value)} />
+                      {normalizePartyType(t) !== 'single' ? (
+                        <input type="number" min="1" className={inputCls} placeholder="Máx. de pessoas" value={t.groupSize} onChange={(e) => setTicketField(i, 'groupSize', e.target.value)} />
                       ) : (
                         <span />
                       )}
                     </div>
-                    {t.kind === 'grupo' ? (
+                    {normalizePartyType(t) !== 'single' ? (
                       <p className="m-0 text-xs text-muted-foreground">
-                        No formulário público, escolher este bilhete abre uma secção para inscrever os membros do grupo.
+                        No formulário público, este bilhete abre a lista de {normalizePartyType(t) === 'family' ? 'membros da família' : 'membros do grupo'} — pede nome, idade e (se for menor de 11) observações.
+                      </p>
+                    ) : null}
+                    {t.kind === 'voluntaria' ? (
+                      <p className="m-0 text-xs text-muted-foreground">
+                        No formulário público, o doador indica o valor que quiser (o valor acima é apenas sugerido).
                       </p>
                     ) : null}
                     {!ticketIsFree(t) ? (
@@ -1030,6 +1074,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
                   const entries = [
                     g.phone ? { label: 'Telemóvel', value: g.phone } : null,
                     g.ticketId ? { label: 'Bilhete', value: ticketName(g.ticketId) } : null,
+                    g.extra?.tipoInscricao ? { label: 'Tipo de inscrição', value: g.extra.tipoInscricao } : null,
+                    g.extra?.membros ? { label: 'Membros', value: formatAnswer(null, g.extra.membros) } : null,
+                    g.extra?.donationAmount ? { label: 'Doação', value: fmtDonation(g.extra.donationAmount) } : null,
                     g.paymentState && g.paymentState !== 'not_applicable'
                       ? { label: 'Pagamento', value: PAY_LABEL[g.paymentState] || g.paymentState }
                       : null,

@@ -400,6 +400,7 @@ function mapTicket(row) {
     currency: row.currency ?? 'EUR',
     capacity: row.capacity ?? null,
     groupSize: row.group_size ?? null,
+    partyType: row.party_type ?? 'single',
     description: row.description ?? null,
     paymentMethod: row.payment_method ?? null,
     active: !!row.active,
@@ -465,18 +466,18 @@ export async function replaceTickets(inviteId, tickets) {
         `UPDATE invite_tickets SET
            name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
            group_size = $7, description = $8, active = $9, sort_order = $10,
-           payment_method = $11, updated_at = now()
+           payment_method = $11, party_type = $13, updated_at = now()
          WHERE id = $1 AND invite_id = $12`,
         [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
-          t.groupSize ?? null, t.description ?? null, t.active !== false, order, t.paymentMethod ?? null, inviteId]
+          t.groupSize ?? null, t.description ?? null, t.active !== false, order, t.paymentMethod ?? null, inviteId, t.partyType ?? 'single']
       )
     } else {
       await pool.query(
         `INSERT INTO invite_tickets
-          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
-          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, t.paymentMethod ?? null, t.active !== false, order]
+          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, t.paymentMethod ?? null, t.active !== false, order, t.partyType ?? 'single']
       )
     }
     order += 1

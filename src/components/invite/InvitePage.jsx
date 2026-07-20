@@ -114,35 +114,46 @@ function ticketPriceLabel(t) {
   if (t.kind === 'gratis') return ' — Grátis'
   if (t.kind === 'voluntaria') {
     return t.price != null && t.price > 0
-      ? ` — Oferta voluntária (sugerido ${Number(t.price).toFixed(2)} ${t.currency})`
-      : ' — Oferta voluntária'
+      ? ` — Doação (sugerido ${Number(t.price).toFixed(2)} ${t.currency})`
+      : ' — Doação (valor à escolha)'
   }
   return t.price != null && t.price > 0 ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ' — Grátis'
 }
 
-// Secção predefinida de inscrição do grupo (bilhete de grupo): nome, idade e
-// contactos (telefone + email) de cada membro do grupo.
-function GroupMembersSection({ members, setMembers, max, inputCls }) {
-  const add = () => setMembers([...members, { nome: '', idade: '', telefone: '', email: '' }])
+// Secção de membros (bilhete de família ou grupo): nome, idade e — se a pessoa
+// tiver menos de 11 anos — uma observação / necessidade especial.
+function MembersSection({ title, members, setMembers, max, inputCls }) {
+  const add = () => setMembers([...members, { nome: '', idade: '', observacoes: '' }])
   const patch = (i, chg) => setMembers(members.map((m, idx) => (idx === i ? { ...m, ...chg } : m)))
   const remove = (i) => setMembers(members.filter((_, idx) => idx !== i))
   const atMax = max && members.length >= max
+  const isChild = (age) => age !== '' && age != null && Number(age) < 11
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 p-3">
       <p className="m-0 text-sm font-semibold text-foreground">
-        Inscrição do grupo
+        {title}
         {max ? <span className="font-normal text-muted-foreground"> · até {max} pessoas</span> : null}
       </p>
-      <p className="m-0 text-xs text-muted-foreground">Indique o nome, a idade e o contacto (telefone e email) de cada membro do grupo.</p>
+      <p className="m-0 text-xs text-muted-foreground">
+        Indique o nome e a idade de cada pessoa. Para menores de 11 anos, indique também observações ou necessidades especiais.
+      </p>
       {members.map((m, i) => (
         <div key={i} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
-          <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-2">
-            <input className={inputCls} placeholder={`Nome do membro ${i + 1}`} value={m.nome ?? ''} onChange={(e) => patch(i, { nome: e.target.value })} />
-            <input type="number" inputMode="numeric" min="0" max="120" className={inputCls} placeholder="Idade" value={m.idade ?? ''} onChange={(e) => patch(i, { idade: e.target.value })} />
-            <input type="tel" inputMode="tel" autoComplete="tel" className={inputCls} placeholder="Telefone" value={m.telefone ?? ''} onChange={(e) => patch(i, { telefone: e.target.value })} />
-            <input type="email" inputMode="email" autoComplete="email" className={inputCls} placeholder="Email" value={m.email ?? ''} onChange={(e) => patch(i, { email: e.target.value })} />
+          <div className="grid flex-1 grid-cols-1 gap-1.5">
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              <input className={inputCls} placeholder={`Nome da pessoa ${i + 1}`} value={m.nome ?? ''} onChange={(e) => patch(i, { nome: e.target.value })} />
+              <input type="number" inputMode="numeric" min="0" max="120" className={inputCls} placeholder="Idade" value={m.idade ?? ''} onChange={(e) => patch(i, { idade: e.target.value })} />
+            </div>
+            {isChild(m.idade) ? (
+              <input
+                className={inputCls}
+                placeholder="Observações / necessidades especiais (menor de 11)"
+                value={m.observacoes ?? ''}
+                onChange={(e) => patch(i, { observacoes: e.target.value })}
+              />
+            ) : null}
           </div>
-          <button type="button" onClick={() => remove(i)} className="mt-1 rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover membro">
+          <button type="button" onClick={() => remove(i)} className="mt-1 rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover pessoa">
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -154,9 +165,9 @@ function GroupMembersSection({ members, setMembers, max, inputCls }) {
         className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
       >
         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-        Adicionar membro
+        Adicionar pessoa
       </button>
-      {atMax ? <span className="text-xs text-muted-foreground">Limite de {max} membros atingido.</span> : null}
+      {atMax ? <span className="text-xs text-muted-foreground">Limite de {max} pessoas atingido.</span> : null}
     </div>
   )
 }
@@ -176,7 +187,9 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState('')
-  const [groupMembers, setGroupMembers] = useState([{ nome: '', idade: '', telefone: '', email: '' }])
+  const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
+  const [donationAmount, setDonationAmount] = useState('')
+  const [donationErr, setDonationErr] = useState('')
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
@@ -201,8 +214,12 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
   const visible = visibleKeys(fields, values)
   const selectedTicket = tickets.find((t) => t.id === ticketId) || null
-  const isGroup = selectedTicket?.kind === 'grupo'
-  const groupCap = selectedTicket?.groupSize || null
+  const partyType = selectedTicket ? (selectedTicket.kind === 'grupo' ? 'group' : selectedTicket.partyType || 'single') : 'single'
+  const hasMembers = partyType === 'family' || partyType === 'group'
+  const membersCap = selectedTicket?.groupSize || null
+  const isDonation = selectedTicket?.kind === 'voluntaria'
+  const donationSuggested = Number(selectedTicket?.price) > 0 ? Number(selectedTicket.price) : null
+  const donationCurrency = selectedTicket?.currency || 'EUR'
 
   const submit = async (e) => {
     e.preventDefault()
@@ -221,10 +238,21 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       toast.error('Escolha um bilhete.')
       return
     }
-    const cleanGroup = isGroup ? groupMembers.filter((m) => (m.nome || '').trim()) : []
-    if (isGroup && cleanGroup.length === 0) {
-      toast.error('Indique pelo menos um membro do grupo.')
+    const cleanMembers = hasMembers ? members.filter((m) => (m.nome || '').trim()) : []
+    if (hasMembers && cleanMembers.length === 0) {
+      toast.error(partyType === 'family' ? 'Indique pelo menos um membro da família.' : 'Indique pelo menos um membro do grupo.')
       return
+    }
+    // Doação (valor à escolha): usa o valor indicado ou, em branco, o sugerido.
+    let donationValue = null
+    if (isDonation) {
+      donationValue = donationAmount !== '' ? Number(donationAmount) : donationSuggested
+      if (!(Number(donationValue) > 0)) {
+        setDonationErr('Indica o valor da doação.')
+        toast.error('Indica o valor da doação.')
+        return
+      }
+      setDonationErr('')
     }
     const { name, email, phone, extra } = buildSubmission(fields, values)
     if (!name.trim()) {
@@ -236,8 +264,12 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       return
     }
     const finalExtra = { ...extra }
-    if (cleanGroup.length) finalExtra.grupo = cleanGroup
-    const peopleCount = isGroup ? Math.max(1, cleanGroup.length) : countPeople(fields, values)
+    if (cleanMembers.length) {
+      finalExtra.membros = cleanMembers
+      finalExtra.tipoInscricao = partyType === 'family' ? 'Família' : 'Grupo'
+    }
+    if (donationValue != null) finalExtra.donationAmount = donationValue
+    const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values)
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {
@@ -453,20 +485,59 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               Bilhete *
               <select className={inputCls} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
                 <option value="">— Escolha o bilhete —</option>
-                {tickets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                    {ticketPriceLabel(t)}
-                    {t.kind === 'grupo' && t.groupSize ? ` (grupo até ${t.groupSize})` : ''}
-                  </option>
-                ))}
+                {tickets.map((t) => {
+                  const pt = t.kind === 'grupo' ? 'group' : t.partyType || 'single'
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {ticketPriceLabel(t)}
+                      {pt !== 'single' ? ` · ${pt === 'family' ? 'Família' : 'Grupo'}${t.groupSize ? ` até ${t.groupSize}` : ''}` : ''}
+                    </option>
+                  )
+                })}
               </select>
             </label>
           ) : null}
 
-          {/* Secção de inscrição do grupo (bilhete de grupo) */}
-          {isGroup ? (
-            <GroupMembersSection members={groupMembers} setMembers={setGroupMembers} max={groupCap} inputCls={inputCls} />
+          {/* Secção de membros (bilhete de família ou grupo) */}
+          {hasMembers ? (
+            <MembersSection
+              title={partyType === 'family' ? 'Inscrição da família' : 'Inscrição do grupo'}
+              members={members}
+              setMembers={setMembers}
+              max={membersCap}
+              inputCls={inputCls}
+            />
+          ) : null}
+          {/* Doação: valor à escolha do doador (sugerido opcional vindo do bilhete) */}
+          {isDonation ? (
+            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+              Valor da doação (€) *
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                aria-invalid={!!donationErr}
+                aria-required="true"
+                className={inputCls + (donationErr ? ' border-destructive' : '')}
+                placeholder={donationSuggested ? `Sugerido: ${donationSuggested.toFixed(2)} ${donationCurrency}` : 'Indica o valor'}
+                value={donationAmount}
+                onChange={(e) => {
+                  setDonationAmount(e.target.value)
+                  if (donationErr) setDonationErr('')
+                }}
+              />
+              {donationErr ? (
+                <span className="text-xs font-normal text-destructive">{donationErr}</span>
+              ) : donationSuggested ? (
+                <span className="text-xs font-normal text-muted-foreground">
+                  Valor sugerido: {donationSuggested.toFixed(2)} {donationCurrency}. Podes indicar outro valor.
+                </span>
+              ) : (
+                <span className="text-xs font-normal text-muted-foreground">Podes doar o valor que quiseres.</span>
+              )}
+            </label>
           ) : null}
           {fields.map(renderField)}
           <button

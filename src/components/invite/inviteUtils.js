@@ -48,8 +48,8 @@ export function ticketPrice(t) {
   if (t.kind === 'gratis') return 'Grátis'
   if (t.kind === 'voluntaria') {
     return t.price != null && t.price > 0
-      ? `Oferta voluntária (sugerido ${Number(t.price).toFixed(2)} ${t.currency || 'EUR'})`
-      : 'Oferta voluntária'
+      ? `Doação (sugerido ${Number(t.price).toFixed(2)} ${t.currency || 'EUR'})`
+      : 'Doação (valor à escolha)'
   }
   return t.price != null && t.price > 0 ? `${Number(t.price).toFixed(2)} ${t.currency || 'EUR'}` : 'Grátis'
 }

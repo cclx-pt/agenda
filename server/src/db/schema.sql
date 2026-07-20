@@ -469,9 +469,9 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_url TEXT;
 -- Comunidade enviada ao JotForm do MB WAY (conjunto do JotForm; NULL = automático).
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS jotform_community TEXT;
 
--- Bilhetes (tipos) de um convite. Tipos: individual, grátis (0€), oferta
--- voluntária (valor livre) ou grupo. Cada tipo tem preço, capacidade (NULL =
--- ilimitado), nº de pessoas por grupo e método de pagamento (bilhetes pagos).
+-- Bilhetes (tipos) de um convite. Tipos: individual/pago (com valor), grátis
+-- (0€), doação (valor à escolha) ou grupo. Cada tipo tem preço, capacidade
+-- (NULL = ilimitado), nº de pessoas por grupo e método de pagamento.
 CREATE TABLE IF NOT EXISTS invite_tickets (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
@@ -482,6 +482,7 @@ CREATE TABLE IF NOT EXISTS invite_tickets (
   currency    TEXT NOT NULL DEFAULT 'EUR',
   capacity    INTEGER,
   group_size  INTEGER,
+  party_type  TEXT NOT NULL DEFAULT 'single',
   description TEXT,
   payment_method TEXT,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -495,6 +496,9 @@ ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS payment_method TEXT;
 ALTER TABLE invite_tickets DROP CONSTRAINT IF EXISTS invite_tickets_kind_check;
 ALTER TABLE invite_tickets ADD CONSTRAINT invite_tickets_kind_check
   CHECK (kind IN ('individual', 'gratis', 'voluntaria', 'grupo', 'campanha'));
+-- Composição do bilhete: 'single' (individual), 'family' (família) ou 'group' (grupo).
+-- Family/group abrem a lista de membros (nome, idade, observações se < 11) no formulário.
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS party_type TEXT NOT NULL DEFAULT 'single';
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;

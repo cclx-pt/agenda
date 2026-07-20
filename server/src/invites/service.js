@@ -171,8 +171,8 @@ const inviteInputSchema = z.object({
   jotformCommunity: z.enum(JOTFORM_COMMUNITIES).nullable().optional(),
 })
 
-// Bilhete (tipo) de um convite. Tipos: individual, grátis (0€), oferta
-// voluntária (valor livre) e grupo (abre secção de inscrição do grupo).
+// Bilhete (tipo) de um convite. Tipos: individual/pago (com valor), grátis (0€),
+// doação (valor à escolha do doador) e grupo (abre secção de inscrição do grupo).
 const ticketSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   name: z.string().trim().min(1, 'Indique o nome do bilhete.').max(120),
@@ -181,6 +181,7 @@ const ticketSchema = z.object({
   currency: z.string().trim().max(8).optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
   groupSize: z.number().int().min(1).max(1000).optional().nullable(),
+  partyType: z.enum(['single', 'family', 'group']).optional().default('single'),
   description: z.string().trim().max(500).optional().nullable(),
   paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
   active: z.boolean().optional().default(true),
@@ -219,7 +220,7 @@ function normalizePayment(data) {
   data.paymentMethods = data.paymentMethod ? [data.paymentMethod] : null
 }
 
-// Um bilhete é gratuito se for do tipo "grátis" ou (não-voluntária) sem preço > 0.
+// Um bilhete é gratuito se for do tipo "grátis" ou (não-doação) sem preço > 0.
 function ticketIsFree(t) {
   if (!t) return true
   if (t.kind === 'gratis') return true
@@ -482,6 +483,7 @@ function renderPayload(
         price: t.price,
         currency: t.currency,
         groupSize: t.groupSize,
+        partyType: t.partyType ?? 'single',
         description: t.description,
         paymentMethod: t.paymentMethod ?? null,
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,

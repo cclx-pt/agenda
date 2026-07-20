@@ -4,10 +4,12 @@
 // label + se o utilizador pode adicionar o bloco pelo menu "Adicionar bloco".
 export const BLOCK_META = {
   banner: { label: 'Cabeçalho / Banner', addable: false },
+  overview: { label: 'Descrição (Overview)', addable: true },
   info_extra: { label: 'Informação', addable: true },
   convite_narrativo: { label: 'Convite (narrativa + vídeo)', addable: true },
-  oradores: { label: 'Oradores e convidados', addable: true },
-  agenda: { label: 'Programa', addable: true },
+  good_to_know: { label: 'Bom saber (Good to know)', addable: true },
+  oradores: { label: 'Oradores / Lineup', addable: true },
+  agenda: { label: 'Programa / Agenda', addable: true },
   workshops: { label: 'Workshops', addable: true },
   rsvp: { label: 'Inscrição (RSVP)', addable: false },
   pagamento: { label: 'Custo / Pagamento', addable: false },
@@ -24,12 +26,16 @@ export const ADDABLE_TYPES = Object.entries(BLOCK_META)
 // Conteúdo inicial ao adicionar um bloco novo.
 export function defaultContent(type) {
   switch (type) {
+    case 'overview':
+      return { title: 'Sobre o evento', body: '' }
     case 'info_extra':
       return { title: '', body: '' }
     case 'convite_narrativo':
       return { narrative: '', videoUrl: '' }
+    case 'good_to_know':
+      return { title: 'Bom saber', highlights: [], ageInfo: '', doorTime: '', parkingInfo: '', items: [] }
     case 'oradores':
-      return { title: 'Oradores e Convidados', speakers: [] }
+      return { title: 'Oradores / Lineup', speakers: [] }
     case 'agenda':
       return { title: 'Programa', days: [] }
     case 'workshops':

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
-  Check, ExternalLink, HelpCircle,
+  Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen,
 } from 'lucide-react'
 import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice } from './inviteUtils'
 
@@ -62,6 +62,20 @@ function BannerCard({ block, page, accent }) {
   )
 }
 
+function OverviewCard({ block }) {
+  const c = block.content || {}
+  if (!c.title && !c.body) return null
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.title || 'Sobre o evento'}
+      </h2>
+      {c.body ? <p className="m-0 whitespace-pre-line leading-relaxed text-foreground">{c.body}</p> : null}
+    </div>
+  )
+}
+
 function InfoExtraCard({ block }) {
   const c = block.content || {}
   return (
@@ -71,6 +85,66 @@ function InfoExtraCard({ block }) {
         {c.title || 'Informação'}
       </h2>
       {c.body ? <p className="m-0 whitespace-pre-line text-foreground">{c.body}</p> : null}
+    </div>
+  )
+}
+
+// Secção "Bom saber" (Good to know): destaques + logistica (idade, portas,
+// estacionamento) + informações livres. Esconde-se quando está tudo vazio.
+function GoodToKnowCard({ block, accent }) {
+  const c = block.content || {}
+  const highlights = (c.highlights || [])
+    .map((h) => (typeof h === 'string' ? h : h?.text))
+    .filter(Boolean)
+  const items = (c.items || []).filter((it) => it && it.label && it.value)
+  const tiles = [
+    c.ageInfo ? { icon: Users, label: 'Idade', value: c.ageInfo } : null,
+    c.doorTime ? { icon: DoorOpen, label: 'Abertura de portas', value: c.doorTime } : null,
+    c.parkingInfo ? { icon: Car, label: 'Estacionamento', value: c.parkingInfo } : null,
+  ].filter(Boolean)
+  if (highlights.length === 0 && tiles.length === 0 && items.length === 0) return null
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        <Sparkles className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.title || 'Bom saber'}
+      </h2>
+      {highlights.length > 0 ? (
+        <ul className="m-0 mb-4 flex list-none flex-col gap-2 p-0">
+          {highlights.map((h, i) => (
+            <li key={i} className="flex items-start gap-2 text-foreground">
+              <Check className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: accent }} aria-hidden="true" />
+              <span>{h}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {tiles.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {tiles.map((t, i) => {
+            const Icon = t.icon
+            return (
+              <div key={i} className="flex flex-col gap-1 rounded-xl border border-border bg-background p-3">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {t.label}
+                </span>
+                <span className="text-sm font-medium text-foreground">{t.value}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+      {items.length > 0 ? (
+        <dl className="m-0 mt-4 flex flex-col gap-2">
+          {items.map((it, i) => (
+            <div key={i} className="flex flex-col border-b border-border/60 pb-2 last:border-0 sm:flex-row sm:gap-3">
+              <dt className="text-sm font-semibold text-foreground sm:min-w-[160px]">{it.label}</dt>
+              <dd className="m-0 text-sm text-muted-foreground">{it.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </div>
   )
 }
@@ -195,7 +269,7 @@ function WorkshopsCard({ block }) {
   )
 }
 
-const COST_LABEL = { gratuito: 'Gratuito', pago: 'Pago', voluntario: 'Oferta voluntária' }
+const COST_LABEL = { gratuito: 'Gratuito', pago: 'Pago', voluntario: 'Doação' }
 const METHOD_LABEL = { mbway: 'MB WAY', transferencia: 'Transferência bancária', referencia: 'Referência Multibanco' }
 
 function PaymentCard({ block, page }) {
@@ -218,8 +292,8 @@ function PaymentCard({ block, page }) {
             <li key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
               <span className="flex min-w-0 flex-col">
                 <span className="text-sm font-semibold text-foreground">{t.name}</span>
-                {t.kind === 'grupo' && t.groupSize ? (
-                  <span className="text-xs text-muted-foreground">Grupo até {t.groupSize} pessoas</span>
+                {(t.partyType === 'family' || t.partyType === 'group' || t.kind === 'grupo') && t.groupSize ? (
+                  <span className="text-xs text-muted-foreground">{t.partyType === 'family' ? 'Família' : 'Grupo'} até {t.groupSize} pessoas</span>
                 ) : null}
                 {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
               </span>
@@ -380,8 +454,10 @@ function FooterCard({ block }) {
 
 export {
   BannerCard,
+  OverviewCard,
   InfoExtraCard,
   NarrativeCard,
+  GoodToKnowCard,
   SpeakersCard,
   AgendaCard,
   WorkshopsCard,

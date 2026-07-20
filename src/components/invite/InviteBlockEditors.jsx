@@ -62,6 +62,28 @@ function BannerEditor({ content, onChange }) {
   )
 }
 
+function OverviewEditor({ content, onChange }) {
+  const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  return (
+    <div className="flex flex-col gap-2">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Sobre o evento" />
+      </label>
+      <label className={labelCls}>
+        Descrição
+        <textarea
+          className={inputCls}
+          rows={5}
+          value={content.body ?? ''}
+          onChange={set('body')}
+          placeholder="Adiciona mais detalhes sobre o evento e o que os participantes podem esperar."
+        />
+      </label>
+    </div>
+  )
+}
+
 function InfoExtraEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   return (
@@ -442,10 +464,65 @@ function EmptyEditor() {
   return <p className="m-0 text-xs text-muted-foreground">Este bloco é automático — não precisa de configuração.</p>
 }
 
+function GoodToKnowEditor({ content, onChange }) {
+  const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  return (
+    <div className="flex flex-col gap-3">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Bom saber" />
+      </label>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <label className={labelCls}>
+          Idade
+          <input className={inputCls} value={content.ageInfo ?? ''} onChange={set('ageInfo')} placeholder="Ex.: Todas as idades" />
+        </label>
+        <label className={labelCls}>
+          Abertura de portas
+          <input className={inputCls} value={content.doorTime ?? ''} onChange={set('doorTime')} placeholder="Ex.: 18:30" />
+        </label>
+        <label className={labelCls}>
+          Estacionamento
+          <input className={inputCls} value={content.parkingInfo ?? ''} onChange={set('parkingInfo')} placeholder="Ex.: Gratuito no local" />
+        </label>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold text-foreground">Destaques</span>
+        <RowsEditor
+          rows={content.highlights}
+          onChange={(highlights) => onChange({ ...content, highlights })}
+          emptyRow={{ text: '' }}
+          addLabel="Adicionar destaque"
+          render={(row, upd) => (
+            <input className={inputCls} placeholder="Destaque" value={row.text ?? ''} onChange={(e) => upd({ text: e.target.value })} />
+          )}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold text-foreground">Outras informações</span>
+        <RowsEditor
+          rows={content.items}
+          onChange={(items) => onChange({ ...content, items })}
+          emptyRow={{ label: '', value: '' }}
+          addLabel="Adicionar informação"
+          render={(row, upd) => (
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              <input className={inputCls} placeholder="Etiqueta (ex.: Acessibilidade)" value={row.label ?? ''} onChange={(e) => upd({ label: e.target.value })} />
+              <input className={inputCls} placeholder="Detalhe" value={row.value ?? ''} onChange={(e) => upd({ value: e.target.value })} />
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  )
+}
+
 const EDITORS = {
   banner: BannerEditor,
+  overview: OverviewEditor,
   info_extra: InfoExtraEditor,
   convite_narrativo: NarrativeEditor,
+  good_to_know: GoodToKnowEditor,
   oradores: SpeakersEditor,
   agenda: AgendaEditor,
   workshops: WorkshopsEditor,
