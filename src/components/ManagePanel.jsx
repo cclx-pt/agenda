@@ -14,6 +14,7 @@ import MapPicker from './MapPicker'
 import DateField from './DateField'
 import TimeField from './TimeField'
 import InvitesAdmin from './invite/InvitesAdmin'
+import PaymentMethodsAdmin from './PaymentMethodsAdmin'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
@@ -274,6 +275,7 @@ const SECTION = {
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
   loop: { icon: 'ti-device-tv', title: 'Loop + CCLX' },
   invites: { icon: 'ti-mail', title: 'Convites' },
+  paymentMethods: { icon: 'ti-credit-card', title: 'Métodos de pagamento' },
 }
 
 // view → chave de tradução do título da secção (churches usa manageEntities;
@@ -292,6 +294,7 @@ const SECTION_TKEY = {
   overlaps: 'overlaps',
   loop: 'manageLoop',
   invites: 'manageInvites',
+  paymentMethods: 'paymentMethods',
 }
 
 function eventToForm(evt) {
@@ -1896,6 +1899,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <span className={styles.menuDesc}>{t('manageInvitesDesc')}</span>
                 </button>
               )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={() => setView('paymentMethods')} disabled={busy}>
+                  <i className="ti ti-credit-card" aria-hidden="true" />
+                  <span className={styles.menuTitle}>{t('paymentMethods')}</span>
+                  <span className={styles.menuDesc}>{t('paymentMethodsDesc')}</span>
+                </button>
+              )}
             </div>
           </div>
         ) : view === 'events' ? (
@@ -3127,6 +3137,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ) : view === 'invites' ? (
           <div className={styles.body}>
             <InvitesAdmin />
+          </div>
+        ) : view === 'paymentMethods' ? (
+          <div className={styles.body}>
+            <PaymentMethodsAdmin />
           </div>
         ) : view === 'loop' ? (
           <div className={styles.body}>

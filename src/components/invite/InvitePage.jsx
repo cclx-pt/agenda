@@ -192,6 +192,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
   const [donationAmount, setDonationAmount] = useState('')
   const [donationErr, setDonationErr] = useState('')
+  const [paymentChoice, setPaymentChoice] = useState('')
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
@@ -222,6 +223,9 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const isDonation = selectedTicket?.kind === 'voluntaria'
   const donationSuggested = Number(selectedTicket?.price) > 0 ? Number(selectedTicket.price) : null
   const donationCurrency = selectedTicket?.currency || 'EUR'
+  // Métodos de pagamento oferecidos pelo bilhete (vários → o convidado escolhe um).
+  const ticketPayMethods = selectedTicket?.paymentMethods || []
+  const effectiveMethod = ticketPayMethods.includes(paymentChoice) ? paymentChoice : ticketPayMethods[0] || ''
 
   const submit = async (e) => {
     e.preventDefault()
@@ -271,6 +275,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       finalExtra.tipoInscricao = partyType === 'family' ? 'Família' : 'Grupo'
     }
     if (donationValue != null) finalExtra.donationAmount = donationValue
+    if (effectiveMethod) finalExtra.paymentMethod = effectiveMethod
     const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values)
     setBusy(true)
     try {
@@ -540,6 +545,23 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
                 <span className="text-xs font-normal text-muted-foreground">Podes doar o valor que quiseres.</span>
               )}
             </label>
+          ) : null}
+          {/* Método de pagamento: se o bilhete oferecer vários, o convidado escolhe um. */}
+          {ticketPayMethods.length > 1 ? (
+            <fieldset className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <legend className="mb-1">Método de pagamento *</legend>
+              {ticketPayMethods.map((m) => (
+                <label key={m} className="inline-flex items-center gap-2 font-normal text-foreground">
+                  <input
+                    type="radio"
+                    name="paymentChoice"
+                    checked={effectiveMethod === m}
+                    onChange={() => setPaymentChoice(m)}
+                  />
+                  {PAYMENT_METHOD_LABEL[m] || m}
+                </label>
+              ))}
+            </fieldset>
           ) : null}
           {fields.map(renderField)}
           <button

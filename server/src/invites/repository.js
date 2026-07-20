@@ -419,6 +419,11 @@ function mapTicket(row) {
     partyType: row.party_type ?? 'single',
     description: row.description ?? null,
     paymentMethod: row.payment_method ?? null,
+    paymentMethods: Array.isArray(row.payment_methods)
+      ? row.payment_methods
+      : row.payment_method
+        ? [row.payment_method]
+        : [],
     active: !!row.active,
     order: row.sort_order,
     sold: row.sold == null ? undefined : Number(row.sold),
@@ -477,23 +482,33 @@ export async function replaceTickets(inviteId, tickets) {
   }
   let order = 0
   for (const t of tickets) {
+    // Métodos de pagamento: vários por bilhete. payment_method (único) fica com o
+    // primeiro, por retrocompatibilidade com o fluxo de pagamento existente.
+    const methods =
+      Array.isArray(t.paymentMethods) && t.paymentMethods.length
+        ? t.paymentMethods
+        : t.paymentMethod
+          ? [t.paymentMethod]
+          : []
+    const pmFirst = methods[0] ?? null
+    const pmsJson = methods.length ? JSON.stringify(methods) : null
     if (t.id) {
       await pool.query(
         `UPDATE invite_tickets SET
            name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
            group_size = $7, description = $8, active = $9, sort_order = $10,
-           payment_method = $11, party_type = $13, updated_at = now()
+           payment_method = $11, party_type = $13, payment_methods = $14, updated_at = now()
          WHERE id = $1 AND invite_id = $12`,
         [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
-          t.groupSize ?? null, t.description ?? null, t.active !== false, order, t.paymentMethod ?? null, inviteId, t.partyType ?? 'single']
+          t.groupSize ?? null, t.description ?? null, t.active !== false, order, pmFirst, inviteId, t.partyType ?? 'single', pmsJson]
       )
     } else {
       await pool.query(
         `INSERT INTO invite_tickets
-          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
-          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, t.paymentMethod ?? null, t.active !== false, order, t.partyType ?? 'single']
+          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, pmFirst, t.active !== false, order, t.partyType ?? 'single', pmsJson]
       )
     }
     order += 1

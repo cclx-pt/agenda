@@ -6,7 +6,7 @@ import {
   Calendar as CalendarIcon, MapPin,
 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
-import { uploadEventImage } from '../../services/eventsService'
+import { uploadEventImage, getPaymentMethods } from '../../services/eventsService'
 import DateField from '../DateField'
 import TimeField from '../TimeField'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
@@ -82,14 +82,19 @@ function ticketIsFree(t) {
 function hasPaidTicket(tickets) {
   return (tickets || []).some((t) => (t.name || '').trim() && !ticketIsFree(t))
 }
+// Métodos de pagamento oferecidos por um bilhete (array; retrocompat com o único).
+function ticketMethods(t) {
+  if (Array.isArray(t.paymentMethods) && t.paymentMethods.length) return t.paymentMethods
+  return t.paymentMethod ? [t.paymentMethod] : []
+}
 // Método de pagamento do primeiro bilhete pago (para o fluxo de pagamento do convite).
 function firstPaidTicketMethod(tickets) {
-  const t = (tickets || []).find((x) => (x.name || '').trim() && !ticketIsFree(x) && x.paymentMethod)
-  return t?.paymentMethod || null
+  const t = (tickets || []).find((x) => (x.name || '').trim() && !ticketIsFree(x) && ticketMethods(x).length)
+  return t ? ticketMethods(t)[0] || null : null
 }
 // Há algum bilhete pago por MB WAY (usa o fluxo JotForm)?
 function hasMbwayTicket(tickets) {
-  return (tickets || []).some((t) => (t.name || '').trim() && t.paymentMethod === 'mbway')
+  return (tickets || []).some((t) => (t.name || '').trim() && ticketMethods(t).includes('mbway'))
 }
 // Opções do campo "comunidade" no formulário JotForm do MB WAY.
 const JOTFORM_COMMUNITIES = ['Sede', 'Açores', 'Almada', 'Moita & Barreiro', 'Caldas da Rainha', 'Coruche', 'Porto', 'Outra']
@@ -208,7 +213,17 @@ function InviteEditor({ invite, onBack, onSaved }) {
     jotformCommunity: invite.jotformCommunity ?? '',
   }))
   const [tickets, setTickets] = useState(() =>
-    (invite.tickets || []).map((t) => ({ ...t, partyType: normalizePartyType(t), kind: normalizeKind(t.kind) }))
+    (invite.tickets || []).map((t) => ({
+      ...t,
+      partyType: normalizePartyType(t),
+      kind: normalizeKind(t.kind),
+      paymentMethods:
+        Array.isArray(t.paymentMethods) && t.paymentMethods.length
+          ? t.paymentMethods
+          : t.paymentMethod
+            ? [t.paymentMethod]
+            : [],
+    }))
   )
   // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
   const [events, setEvents] = useState(() => (invite.event ? [invite.event] : []))
@@ -222,6 +237,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [expandedGuest, setExpandedGuest] = useState(null)
   const [tab, setTab] = useState('definicoes')
   const [showFormPreview, setShowFormPreview] = useState(false)
+  // Métodos de pagamento ativos (geridos no Admin) para configurar nos bilhetes.
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([])
 
   // Carrega os eventos associáveis (atuais/futuros), preservando o evento já
   // associado que possa estar fora dessa lista (ex.: já decorreu).
@@ -235,6 +252,19 @@ function InviteEditor({ invite, onBack, onSaved }) {
           const extra = prev.filter((p) => !evs.some((e) => e.id === p.id))
           return [...evs, ...extra]
         })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // Carrega os métodos de pagamento ativos (para o seletor de métodos dos bilhetes).
+  useEffect(() => {
+    let alive = true
+    getPaymentMethods()
+      .then((m) => {
+        if (alive) setPaymentMethodOptions((m || []).filter((x) => x.active))
       })
       .catch(() => {})
     return () => {
@@ -296,7 +326,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethod: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -345,7 +375,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
             capacity: t.capacity === '' || t.capacity == null ? null : Number(t.capacity),
             groupSize:
               normalizePartyType(t) !== 'single' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
-            paymentMethod: ticketIsFree(t) ? null : t.paymentMethod || null,
+            paymentMethods: ticketIsFree(t) ? [] : ticketMethods(t),
+            paymentMethod: ticketIsFree(t) ? null : ticketMethods(t)[0] || null,
             active: t.active !== false,
           }))
       )
@@ -499,6 +530,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
         kind: t.kind,
         partyType: normalizePartyType(t),
         groupSize: t.groupSize ? Number(t.groupSize) : null,
+        paymentMethods: ticketMethods(t),
         soldOut: false,
       })),
   }
@@ -860,16 +892,37 @@ function InviteEditor({ invite, onBack, onSaved }) {
                       </p>
                     ) : null}
                     {!ticketIsFree(t) ? (
-                      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-                        Método de pagamento
-                        <select className={inputCls} value={t.paymentMethod || ''} onChange={(e) => setTicketField(i, 'paymentMethod', e.target.value)}>
-                          <option value="">— Selecione —</option>
-                          <option value="mbway">MB WAY</option>
-                          <option value="transferencia">Transferência bancária</option>
-                          <option value="referencia">Referência Multibanco</option>
-                        </select>
-                        <span className="text-xs text-muted-foreground">Processamento de pagamento a desenvolver.</span>
-                      </label>
+                      <div className="flex flex-col gap-1 text-sm font-medium text-foreground">
+                        Métodos de pagamento
+                        {paymentMethodOptions.length === 0 ? (
+                          <span className="text-xs font-normal text-muted-foreground">
+                            Sem métodos ativos. Ative-os em Admin → Métodos de pagamento.
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                            {paymentMethodOptions.map((pm) => {
+                              const selected = (t.paymentMethods || []).includes(pm.key)
+                              return (
+                                <label key={pm.key} className="inline-flex items-center gap-1.5 text-sm font-normal text-foreground">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={(e) => {
+                                      const cur = t.paymentMethods || []
+                                      const next = e.target.checked ? [...cur, pm.key] : cur.filter((k) => k !== pm.key)
+                                      setTicketField(i, 'paymentMethods', next)
+                                    }}
+                                  />
+                                  {pm.label}
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Escolha os métodos disponíveis para este bilhete (o convidado escolhe um). Processamento a desenvolver.
+                        </span>
+                      </div>
                     ) : null}
                     <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
                       <input type="checkbox" checked={t.active !== false} onChange={(e) => setTicketField(i, 'active', e.target.checked)} />

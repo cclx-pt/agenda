@@ -279,7 +279,12 @@ function PaymentCard({ block, page }) {
   const costType = c.costType || inv.costType || 'gratuito'
   const amount = c.fixedAmount ?? inv.costAmount
   const currency = inv.costCurrency || 'EUR'
-  const methods = c.allowedMethods || (inv.paymentMethod ? [inv.paymentMethod] : [])
+  // Métodos aceites: a união dos métodos de todos os bilhetes (vários por bilhete).
+  const ticketMethodSet = [
+    ...new Set(tickets.flatMap((t) => t.paymentMethods || (t.paymentMethod ? [t.paymentMethod] : []))),
+  ]
+  const methods =
+    c.allowedMethods || (ticketMethodSet.length ? ticketMethodSet : inv.paymentMethod ? [inv.paymentMethod] : [])
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">

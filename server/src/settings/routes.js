@@ -133,6 +133,27 @@ brandingRouter.put('/', adminOnly, async (req, res, next) => {
   }
 })
 
+// ── Métodos de pagamento ──────────────────────────────
+// GET público (o editor de convites precisa da lista ativa); PUT só admin.
+export const paymentMethodsRouter = Router()
+
+paymentMethodsRouter.get('/', async (_req, res, next) => {
+  try {
+    res.json({ methods: await service.getPaymentMethods() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+paymentMethodsRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const methods = await service.updatePaymentMethods(req.body?.methods ?? req.body, req.user.sub)
+    res.json({ methods })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ── Política de sobreposição de eventos ────────────────
 // GET + PUT só admin.
 export const overlapPolicyRouter = Router()

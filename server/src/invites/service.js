@@ -186,6 +186,7 @@ const ticketSchema = z.object({
   partyType: z.enum(['single', 'family', 'group']).optional().default('single'),
   description: z.string().trim().max(500).optional().nullable(),
   paymentMethod: z.enum(PAYMENT_METHODS).optional().nullable(),
+  paymentMethods: z.array(z.enum(PAYMENT_METHODS)).max(10).optional().nullable(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -405,6 +406,21 @@ function buildMeta(invite, bannerUrl) {
   }
 }
 
+// Métodos de pagamento oferecidos por um bilhete (vários; retrocompat com o único).
+function ticketMethods(ticket) {
+  if (!ticket) return []
+  if (Array.isArray(ticket.paymentMethods) && ticket.paymentMethods.length) return ticket.paymentMethods
+  return ticket.paymentMethod ? [ticket.paymentMethod] : []
+}
+// Método efetivo do convidado: o que escolheu (extra.paymentMethod), se for
+// oferecido pelo bilhete; senão o primeiro método do bilhete.
+function resolveGuestMethod(guest, ticket) {
+  const offered = ticketMethods(ticket)
+  const chosen = guest?.extra?.paymentMethod
+  if (chosen && offered.includes(chosen)) return chosen
+  return offered[0] ?? null
+}
+
 // Estado do convidado (calculado, não persistido como bloco). `paymentMethod` = o
 // método do bilhete escolhido (mbway/transferencia/referencia); null se grátis.
 function guestStatusPayload(guest, paymentMethod = null) {
@@ -448,9 +464,8 @@ function renderPayload(
   { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
-  const guestTicketMethod =
-    (guest?.ticketId && (tickets || []).find((t) => t.id === guest.ticketId)?.paymentMethod) || null
-  const guestStatus = guestStatusPayload(guest, guestTicketMethod)
+  const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
+  const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket))
   if (guestStatus) guestStatus.jotformCommunity = resolveJotformCommunity(invite, guest, community)
   return {
     slug: invite.slug,
@@ -495,6 +510,7 @@ function renderPayload(
         partyType: t.partyType ?? 'single',
         description: t.description,
         paymentMethod: t.paymentMethod ?? null,
+        paymentMethods: ticketMethods(t),
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
@@ -702,7 +718,7 @@ export async function submitRsvp(slug, input) {
       extra: data.extra ?? null,
     })
   }
-  const status = guestStatusPayload(guest, ticket?.paymentMethod ?? null)
+  const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket))
   notifyGuestConfirmation(invite, guest, status)
   let spotsLeft = null
   if (invite.capacity) {

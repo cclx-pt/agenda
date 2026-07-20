@@ -219,6 +219,23 @@ export async function updateBranding(branding) {
   return saved
 }
 
+// ── Métodos de pagamento ─────────────────────────
+
+/** Lê a lista de métodos de pagamento (com flag ativo/inativo). Público. */
+export async function getPaymentMethods() {
+  const { methods } = await request('/data/payment-methods')
+  return methods
+}
+
+/** Guarda os métodos de pagamento (admin). */
+export async function updatePaymentMethods(methods) {
+  const { methods: saved } = await request('/data/payment-methods', {
+    method: 'PUT',
+    body: { methods },
+  })
+  return saved
+}
+
 // ── Sobreposição de eventos ─────────────────────────
 
 /** Lê a política de sobreposição (admin). */

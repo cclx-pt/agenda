@@ -130,6 +130,49 @@ export async function updateBranding(input, actorId) {
   return { logoUrl, subcategoryColors }
 }
 
+// ── Métodos de pagamento (geridos no Admin) ──────────────
+// app_settings key 'payment_methods' = [{ key, label, active }]. O conjunto de
+// CHAVES é fixo (mbway/transferencia/referencia) porque cada uma tem
+// comportamento próprio no código (MB WAY salta para o JotForm); o admin só
+// ativa/desativa e renomeia. A lista ativa alimenta a configuração dos bilhetes.
+const PAYMENT_METHODS_KEY = 'payment_methods'
+export const PAYMENT_METHOD_DEFAULTS = [
+  { key: 'mbway', label: 'MB WAY', active: true },
+  { key: 'transferencia', label: 'Transferência bancária', active: true },
+  { key: 'referencia', label: 'Referência Multibanco', active: true },
+]
+
+// Funde os defaults (chaves/ordem fixas) com o guardado (label/active).
+function normalizePaymentMethods(stored) {
+  const byKey = new Map()
+  if (Array.isArray(stored)) {
+    for (const m of stored) if (m && typeof m.key === 'string') byKey.set(m.key, m)
+  }
+  return PAYMENT_METHOD_DEFAULTS.map((d) => {
+    const s = byKey.get(d.key)
+    const label = s && typeof s.label === 'string' && s.label.trim() ? s.label.trim().slice(0, 60) : d.label
+    const active = s ? s.active !== false : d.active
+    return { key: d.key, label, active }
+  })
+}
+
+/** Lista completa de métodos de pagamento (com flag ativo/inativo) para o Admin. */
+export async function getPaymentMethods() {
+  return normalizePaymentMethods(await repo.get(PAYMENT_METHODS_KEY))
+}
+
+/** Só os métodos ativos (para a configuração dos bilhetes e a página pública). */
+export async function getActivePaymentMethods() {
+  return (await getPaymentMethods()).filter((m) => m.active)
+}
+
+/** Valida e persiste os métodos de pagamento (admin). Chaves fixas; edita label + ativo. */
+export async function updatePaymentMethods(input, actorId) {
+  const next = normalizePaymentMethods(Array.isArray(input) ? input : [])
+  await repo.set(PAYMENT_METHODS_KEY, next, actorId)
+  return next
+}
+
 // ── Configuração do Loop + CCLX (múltiplos "loops" nomeados, para TV) ──
 // app_settings key 'loop' = { [slug]: { name, community, active, showGeneral,
 // weeks, format, secondsPerSlide, secondsPerSlideFeatured } }.

@@ -485,6 +485,7 @@ CREATE TABLE IF NOT EXISTS invite_tickets (
   party_type  TEXT NOT NULL DEFAULT 'single',
   description TEXT,
   payment_method TEXT,
+  payment_methods JSONB,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -493,6 +494,9 @@ CREATE TABLE IF NOT EXISTS invite_tickets (
 CREATE INDEX IF NOT EXISTS idx_invite_tickets_invite ON invite_tickets (invite_id);
 -- Migrações idempotentes (BDs já criadas): novos tipos de bilhete + método por bilhete.
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS payment_method TEXT;
+-- Vários métodos de pagamento por bilhete (o convidado escolhe um). payment_method
+-- mantém-se sincronizado com o primeiro elemento (retrocompatibilidade).
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS payment_methods JSONB;
 ALTER TABLE invite_tickets DROP CONSTRAINT IF EXISTS invite_tickets_kind_check;
 ALTER TABLE invite_tickets ADD CONSTRAINT invite_tickets_kind_check
   CHECK (kind IN ('individual', 'gratis', 'voluntaria', 'grupo', 'campanha'));
