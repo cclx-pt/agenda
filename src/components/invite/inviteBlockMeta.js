@@ -45,7 +45,7 @@ export function defaultContent(type) {
     case 'faqs':
       return { title: 'Perguntas frequentes', items: [] }
     case 'rodape':
-      return { logoUrl: '', contactEmail: '', contactPhone: '', socialLinks: [] }
+      return { contactEmail: '', contactPhone: '', socialLinks: [] }
     default:
       return {}
   }

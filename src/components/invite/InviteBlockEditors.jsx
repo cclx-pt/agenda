@@ -428,10 +428,6 @@ function FooterEditor({ content, onChange }) {
           <input className={inputCls} value={content.contactPhone ?? ''} onChange={set('contactPhone')} />
         </label>
       </div>
-      <label className={labelCls}>
-        URL do logótipo
-        <input className={inputCls} value={content.logoUrl ?? ''} onChange={set('logoUrl')} />
-      </label>
       <RowsEditor
         rows={content.socialLinks}
         onChange={(socialLinks) => onChange({ ...content, socialLinks })}

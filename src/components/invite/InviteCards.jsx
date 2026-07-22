@@ -432,7 +432,6 @@ function FooterCard({ block }) {
   const c = block.content || {}
   return (
     <div className="mt-2 flex flex-col items-center gap-3 py-6 text-center">
-      {c.logoUrl ? <img src={c.logoUrl} alt="Logótipo" className="h-8 object-contain" /> : null}
       {Array.isArray(c.socialLinks) && c.socialLinks.length > 0 ? (
         <div className="flex gap-3">
           {c.socialLinks.map((s, i) => (
