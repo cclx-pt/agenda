@@ -374,6 +374,27 @@ export async function updateGuest(id, data) {
   return findGuestById(id)
 }
 
+// Atualiza SÓ os campos editáveis pelo organizador (nome/email/telemóvel/estado),
+// sem mexer em responded_at (mantém a data de inscrição original).
+export async function updateGuestDetails(id, data) {
+  await pool.query(
+    `UPDATE invite_guests SET
+       name = COALESCE($2, name),
+       email = COALESCE($3, email),
+       phone = COALESCE($4, phone),
+       rsvp_state = COALESCE($5, rsvp_state),
+       updated_at = now()
+     WHERE id = $1`,
+    [id, data.name ?? null, data.email ?? null, data.phone ?? null, data.rsvpState ?? null]
+  )
+  return findGuestById(id)
+}
+
+// Elimina uma inscrição (os pagamentos associados são apagados em cascata pela FK).
+export async function deleteGuest(id) {
+  await pool.query('DELETE FROM invite_guests WHERE id = $1', [id])
+}
+
 // Soma de lugares confirmados (guests_count dos convidados 'confirmed'), para a
 // verificação de capacidade.
 export async function countConfirmedSeats(inviteId) {

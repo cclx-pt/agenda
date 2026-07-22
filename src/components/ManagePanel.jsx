@@ -1752,7 +1752,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       transition={{ duration: 0.2 }}
     >
       <motion.div
-        className={styles.panel}
+        className={`${styles.panel}${view === 'invites' ? ' min-[900px]:!w-[1100px]' : ''}`}
         ref={containerRef}
         tabIndex={-1}
         initial={{ opacity: 0, y: 24, scale: 0.98 }}

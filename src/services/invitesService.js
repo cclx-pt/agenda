@@ -85,6 +85,21 @@ export async function listInviteGuests(id) {
   return guests
 }
 
+// Gestão de uma inscrição (organizador).
+export async function updateInviteGuest(inviteId, guestId, payload) {
+  const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'PUT', body: payload })
+  return guest
+}
+
+export async function cancelInviteGuest(inviteId, guestId) {
+  const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}/cancel`, { method: 'POST' })
+  return guest
+}
+
+export async function deleteInviteGuest(inviteId, guestId) {
+  await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'DELETE' })
+}
+
 // ── Definições gerais dos convites (admin) ───────────────────────
 
 export async function getInviteSettings() {

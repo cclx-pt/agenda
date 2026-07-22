@@ -51,6 +51,11 @@ invitesRouter.param('id', (req, res, next, id) => {
   next()
 })
 
+invitesRouter.param('guestId', (req, res, next, id) => {
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Inscrição não encontrada.' })
+  next()
+})
+
 invitesRouter.get(
   '/',
   manageRoles,
@@ -129,6 +134,34 @@ invitesRouter.get(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ guests: await service.listGuests(req.user, req.params.id) })
+  })
+)
+
+// Edita uma inscrição (nome/email/telemóvel/estado).
+invitesRouter.put(
+  '/:id/guests/:guestId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ guest: await service.updateGuest(req.user, req.params.id, req.params.guestId, req.body) })
+  })
+)
+
+// Cancela uma inscrição (estado 'declined').
+invitesRouter.post(
+  '/:id/guests/:guestId/cancel',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ guest: await service.cancelGuest(req.user, req.params.id, req.params.guestId) })
+  })
+)
+
+// Elimina uma inscrição.
+invitesRouter.delete(
+  '/:id/guests/:guestId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    await service.removeGuest(req.user, req.params.id, req.params.guestId)
+    res.json({ ok: true })
   })
 )
 

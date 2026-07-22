@@ -391,6 +391,48 @@ export async function listGuests(user, id) {
   return repo.listGuests(id)
 }
 
+// Estados possíveis de uma inscrição (CHECK invite_guests.rsvp_state).
+const GUEST_RSVP_STATES = ['pending', 'confirmed', 'declined', 'waitlisted']
+
+const guestUpdateSchema = z.object({
+  name: z.string().trim().min(1, 'Indique o nome.').max(160).optional(),
+  email: z.union([z.string().trim().email('Email inválido.').max(200), z.literal('')]).optional(),
+  phone: z.string().trim().max(40).optional(),
+  rsvpState: z.enum(GUEST_RSVP_STATES).optional(),
+})
+
+// Carrega a inscrição garantindo permissão de gestão + acesso ao convite.
+async function loadGuestForManage(user, inviteId, guestId) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const guest = await repo.findGuestById(guestId)
+  if (!guest || guest.inviteId !== inviteId) throw new InviteError(404, 'Inscrição não encontrada.')
+  return { invite, guest }
+}
+
+// Edita os dados de uma inscrição (organizador).
+export async function updateGuest(user, inviteId, guestId, input) {
+  const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  const data = guestUpdateSchema.parse(input ?? {})
+  await repo.updateGuestDetails(guest.id, data)
+  return repo.findGuestById(guest.id)
+}
+
+// Cancela uma inscrição (estado 'declined' → deixa de contar como confirmada).
+export async function cancelGuest(user, inviteId, guestId) {
+  const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  await repo.updateGuestDetails(guest.id, { rsvpState: 'declined' })
+  return repo.findGuestById(guest.id)
+}
+
+// Elimina definitivamente uma inscrição.
+export async function removeGuest(user, inviteId, guestId) {
+  const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  await repo.deleteGuest(guest.id)
+}
+
 // Pré-visualização (organizador): mesma forma do payload público, sem exigir publicação.
 export async function getPreview(user, id) {
   ensureCanManage(user)
