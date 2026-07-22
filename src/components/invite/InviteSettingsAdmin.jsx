@@ -9,10 +9,10 @@ const primaryBtn =
   'inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60'
 
 // Definições gerais partilhadas por todos os convites (dentro da Administração
-// de convites). Por agora: os dados de pagamento (IBAN / beneficiário / entidade
-// Multibanco) que o fluxo de pagamento "manual" mostra ao convidado nas
-// instruções de transferência e referência. Campos vazios usam o valor por
-// omissão do servidor (variáveis de ambiente).
+// de convites). Por agora: os dados de pagamento (IBAN / beneficiário) que o
+// fluxo de pagamento "manual" mostra ao convidado nas instruções de
+// transferência. Campos vazios usam o valor por omissão do servidor (variáveis
+// de ambiente). A entidade e referência Multibanco definem-se em cada bilhete.
 export default function InviteSettingsAdmin() {
   const [form, setForm] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -25,7 +25,6 @@ export default function InviteSettingsAdmin() {
         setForm({
           iban: s.paymentInfo?.iban ?? '',
           beneficiary: s.paymentInfo?.beneficiary ?? '',
-          mbEntity: s.paymentInfo?.mbEntity ?? '',
         })
       })
       .catch((err) => toast.error(err.message))
@@ -43,7 +42,6 @@ export default function InviteSettingsAdmin() {
       setForm({
         iban: saved.paymentInfo?.iban ?? '',
         beneficiary: saved.paymentInfo?.beneficiary ?? '',
-        mbEntity: saved.paymentInfo?.mbEntity ?? '',
       })
       toast.success('Definições guardadas.')
     } catch (err) {
@@ -60,8 +58,8 @@ export default function InviteSettingsAdmin() {
   return (
     <div className="flex flex-col gap-4">
       <p className="m-0 text-sm text-muted-foreground">
-        Dados de pagamento usados nas instruções de <strong>transferência</strong> e <strong>referência</strong> que o
-        convidado vê ao pagar. Deixe em branco para usar o valor por omissão do servidor.
+        Dados de pagamento usados nas instruções de <strong>transferência</strong> que o convidado vê ao pagar. Deixe
+        em branco para usar o valor por omissão do servidor. A entidade e referência Multibanco definem-se em cada bilhete.
       </p>
 
       <div className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-card p-4">
@@ -84,20 +82,6 @@ export default function InviteSettingsAdmin() {
             placeholder="CCLX"
             autoComplete="off"
           />
-        </label>
-        <label className={labelCls}>
-          Entidade Multibanco
-          <input
-            className={inputCls}
-            value={form.mbEntity}
-            onChange={setField('mbEntity')}
-            placeholder="00000"
-            inputMode="numeric"
-            autoComplete="off"
-          />
-          <span className="text-xs text-muted-foreground">
-            Usada nas referências Multibanco de exemplo (um conector real emite a referência final).
-          </span>
         </label>
       </div>
 
