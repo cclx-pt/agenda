@@ -449,11 +449,12 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
 export default function ManagePanel({ onClose, initialView = 'home', initialEditEvent = null }) {
   const { user, hasRole } = useAuth()
   const { t, entity, entities, refreshTranslations, logoUrl, subcategoryColors, refreshBranding } = useI18n()
-  // Ao editar/criar um evento (view 'form') o painel NÃO fecha por clique fora
-  // nem por Esc — evita perder alterações. Só Guardar/Cancelar/X saem.
+  // Dentro de qualquer sub-vista (tudo o que não seja o menu 'home') o painel NÃO
+  // fecha por clique fora nem por Esc — evita sair da opção sem querer. Só o botão
+  // Voltar/X (ou Guardar/Cancelar nos formulários) saem.
   const viewRef = useRef(initialEditEvent ? 'form' : initialView)
   const dismissPanel = useCallback(() => {
-    if (viewRef.current === 'form') return
+    if (viewRef.current !== 'home') return
     onClose()
   }, [onClose])
   const containerRef = useModalA11y(dismissPanel)

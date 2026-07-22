@@ -198,6 +198,8 @@ const ticketSchema = z.object({
   // Entidade + referência Multibanco (tipo 'referencia-multibanco') definidas no bilhete.
   mbEntity: z.string().trim().max(10).optional().nullable(),
   mbReference: z.string().trim().max(30).optional().nullable(),
+  // Números MB WAY definidos no bilhete (tipo 'mbway'); vazio usa os do método.
+  mbNumbers: z.array(z.string().trim().max(20)).max(4).optional().nullable(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -600,6 +602,7 @@ function renderPayload(
         paymentMethods: ticketMethods(t),
         mbEntity: t.mbEntity ?? null,
         mbReference: t.mbReference ?? null,
+        mbNumbers: t.mbNumbers ?? [],
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),

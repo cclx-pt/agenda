@@ -87,7 +87,7 @@ export async function initiate(slug, guestToken, input) {
   const activeMethods = await getActivePaymentMethods().catch(() => [])
   const methodDef = activeMethods.find((m) => m.key === method) || null
   const methodType = methodDef?.type || null
-  const numbers = methodDef?.numbers || []
+  let numbers = methodDef?.numbers || []
 
   const connector = getConnector(invite.paymentProvider || DEFAULT_PROVIDER)
   const supported =
@@ -100,13 +100,18 @@ export async function initiate(slug, guestToken, input) {
   const amount = await chargeAmount(invite, guest)
   const currency = invite.costCurrency || 'EUR'
 
-  // Entidade + referência do BILHETE (só para o tipo 'referencia-multibanco').
+  // Entidade + referência do BILHETE ('referencia-multibanco') e números MB WAY
+  // definidos no bilhete ('mbway') — substituem os do método quando indicados.
   let ticketEntity = null
   let ticketReference = null
-  if (methodType === 'referencia-multibanco' && guest.ticketId) {
+  if (guest.ticketId && (methodType === 'referencia-multibanco' || methodType === 'mbway')) {
     const ticket = await invitesRepo.findTicketById(guest.ticketId)
-    ticketEntity = ticket?.mbEntity ?? null
-    ticketReference = ticket?.mbReference ?? null
+    if (methodType === 'referencia-multibanco') {
+      ticketEntity = ticket?.mbEntity ?? null
+      ticketReference = ticket?.mbReference ?? null
+    } else if (Array.isArray(ticket?.mbNumbers) && ticket.mbNumbers.length) {
+      numbers = ticket.mbNumbers
+    }
   }
 
   // Cria o registo (pending) e pede a cobrança ao conector.

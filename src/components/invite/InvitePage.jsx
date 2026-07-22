@@ -194,8 +194,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     return wanted && tickets.some((t) => t.id === wanted) ? wanted : ''
   })
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
-  const [donationAmount, setDonationAmount] = useState('')
-  const [donationErr, setDonationErr] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -224,9 +222,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const partyType = selectedTicket ? (selectedTicket.kind === 'grupo' ? 'group' : selectedTicket.partyType || 'single') : 'single'
   const hasMembers = partyType === 'family' || partyType === 'group'
   const membersCap = selectedTicket?.groupSize || null
-  const isDonation = selectedTicket?.kind === 'voluntaria'
-  const donationSuggested = Number(selectedTicket?.price) > 0 ? Number(selectedTicket.price) : null
-  const donationCurrency = selectedTicket?.currency || 'EUR'
   // Métodos de pagamento oferecidos pelo bilhete (vários → o convidado escolhe um).
   const ticketPayMethods = selectedTicket?.paymentMethods || []
   const effectiveMethod = ticketPayMethods.includes(paymentChoice) ? paymentChoice : ticketPayMethods[0] || ''
@@ -253,17 +248,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       toast.error(partyType === 'family' ? 'Indique pelo menos um membro da família.' : 'Indique pelo menos um membro do grupo.')
       return
     }
-    // Doação (valor à escolha): usa o valor indicado ou, em branco, o sugerido.
-    let donationValue = null
-    if (isDonation) {
-      donationValue = donationAmount !== '' ? Number(donationAmount) : donationSuggested
-      if (!(Number(donationValue) > 0)) {
-        setDonationErr('Indica o valor da doação.')
-        toast.error('Indica o valor da doação.')
-        return
-      }
-      setDonationErr('')
-    }
     const { name, email, phone, extra } = buildSubmission(fields, values, ticketId)
     if (!name.trim()) {
       toast.error('Indique o seu nome.')
@@ -278,7 +262,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       finalExtra.membros = cleanMembers
       finalExtra.tipoInscricao = partyType === 'family' ? 'Família' : 'Grupo'
     }
-    if (donationValue != null) finalExtra.donationAmount = donationValue
     if (effectiveMethod) finalExtra.paymentMethod = effectiveMethod
     const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values, ticketId)
     setBusy(true)
@@ -537,36 +520,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               max={membersCap}
               inputCls={inputCls}
             />
-          ) : null}
-          {/* Doação: valor à escolha do doador (sugerido opcional vindo do bilhete) */}
-          {isDonation ? (
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Valor da doação (€) *
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                aria-invalid={!!donationErr}
-                aria-required="true"
-                className={inputCls + (donationErr ? ' border-destructive' : '')}
-                placeholder={donationSuggested ? `Sugerido: ${donationSuggested.toFixed(2)} ${donationCurrency}` : 'Indica o valor'}
-                value={donationAmount}
-                onChange={(e) => {
-                  setDonationAmount(e.target.value)
-                  if (donationErr) setDonationErr('')
-                }}
-              />
-              {donationErr ? (
-                <span className="text-xs font-normal text-destructive">{donationErr}</span>
-              ) : donationSuggested ? (
-                <span className="text-xs font-normal text-muted-foreground">
-                  Valor sugerido: {donationSuggested.toFixed(2)} {donationCurrency}. Podes indicar outro valor.
-                </span>
-              ) : (
-                <span className="text-xs font-normal text-muted-foreground">Podes doar o valor que quiseres.</span>
-              )}
-            </label>
           ) : null}
           {/* Método de pagamento: se o bilhete oferecer vários, o convidado escolhe um. */}
           {ticketPayMethods.length > 1 ? (
@@ -1030,7 +983,6 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
     <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
       {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
-      <SpotsCounter invite={invite} accent={accent} />
       {guestStatus ? (
         <>
           <StatusCard status={guestStatus} />

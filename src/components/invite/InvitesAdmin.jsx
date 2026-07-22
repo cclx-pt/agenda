@@ -231,6 +231,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
           : t.paymentMethod
             ? [t.paymentMethod]
             : [],
+      mbNumbers: Array.isArray(t.mbNumbers) ? t.mbNumbers : [],
     }))
   )
   // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
@@ -247,6 +248,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [showFormPreview, setShowFormPreview] = useState(false)
   // Métodos de pagamento ativos (geridos no Admin) para configurar nos bilhetes.
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([])
+  // NIB/IBAN partilhado (Definições) — mostrado só-leitura no bilhete (transferência).
+  const [inviteIban, setInviteIban] = useState('')
 
   // Carrega os eventos associáveis (atuais/futuros), preservando o evento já
   // associado que possa estar fora dessa lista (ex.: já decorreu).
@@ -273,6 +276,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
     getPaymentMethods()
       .then((m) => {
         if (alive) setPaymentMethodOptions((m || []).filter((x) => x.active))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // Carrega o NIB/IBAN das Definições de convites (mostrado só-leitura no bilhete).
+  useEffect(() => {
+    let alive = true
+    invitesService
+      .getInviteSettings()
+      .then((s) => {
+        if (alive) setInviteIban(s?.paymentInfo?.iban || '')
       })
       .catch(() => {})
     return () => {
@@ -338,7 +355,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -392,6 +409,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
             paymentMethod: ticketIsFree(t) ? null : ticketMethods(t)[0] || null,
             mbEntity: (t.mbEntity || '').trim() || null,
             mbReference: (t.mbReference || '').trim() || null,
+            mbNumbers: (t.mbNumbers || []).map((n) => String(n).trim()).filter(Boolean).slice(0, 4),
             active: t.active !== false,
           }))
       )
@@ -962,6 +980,64 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         </div>
                         <span className="text-xs font-normal text-muted-foreground">
                           Entidade e referência Multibanco deste bilhete (mostradas ao convidado que escolher este método).
+                        </span>
+                      </div>
+                    ) : null}
+                    {/* MB WAY: números editáveis por bilhete (em branco usa os do método). */}
+                    {!ticketIsFree(t) &&
+                    paymentMethodOptions.some((pm) => pm.type === 'mbway' && (t.paymentMethods || []).includes(pm.key)) ? (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium text-foreground">Números MB WAY</span>
+                        {(t.mbNumbers || []).map((num, ni) => (
+                          <div key={ni} className="flex items-center gap-2">
+                            <input
+                              className={inputCls}
+                              inputMode="tel"
+                              placeholder="Número MB WAY (ex.: 912345678)"
+                              value={num}
+                              onChange={(e) => {
+                                const next = [...(t.mbNumbers || [])]
+                                next[ni] = e.target.value
+                                setTicketField(i, 'mbNumbers', next)
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setTicketField(i, 'mbNumbers', (t.mbNumbers || []).filter((_, x) => x !== ni))}
+                              className="rounded p-1 text-destructive hover:bg-destructive/10"
+                              aria-label="Remover número"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        ))}
+                        {(t.mbNumbers || []).length < 4 ? (
+                          <button
+                            type="button"
+                            onClick={() => setTicketField(i, 'mbNumbers', [...(t.mbNumbers || []), ''])}
+                            className="inline-flex items-center gap-1 self-start text-xs font-semibold text-primary hover:underline"
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar número
+                          </button>
+                        ) : null}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Até 4 números MB WAY deste bilhete. Em branco, usa os números definidos no método de pagamento.
+                        </span>
+                      </div>
+                    ) : null}
+                    {/* Transferência: NIB só-leitura (definido nas Definições de convites). */}
+                    {!ticketIsFree(t) &&
+                    paymentMethodOptions.some((pm) => pm.type === 'transferencia' && (t.paymentMethods || []).includes(pm.key)) ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium text-foreground">NIB / IBAN (transferência)</span>
+                        <input
+                          className={inputCls + ' bg-muted text-muted-foreground'}
+                          value={inviteIban || 'Defina o IBAN nas Definições de convites'}
+                          readOnly
+                          aria-readonly="true"
+                        />
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Partilhado por todos os convites (Definições). Aqui é apenas visualização.
                         </span>
                       </div>
                     ) : null}

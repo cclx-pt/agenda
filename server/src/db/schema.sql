@@ -488,6 +488,7 @@ CREATE TABLE IF NOT EXISTS invite_tickets (
   payment_methods JSONB,
   mb_entity   TEXT,
   mb_reference TEXT,
+  mb_numbers  JSONB,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -508,6 +509,8 @@ ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS party_type TEXT NOT NULL DEF
 -- Entidade + referência Multibanco definidas no bilhete (método 'referencia-multibanco').
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_entity TEXT;
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_reference TEXT;
+-- Números MB WAY definidos no bilhete (método 'mbway'); vazio usa os do método.
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_numbers JSONB;
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;
