@@ -98,6 +98,19 @@ function firstPaidTicketMethod(tickets) {
   return t ? ticketMethods(t)[0] || null : null
 }
 
+// O banner fica SEMPRE em primeiro e o rodapé SEMPRE em último; os restantes blocos
+// mantêm a ordem relativa. Usado para normalizar a ordem e travar a reordenação.
+const FIXED_FIRST_BLOCK = 'banner'
+const FIXED_LAST_BLOCK = 'rodape'
+const isFixedBlock = (t) => t === FIXED_FIRST_BLOCK || t === FIXED_LAST_BLOCK
+function orderInviteBlocks(list) {
+  const arr = Array.isArray(list) ? list : []
+  const first = arr.filter((b) => b.type === FIXED_FIRST_BLOCK)
+  const last = arr.filter((b) => b.type === FIXED_LAST_BLOCK)
+  const middle = arr.filter((b) => !isFixedBlock(b.type))
+  return [...first, ...middle, ...last]
+}
+
 function toDateInput(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -222,7 +235,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   )
   // Semeia com o evento já associado (mesmo passado) para que apareça sempre.
   const [events, setEvents] = useState(() => (invite.event ? [invite.event] : []))
-  const [blocks, setBlocks] = useState(() => invite.blocks || [])
+  const [blocks, setBlocks] = useState(() => orderInviteBlocks(invite.blocks || []))
   const [openBlock, setOpenBlock] = useState(null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -315,8 +328,12 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const removeBlock = (i) => setBlocks((b) => b.filter((_, idx) => idx !== i))
   const setBlockContent = (i, content) => setBlocks((b) => b.map((blk, idx) => (idx === i ? { ...blk, content } : blk)))
   const addBlock = () => {
-    setBlocks((b) => [...b, { id: null, type: addType, visible: true, content: defaultContent(addType) }])
-    setOpenBlock(blocks.length)
+    // Insere antes do rodapé (que fica sempre em último); o próprio rodapé vai para o fim.
+    const footerIdx = addType === FIXED_LAST_BLOCK ? -1 : blocks.findIndex((x) => x.type === FIXED_LAST_BLOCK)
+    const insertAt = footerIdx === -1 ? blocks.length : footerIdx
+    const newBlock = { id: null, type: addType, visible: true, content: defaultContent(addType) }
+    setBlocks((b) => [...b.slice(0, insertAt), newBlock, ...b.slice(insertAt)])
+    setOpenBlock(insertAt)
   }
 
   // Bilhetes: adicionar/editar/remover tipos.
@@ -500,6 +517,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const movePageBlock = (vi, dir) => {
     const target = vi + dir
     if (target < 0 || target >= pageBlocks.length) return
+    // Banner fica sempre em primeiro e rodapé em último: não se movem nem se trocam.
+    if (isFixedBlock(pageBlocks[vi].b.type) || isFixedBlock(pageBlocks[target].b.type)) return
     const a = pageBlocks[vi].i
     const bIdx = pageBlocks[target].i
     setBlocks((bs) => {
@@ -1046,7 +1065,11 @@ function InviteEditor({ invite, onBack, onSaved }) {
           <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Blocos da página</h3>
         </div>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {pageBlocks.map(({ b: block, i }, vi) => (
+          {pageBlocks.map(({ b: block, i }, vi) => {
+            const fixed = isFixedBlock(block.type)
+            const upDisabled = vi === 0 || fixed || isFixedBlock(pageBlocks[vi - 1].b.type)
+            const downDisabled = vi === pageBlocks.length - 1 || fixed || isFixedBlock(pageBlocks[vi + 1].b.type)
+            return (
             <li key={block.id || `new-${i}`} className="rounded-lg border border-border bg-background">
               <div className="flex items-center gap-2 p-2">
                 <button
@@ -1061,10 +1084,10 @@ function InviteEditor({ invite, onBack, onSaved }) {
                 <button type="button" onClick={() => toggleVisible(i)} className="rounded p-1 text-muted-foreground hover:bg-accent" aria-label="Alternar visibilidade" title="Mostrar/ocultar">
                   <Eye className={'h-4 w-4 ' + (block.visible ? '' : 'opacity-30')} aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => movePageBlock(vi, -1)} disabled={vi === 0} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Subir">
+                <button type="button" onClick={() => movePageBlock(vi, -1)} disabled={upDisabled} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Subir">
                   <ArrowUp className="h-4 w-4" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => movePageBlock(vi, 1)} disabled={vi === pageBlocks.length - 1} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
+                <button type="button" onClick={() => movePageBlock(vi, 1)} disabled={downDisabled} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30" aria-label="Descer">
                   <ArrowDown className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button type="button" onClick={() => removeBlock(i)} className="rounded p-1 text-destructive hover:bg-destructive/10" aria-label="Remover bloco">
@@ -1077,7 +1100,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
                 </div>
               ) : null}
             </li>
-          ))}
+            )
+          })}
         </ul>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select className={inputCls + ' max-w-[240px]'} value={addType} onChange={(e) => setAddType(e.target.value)}>
