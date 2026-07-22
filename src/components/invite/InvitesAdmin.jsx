@@ -513,6 +513,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
       costType: hasPaidTicket(tickets) ? 'pago' : 'gratuito',
       costAmount: null,
       costCurrency: 'EUR',
+      // Rótulos dos métodos de pagamento configurados (para a pré-visualização
+      // mostrar os mesmos nomes que a página pública, incl. renomeados/personalizados).
+      paymentMethodLabels: Object.fromEntries((paymentMethodOptions || []).map((m) => [m.key, m.label])),
       rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
       rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
     },
