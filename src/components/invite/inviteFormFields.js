@@ -123,19 +123,29 @@ export function isVisible(field, values) {
   return String(values[cond.field] ?? '') === String(cond.equals ?? '')
 }
 
+// Bilhetes em que o campo aparece. Sem `tickets` (ou vazio) = todos os bilhetes.
+// Os campos de sistema (nome/email/telemóvel) aparecem SEMPRE, seja qual for o bilhete.
+export function fieldAllowedForTicket(field, ticketId) {
+  if (isSystemKey(field.key)) return true
+  const list = Array.isArray(field.tickets) ? field.tickets : []
+  if (!list.length) return true
+  return !!ticketId && list.includes(ticketId)
+}
+
 // Conjunto de chaves de campos VISÍVEIS considerando a HERANÇA DE SECÇÃO: uma
 // secção pode ser condicional (visibleWhen) e os campos que a seguem (até à
 // próxima secção) herdam a sua visibilidade. Um nível só — as secções não aninham.
-export function visibleKeys(fields, values) {
+// `ticketId` (opcional) filtra os campos restritos a bilhetes específicos.
+export function visibleKeys(fields, values, ticketId) {
   const set = new Set()
   let sectionVisible = true
   for (const f of fields) {
     if (f.type === 'section') {
-      sectionVisible = isVisible(f, values)
+      sectionVisible = isVisible(f, values) && fieldAllowedForTicket(f, ticketId)
       if (sectionVisible) set.add(f.key)
       continue
     }
-    if (sectionVisible && isVisible(f, values)) set.add(f.key)
+    if (sectionVisible && isVisible(f, values) && fieldAllowedForTicket(f, ticketId)) set.add(f.key)
   }
   return set
 }
@@ -154,8 +164,8 @@ export function initialValues(fields) {
 
 // Valida os campos VISÍVEIS e obrigatórios (+ formato de email/telemóvel).
 // Devolve a 1ª mensagem de erro ou null.
-export function validateForm(fields, values) {
-  const visible = visibleKeys(fields, values)
+export function validateForm(fields, values, ticketId) {
+  const visible = visibleKeys(fields, values, ticketId)
   for (const f of fields) {
     if (f.type === 'section' || f.type === 'document' || !visible.has(f.key)) continue
     const val = values[f.key]
@@ -183,8 +193,8 @@ export function validateForm(fields, values) {
 
 // Como validateForm mas devolve um mapa { chave: mensagem } de TODOS os campos
 // inválidos visíveis (para erros inline). Mensagens curtas.
-export function validateFields(fields, values) {
-  const visible = visibleKeys(fields, values)
+export function validateFields(fields, values, ticketId) {
+  const visible = visibleKeys(fields, values, ticketId)
   const errors = {}
   for (const f of fields) {
     if (f.type === 'section' || f.type === 'document' || !visible.has(f.key)) continue
@@ -217,8 +227,8 @@ export function validateFields(fields, values) {
 
 // Reparte os valores em campos de sistema (name/email/phone) + `extra` (o resto),
 // considerando apenas os campos VISÍVEIS.
-export function buildSubmission(fields, values) {
-  const visible = visibleKeys(fields, values)
+export function buildSubmission(fields, values, ticketId) {
+  const visible = visibleKeys(fields, values, ticketId)
   const extra = {}
   let name = ''
   let email = null
@@ -246,8 +256,8 @@ export function buildSubmission(fields, values) {
 
 // Nº de pessoas que a inscrição representa (1 = o próprio + crianças indicadas nos
 // campos do tipo 'children' visíveis). Alimenta a contagem de capacidade.
-export function countPeople(fields, values) {
-  const visible = visibleKeys(fields, values)
+export function countPeople(fields, values, ticketId) {
+  const visible = visibleKeys(fields, values, ticketId)
   let n = 1
   for (const f of fields) {
     if (f.type !== 'children' || !visible.has(f.key)) continue

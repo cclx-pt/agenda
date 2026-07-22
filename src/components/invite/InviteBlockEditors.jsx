@@ -202,8 +202,9 @@ function WorkshopsEditor({ content, onChange }) {
   )
 }
 
-export function RsvpEditor({ content, onChange }) {
+export function RsvpEditor({ content, onChange, tickets }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  const ticketOptions = (tickets || []).filter((t) => t.id && (t.name || '').trim())
   const fields = Array.isArray(content.fields) && content.fields.length ? content.fields : DEFAULT_RSVP_FIELDS
   const setFields = (next) => onChange({ ...content, fields: next })
   const updateField = (i, patch) => setFields(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
@@ -339,6 +340,36 @@ export function RsvpEditor({ content, onChange }) {
                           ) : null}
                         </div>
                       ) : null}
+                    </div>
+                  ) : null}
+                  {!isSystem && ticketOptions.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>Aparece em:</span>
+                      <label className="inline-flex items-center gap-1 font-normal text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={!Array.isArray(f.tickets) || f.tickets.length === 0}
+                          onChange={() => updateField(i, { tickets: [] })}
+                        />
+                        Todos
+                      </label>
+                      {ticketOptions.map((t) => {
+                        const sel = Array.isArray(f.tickets) && f.tickets.includes(t.id)
+                        return (
+                          <label key={t.id} className="inline-flex items-center gap-1 font-normal text-foreground">
+                            <input
+                              type="checkbox"
+                              checked={sel}
+                              onChange={(e) => {
+                                const cur = Array.isArray(f.tickets) ? f.tickets : []
+                                const next = e.target.checked ? [...cur, t.id] : cur.filter((x) => x !== t.id)
+                                updateField(i, { tickets: next })
+                              }}
+                            />
+                            {t.name}
+                          </label>
+                        )
+                      })}
                     </div>
                   ) : null}
                 </div>

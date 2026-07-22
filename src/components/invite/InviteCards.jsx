@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen,
 } from 'lucide-react'
-import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice } from './inviteUtils'
+import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice, inviteRsvpHref } from './inviteUtils'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 const titleCls = 'mb-4 text-xl font-bold text-foreground'
@@ -266,13 +266,14 @@ function WorkshopsCard({ block }) {
 const COST_LABEL = { gratuito: 'Gratuito', pago: 'Pago', voluntario: 'Doação' }
 const METHOD_LABEL = { mbway: 'MB WAY', transferencia: 'Transferência bancária', referencia: 'Referência Multibanco' }
 
-function PaymentCard({ block, page }) {
+function PaymentCard({ block, page, accent }) {
   const inv = page.invite
   const c = block.content || {}
   const tickets = page.tickets || []
   const costType = c.costType || inv.costType || 'gratuito'
   const amount = c.fixedAmount ?? inv.costAmount
   const currency = inv.costCurrency || 'EUR'
+  const mode = inv.registrationMode || 'internal'
   // Métodos aceites: a união dos métodos de todos os bilhetes (vários por bilhete).
   const ticketMethodSet = [
     ...new Set(tickets.flatMap((t) => t.paymentMethods || (t.paymentMethod ? [t.paymentMethod] : []))),
@@ -283,24 +284,45 @@ function PaymentCard({ block, page }) {
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
         <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        Custo
+        Bilhetes
       </h2>
       {tickets.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {tickets.map((t) => (
-            <li key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
-              <span className="flex min-w-0 flex-col">
-                <span className="text-sm font-semibold text-foreground">{t.name}</span>
-                {(t.partyType === 'family' || t.partyType === 'group' || t.kind === 'grupo') && t.groupSize ? (
-                  <span className="text-xs text-muted-foreground">{t.partyType === 'family' ? 'Família' : 'Grupo'} até {t.groupSize} pessoas</span>
+          {tickets.map((t) => {
+            const registerHref =
+              t.soldOut || mode === 'none'
+                ? null
+                : mode === 'external'
+                  ? inv.registrationUrl || null
+                  : inviteRsvpHref(page.slug, t.id)
+            return (
+              <li key={t.id} className="flex flex-col gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-sm font-semibold text-foreground">{t.name}</span>
+                    {(t.partyType === 'family' || t.partyType === 'group' || t.kind === 'grupo') && t.groupSize ? (
+                      <span className="text-xs text-muted-foreground">{t.partyType === 'family' ? 'Família' : 'Grupo'} até {t.groupSize} pessoas</span>
+                    ) : null}
+                    {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
+                  </span>
+                  <span className="whitespace-nowrap text-sm font-bold text-foreground">
+                    {t.soldOut ? <span className="text-destructive">Esgotado</span> : ticketPrice(t)}
+                  </span>
+                </div>
+                {registerHref ? (
+                  <a
+                    href={registerHref}
+                    {...(mode === 'external' ? { target: '_blank', rel: 'noreferrer' } : {})}
+                    className="inline-flex w-fit items-center gap-1.5 self-end rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: accent }}
+                  >
+                    <Ticket className="h-3.5 w-3.5" aria-hidden="true" />
+                    Inscrever-me
+                  </a>
                 ) : null}
-                {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
-              </span>
-              <span className="whitespace-nowrap text-sm font-bold text-foreground">
-                {t.soldOut ? <span className="text-destructive">Esgotado</span> : ticketPrice(t)}
-              </span>
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       ) : costType === 'gratuito' ? (
         <p className="m-0 text-lg font-bold text-emerald-600 dark:text-emerald-400">Gratuito</p>

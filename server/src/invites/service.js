@@ -673,18 +673,28 @@ function fieldVisible(field, values) {
   return String(values[cond.field] ?? '') === String(cond.equals ?? '')
 }
 
+// Bilhetes em que o campo aparece (espelha inviteFormFields.fieldAllowedForTicket).
+// Nome/email/telemóvel são de sistema → aparecem sempre.
+const RSVP_SYSTEM_KEYS = ['name', 'email', 'phone']
+function fieldAllowedForTicket(field, ticketId) {
+  if (RSVP_SYSTEM_KEYS.includes(field.key)) return true
+  const list = Array.isArray(field.tickets) ? field.tickets : []
+  if (!list.length) return true
+  return !!ticketId && list.includes(ticketId)
+}
+
 // Defesa no servidor: valida os campos OBRIGATÓRIOS visíveis (incl. consentimentos)
 // contra o formulário configurado no bloco rsvp. É estritamente MAIS FRACA que a
 // validação do frontend (só verifica presença, não formato) → nunca rejeita uma
 // submissão válida feita pela UI; apenas trava POSTs diretos que saltam o formulário.
-function assertSubmissionValid(fields, values) {
+function assertSubmissionValid(fields, values, ticketId) {
   let sectionVisible = true
   for (const f of fields) {
     if (f.type === 'section') {
-      sectionVisible = fieldVisible(f, values)
+      sectionVisible = fieldVisible(f, values) && fieldAllowedForTicket(f, ticketId)
       continue
     }
-    if (f.type === 'document' || !sectionVisible || !f.required || !fieldVisible(f, values)) continue
+    if (f.type === 'document' || !sectionVisible || !f.required || !fieldVisible(f, values) || !fieldAllowedForTicket(f, ticketId)) continue
     const val = values[f.key]
     let empty
     if (f.type === 'checkbox') empty = !val
@@ -765,12 +775,16 @@ export async function submitRsvp(slug, input) {
     formFields = null
   }
   if (Array.isArray(formFields) && formFields.length) {
-    assertSubmissionValid(formFields, {
-      ...(data.extra || {}),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-    })
+    assertSubmissionValid(
+      formFields,
+      {
+        ...(data.extra || {}),
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+      },
+      data.ticketId
+    )
   }
 
   // Bilhete: valida que pertence ao convite e está ativo (grátis ou pago).

@@ -188,7 +188,11 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const hasTickets = tickets.length > 0
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
-  const [ticketId, setTicketId] = useState('')
+  const [ticketId, setTicketId] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    const wanted = new URLSearchParams(window.location.search).get('ticket')
+    return wanted && tickets.some((t) => t.id === wanted) ? wanted : ''
+  })
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
   const [donationAmount, setDonationAmount] = useState('')
   const [donationErr, setDonationErr] = useState('')
@@ -215,7 +219,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     })
   }
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
-  const visible = visibleKeys(fields, values)
+  const visible = visibleKeys(fields, values, ticketId)
   const selectedTicket = tickets.find((t) => t.id === ticketId) || null
   const partyType = selectedTicket ? (selectedTicket.kind === 'grupo' ? 'group' : selectedTicket.partyType || 'single') : 'single'
   const hasMembers = partyType === 'family' || partyType === 'group'
@@ -229,7 +233,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
 
   const submit = async (e) => {
     e.preventDefault()
-    const errs = validateFields(fields, values)
+    const errs = validateFields(fields, values, ticketId)
     if (Object.keys(errs).length) {
       setErrors(errs)
       const firstKey = fields.find((f) => errs[f.key])?.key
@@ -260,7 +264,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       }
       setDonationErr('')
     }
-    const { name, email, phone, extra } = buildSubmission(fields, values)
+    const { name, email, phone, extra } = buildSubmission(fields, values, ticketId)
     if (!name.trim()) {
       toast.error('Indique o seu nome.')
       return
@@ -276,7 +280,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     }
     if (donationValue != null) finalExtra.donationAmount = donationValue
     if (effectiveMethod) finalExtra.paymentMethod = effectiveMethod
-    const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values)
+    const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values, ticketId)
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {

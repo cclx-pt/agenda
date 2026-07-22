@@ -12,7 +12,7 @@ export const BLOCK_META = {
   agenda: { label: 'Programa / Agenda', addable: true },
   workshops: { label: 'Workshops', addable: true },
   rsvp: { label: 'Inscrição (RSVP)', addable: false },
-  pagamento: { label: 'Custo / Pagamento', addable: false },
+  pagamento: { label: 'Bilhetes', addable: false },
   localizacao: { label: 'Localização', addable: true },
   faqs: { label: 'Perguntas frequentes', addable: true },
   partilha: { label: 'Partilhar', addable: false },

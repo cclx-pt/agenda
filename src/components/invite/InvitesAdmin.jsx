@@ -1051,7 +1051,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
               />
             </div>
           ) : (
-            <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} />
+            <RsvpEditor content={rsvpBlock?.content || {}} onChange={setRsvpContent} tickets={tickets} />
           )}
         </section>
         </>

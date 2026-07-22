@@ -29,11 +29,15 @@ function currentGuestToken() {
   if (typeof window === 'undefined') return null
   return new URLSearchParams(window.location.search).get('g')
 }
-// URL da página dedicada de inscrição (/invite/<slug>/inscricao), preservando ?g=.
-export function inviteRsvpHref(slug) {
+// URL da página dedicada de inscrição (/invite/<slug>/inscricao), preservando ?g= e
+// (opcional) pré-selecionando um bilhete via ?ticket=.
+export function inviteRsvpHref(slug, ticketId) {
   const g = currentGuestToken()
-  const base = `/invite/${encodeURIComponent(slug)}/inscricao`
-  return g ? `${base}?g=${encodeURIComponent(g)}` : base
+  const params = new URLSearchParams()
+  if (ticketId) params.set('ticket', ticketId)
+  if (g) params.set('g', g)
+  const qs = params.toString()
+  return `/invite/${encodeURIComponent(slug)}/inscricao${qs ? `?${qs}` : ''}`
 }
 // URL da landing do convite (/invite/<slug>), preservando ?g=.
 export function inviteHomeHref(slug) {
