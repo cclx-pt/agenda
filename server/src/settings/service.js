@@ -223,6 +223,48 @@ export async function updatePaymentMethods(input, actorId) {
   return next
 }
 
+// ── Definições gerais dos convites (Administração de convites) ──
+// app_settings key 'invite_settings' = { paymentInfo: { iban, beneficiary, mbEntity } }.
+// São os dados que o conector de pagamento "manual" usa nas instruções de
+// transferência/referência. Quando um campo fica vazio, usa-se o valor de
+// config.payments (env) como recurso — por isso é sempre seguro.
+const INVITE_SETTINGS_KEY = 'invite_settings'
+
+function normalizeInviteSettings(stored) {
+  const s = stored && typeof stored === 'object' ? stored : {}
+  const pi = s.paymentInfo && typeof s.paymentInfo === 'object' ? s.paymentInfo : {}
+  const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+  return {
+    paymentInfo: {
+      iban: str(pi.iban, 40),
+      beneficiary: str(pi.beneficiary, 120),
+      mbEntity: str(pi.mbEntity, 10),
+    },
+  }
+}
+
+/** Definições dos convites tal como guardadas (campos vazios = usar o valor por omissão). */
+export async function getInviteSettings() {
+  return normalizeInviteSettings(await repo.get(INVITE_SETTINGS_KEY))
+}
+
+/** Dados de pagamento EFETIVOS: definições guardadas com recurso a config.payments (env). */
+export async function getInvitePaymentInfo() {
+  const { paymentInfo } = await getInviteSettings()
+  return {
+    iban: paymentInfo.iban || config.payments.iban,
+    beneficiary: paymentInfo.beneficiary || config.payments.beneficiary,
+    mbEntity: paymentInfo.mbEntity || config.payments.mbEntity,
+  }
+}
+
+/** Valida e persiste as definições dos convites (admin). */
+export async function updateInviteSettings(input, actorId) {
+  const next = normalizeInviteSettings(input)
+  await repo.set(INVITE_SETTINGS_KEY, next, actorId)
+  return next
+}
+
 // ── Configuração do Loop + CCLX (múltiplos "loops" nomeados, para TV) ──
 // app_settings key 'loop' = { [slug]: { name, community, active, showGeneral,
 // weeks, format, secondsPerSlide, secondsPerSlideFeatured } }.

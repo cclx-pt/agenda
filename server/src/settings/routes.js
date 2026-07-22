@@ -154,6 +154,27 @@ paymentMethodsRouter.put('/', adminOnly, async (req, res, next) => {
   }
 })
 
+// ── Definições gerais dos convites ─────────────────────
+// GET + PUT só admin (o separador "Definições" da Administração de convites).
+export const inviteSettingsRouter = Router()
+
+inviteSettingsRouter.get('/', adminOnly, async (_req, res, next) => {
+  try {
+    res.json({ settings: await service.getInviteSettings() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+inviteSettingsRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const settings = await service.updateInviteSettings(req.body?.settings ?? req.body, req.user.sub)
+    res.json({ settings })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ── Política de sobreposição de eventos ────────────────
 // GET + PUT só admin.
 export const overlapPolicyRouter = Router()

@@ -10,7 +10,7 @@ import { authRouter } from './auth/routes.js'
 import { adminRouter } from './routes/admin.js'
 import { inradarRouter } from './routes/inradar.js'
 import { eventsRouter } from './events/routes.js'
-import { integrationRouter, translationsRouter, brandingRouter, overlapPolicyRouter, paymentMethodsRouter } from './settings/routes.js'
+import { integrationRouter, translationsRouter, brandingRouter, overlapPolicyRouter, paymentMethodsRouter, inviteSettingsRouter } from './settings/routes.js'
 import { usersRouter } from './users/routes.js'
 import { reportsRouter } from './reports/routes.js'
 import { churchesRouter } from './churches/routes.js'
@@ -63,6 +63,7 @@ app.use('/data/translations', translationsRouter)
 app.use('/data/branding', brandingRouter)
 app.use('/data/overlap-policy', overlapPolicyRouter)
 app.use('/data/payment-methods', paymentMethodsRouter)
+app.use('/data/invite-settings', inviteSettingsRouter)
 app.use('/data/users', usersRouter)
 app.use('/data/reports', reportsRouter)
 app.use('/data/events', eventsRouter)

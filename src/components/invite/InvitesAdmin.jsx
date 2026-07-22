@@ -3,13 +3,15 @@ import { toast } from 'sonner'
 import {
   Plus, Pencil, Trash2, ExternalLink, Copy, Eye, Send, ArrowLeft, ArrowUp, ArrowDown,
   Users, Image as ImageIcon, Loader2, Download, ChevronDown, ChevronRight,
-  Calendar as CalendarIcon, MapPin, CreditCard,
+  Calendar as CalendarIcon, MapPin,
 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { uploadEventImage, getPaymentMethods } from '../../services/eventsService'
 import DateField from '../DateField'
 import TimeField from '../TimeField'
 import PaymentMethodsAdmin from '../PaymentMethodsAdmin'
+import InviteSubmissionsAdmin from './InviteSubmissionsAdmin'
+import InviteSettingsAdmin from './InviteSettingsAdmin'
 import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
@@ -1241,7 +1243,7 @@ export default function InvitesAdmin() {
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
   const [editing, setEditing] = useState(null)
-  const [managing, setManaging] = useState(false)
+  const [adminTab, setAdminTab] = useState('convites')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -1312,21 +1314,6 @@ export default function InvitesAdmin() {
     }
   }
 
-  if (managing) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="m-0 text-base font-bold text-foreground">Métodos de pagamento</h3>
-          <button type="button" onClick={() => setManaging(false)} className={ghostBtn}>
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Voltar aos convites
-          </button>
-        </div>
-        <PaymentMethodsAdmin />
-      </div>
-    )
-  }
-
   if (editingId && editing) {
     return (
       <InviteEditor
@@ -1341,27 +1328,57 @@ export default function InvitesAdmin() {
     )
   }
 
+  const tabs = [
+    { id: 'convites', label: 'Convites' },
+    { id: 'inscricoes', label: 'Inscrições' },
+    ...(isAdmin
+      ? [
+          { id: 'metodos', label: 'Meios de pagamento' },
+          { id: 'definicoes', label: 'Definições' },
+        ]
+      : []),
+  ]
+  const activeTab = tabs.some((t) => t.id === adminTab) ? adminTab : 'convites'
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="m-0 text-sm text-muted-foreground">
-          Páginas de convite públicas e partilháveis, com blocos de conteúdo, inscrições e partilha.
-        </p>
-        <div className="flex flex-shrink-0 gap-2">
-          {isAdmin ? (
-            <button type="button" onClick={() => setManaging(true)} disabled={busy} className={ghostBtn}>
-              <CreditCard className="h-4 w-4" aria-hidden="true" />
-              Métodos de pagamento
-            </button>
-          ) : null}
-          <button type="button" onClick={createInvite} disabled={busy} className={primaryBtn}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Novo convite
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {tabs.map((tb) => (
+          <button
+            key={tb.id}
+            type="button"
+            onClick={() => setAdminTab(tb.id)}
+            className={
+              'rounded-t-lg px-3 py-2 text-sm font-semibold transition-colors ' +
+              (activeTab === tb.id
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground')
+            }
+          >
+            {tb.label}
           </button>
-        </div>
+        ))}
       </div>
 
-      {loading ? (
+      {activeTab === 'inscricoes' ? (
+        <InviteSubmissionsAdmin />
+      ) : activeTab === 'metodos' ? (
+        <PaymentMethodsAdmin />
+      ) : activeTab === 'definicoes' ? (
+        <InviteSettingsAdmin />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0 text-sm text-muted-foreground">
+              Páginas de convite públicas e partilháveis, com blocos de conteúdo, inscrições e partilha.
+            </p>
+            <button type="button" onClick={createInvite} disabled={busy} className={primaryBtn}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Novo convite
+            </button>
+          </div>
+
+          {loading ? (
         <p className="py-8 text-center text-sm text-muted-foreground">A carregar…</p>
       ) : invites.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">Ainda não há convites. Crie o primeiro.</p>
@@ -1408,6 +1425,8 @@ export default function InvitesAdmin() {
             </li>
           ))}
         </ul>
+      )}
+        </div>
       )}
     </div>
   )

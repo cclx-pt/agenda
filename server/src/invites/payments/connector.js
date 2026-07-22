@@ -53,14 +53,18 @@ const manualConnector = {
     return method !== 'mbway'
   },
 
-  async createCharge({ method, amount, currency }) {
+  async createCharge({ method, amount, currency, paymentInfo }) {
+    // Dados de pagamento das Definições de convites; recurso a config (env).
+    const iban = paymentInfo?.iban || config.payments.iban
+    const beneficiary = paymentInfo?.beneficiary || config.payments.beneficiary
+    const mbEntity = paymentInfo?.mbEntity || config.payments.mbEntity
     if (method === 'transferencia') {
       return {
         status: 'pending',
         instructions: {
           type: 'transfer',
-          iban: config.payments.iban,
-          beneficiary: config.payments.beneficiary,
+          iban,
+          beneficiary,
           amount,
           currency,
           note: 'Faça a transferência e depois carregue o comprovativo.',
@@ -71,7 +75,7 @@ const manualConnector = {
       // Referência LOCAL de exemplo (9 dígitos). Um conector real substitui isto
       // por uma referência Multibanco emitida pelo fornecedor.
       const reference = String(Math.floor(100000000 + Math.random() * 900000000))
-      const entity = config.payments.mbEntity
+      const entity = mbEntity
       return {
         status: 'pending',
         providerRef: reference,

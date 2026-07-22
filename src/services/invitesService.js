@@ -85,6 +85,18 @@ export async function listInviteGuests(id) {
   return guests
 }
 
+// ── Definições gerais dos convites (admin) ───────────────────────
+
+export async function getInviteSettings() {
+  const { settings } = await request('/data/invite-settings')
+  return settings
+}
+
+export async function updateInviteSettings(payload) {
+  const { settings } = await request('/data/invite-settings', { method: 'PUT', body: payload })
+  return settings
+}
+
 // ── Público (sem sessão) ─────────────────────────────────────────
 
 export async function getPublicInvite(slug, guestToken) {

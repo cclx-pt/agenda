@@ -2,6 +2,7 @@ import { z } from 'zod'
 import * as repo from './repository.js'
 import * as invitesRepo from '../repository.js'
 import { getConnector, DEFAULT_PROVIDER, ConnectorError } from './connector.js'
+import { getInvitePaymentInfo } from '../../settings/service.js'
 import { config } from '../../config.js'
 
 // Reutiliza o erro de domínio do módulo de convites para respostas HTTP coerentes.
@@ -102,9 +103,11 @@ export async function initiate(slug, guestToken, input) {
     provider: connector.name,
   })
 
+  // Dados de pagamento geridos na Administração de convites (recurso: env).
+  const paymentInfo = await getInvitePaymentInfo().catch(() => null)
   let result
   try {
-    result = await connector.createCharge({ invite, guest, payment, method, amount, currency })
+    result = await connector.createCharge({ invite, guest, payment, method, amount, currency, paymentInfo })
   } catch (err) {
     await repo.update(payment.id, { status: 'failed' })
     if (err instanceof ConnectorError) throw new InviteError(409, err.message)
