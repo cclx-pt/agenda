@@ -125,6 +125,17 @@ export default function InviteSubmissionsAdmin() {
     return true
   })
 
+  // Estatísticas do evento selecionado (contam TODAS as inscrições desse convite,
+  // independentemente dos filtros de estado/pagamento).
+  const eventRows = filterInvite ? (rows || []).filter((r) => r.inviteId === filterInvite) : []
+  const eventStats = {
+    total: eventRows.length,
+    confirmed: eventRows.filter((r) => r.rsvpState === 'confirmed').length,
+    pending: eventRows.filter((r) => (r.rsvpState || 'pending') === 'pending').length,
+    waitlisted: eventRows.filter((r) => r.rsvpState === 'waitlisted').length,
+    declined: eventRows.filter((r) => r.rsvpState === 'declined').length,
+  }
+
   const openDetails = (g) =>
     setExpanded((e) => (e?.id === g.id && e.mode === 'details' ? null : { id: g.id, mode: 'details' }))
 
@@ -266,6 +277,23 @@ export default function InviteSubmissionsAdmin() {
           </button>
         </div>
       </div>
+
+      {filterInvite ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {[
+            { label: 'Inscrições do evento', value: eventStats.total, cls: 'text-foreground' },
+            { label: 'Confirmadas', value: eventStats.confirmed, cls: 'text-emerald-700 dark:text-emerald-400' },
+            { label: 'Pendentes', value: eventStats.pending, cls: 'text-foreground' },
+            { label: 'Lista de espera', value: eventStats.waitlisted, cls: 'text-amber-700 dark:text-amber-400' },
+            { label: 'Canceladas', value: eventStats.declined, cls: 'text-red-700 dark:text-red-400' },
+          ].map((s) => (
+            <div key={s.label} className="rounded-lg border border-border bg-card p-3 text-center">
+              <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
+              <div className="text-xs text-muted-foreground">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <p className="m-0 text-sm text-muted-foreground">
         {filtered.length} inscriç{filtered.length === 1 ? 'ão' : 'ões'}

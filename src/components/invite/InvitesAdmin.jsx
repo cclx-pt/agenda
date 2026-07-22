@@ -813,11 +813,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
               <input className={inputCls} type="url" placeholder="https://…" value={settings.registrationUrl} onChange={setField('registrationUrl')} />
             </label>
           ) : null}
-
-          <label className={labelCls}>
-            Descrição (partilha / Open Graph)
-            <textarea className={inputCls} rows={2} value={settings.metaDescription} onChange={setField('metaDescription')} />
-          </label>
         </div>
       </section>
       ) : null}
@@ -1330,7 +1325,7 @@ export default function InvitesAdmin() {
 
   const tabs = [
     { id: 'convites', label: 'Convites' },
-    { id: 'inscricoes', label: 'Inscrições' },
+    { id: 'inscricoes', label: 'Gestão de inscrições' },
     ...(isAdmin
       ? [
           { id: 'metodos', label: 'Meios de pagamento' },
