@@ -40,20 +40,6 @@ function BannerEditor({ content, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label className={labelCls}>
-        Descrição curta
-        <input className={inputCls} value={content.shortDescription ?? ''} onChange={set('shortDescription')} />
-      </label>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className={labelCls}>
-          Versículo
-          <input className={inputCls} value={content.verse ?? ''} onChange={set('verse')} />
-        </label>
-        <label className={labelCls}>
-          Referência
-          <input className={inputCls} value={content.verseReference ?? ''} onChange={set('verseReference')} placeholder="Filipenses 4:13" />
-        </label>
-      </div>
-      <label className={labelCls}>
         Texto do botão
         <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Inscrever-me" />
       </label>

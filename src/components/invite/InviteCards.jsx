@@ -30,11 +30,6 @@ function BannerCard({ block, page, accent }) {
       )}
       <div className="p-6">
         <h1 className="m-0 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">{name}</h1>
-        {c.verse ? (
-          <p className="mt-2 italic text-muted-foreground">
-            “{c.verse}”{c.verseReference ? <span className="not-italic"> — {c.verseReference}</span> : null}
-          </p>
-        ) : null}
         <div className="mt-4 flex flex-col gap-1.5 text-sm text-muted-foreground">
           {dates ? (
             <span className="inline-flex items-center gap-2">
@@ -56,7 +51,6 @@ function BannerCard({ block, page, accent }) {
             </a>
           ) : null}
         </div>
-        {c.shortDescription ? <p className="mt-4 text-foreground">{c.shortDescription}</p> : null}
       </div>
     </div>
   )
