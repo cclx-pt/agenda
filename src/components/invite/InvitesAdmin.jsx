@@ -97,12 +97,6 @@ function firstPaidTicketMethod(tickets) {
   const t = (tickets || []).find((x) => (x.name || '').trim() && !ticketIsFree(x) && ticketMethods(x).length)
   return t ? ticketMethods(t)[0] || null : null
 }
-// Há algum bilhete pago por MB WAY (usa o fluxo JotForm)?
-function hasMbwayTicket(tickets) {
-  return (tickets || []).some((t) => (t.name || '').trim() && ticketMethods(t).includes('mbway'))
-}
-// Opções do campo "comunidade" no formulário JotForm do MB WAY.
-const JOTFORM_COMMUNITIES = ['Sede', 'Açores', 'Almada', 'Moita & Barreiro', 'Caldas da Rainha', 'Coruche', 'Porto', 'Outra']
 
 function toDateInput(iso) {
   if (!iso) return ''
@@ -212,8 +206,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
     rsvpEndTime: toTimeInput(invite.rsvpDeadline),
     capacity: invite.capacity ?? '',
     metaDescription: invite.metaDescription ?? '',
-    // Comunidade no JotForm (MB WAY); '' = automático.
-    jotformCommunity: invite.jotformCommunity ?? '',
   }))
   const [tickets, setTickets] = useState(() =>
     (invite.tickets || []).map((t) => ({
@@ -354,7 +346,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
     rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
     rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
     capacity: settings.capacity ? Number(settings.capacity) : null,
-    jotformCommunity: settings.jotformCommunity || null,
+    // Sem override por convite: usa a comunidade da inscrição (resolvida no backend).
+    jotformCommunity: null,
   })
 
   const save = async () => {
@@ -936,28 +929,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
             ))}
           </ul>
         )}
-        {hasMbwayTicket(tickets) ? (
-          <div className="mt-4 rounded-lg border border-border bg-background p-3">
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Comunidade no JotForm (MB WAY)
-              <select
-                className={inputCls}
-                value={settings.jotformCommunity}
-                onChange={(e) => setSettings((s) => ({ ...s, jotformCommunity: e.target.value }))}
-              >
-                <option value="">Automático (comunidade do inscrito / igreja)</option>
-                {JOTFORM_COMMUNITIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-muted-foreground">
-                Valor enviado ao campo “comunidade” do formulário JotForm do MB WAY. Automático usa a comunidade escolhida na inscrição (ou a igreja do evento), convertida para as opções do JotForm.
-              </span>
-            </label>
-          </div>
-        ) : null}
       </section>
       ) : null}
 
