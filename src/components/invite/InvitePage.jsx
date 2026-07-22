@@ -1126,7 +1126,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
       return (
         <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>
           <Toaster position="top-center" richColors />
-          <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4">
+          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-4">
             <a href={homeHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Voltar ao convite
@@ -1150,7 +1150,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
     return (
       <div className="min-h-screen bg-background pb-10" style={{ '--invite-accent': accent }}>
         <Toaster position="top-center" richColors />
-        <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4">
+        <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-4">
           <a href={homeHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Voltar ao convite
@@ -1184,7 +1184,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
           Pré-visualização
         </div>
       ) : null}
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4">
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-4">
         {guestStatus ? <StatusCard status={guestStatus} /> : null}
         {page.blocks.map((block) => {
           if (block.type === 'rsvp') {
