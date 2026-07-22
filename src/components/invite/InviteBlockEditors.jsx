@@ -277,7 +277,7 @@ export function RsvpEditor({ content, onChange }) {
                     </select>
                     <input
                       className={inputCls + ' sm:col-span-2'}
-                      placeholder={f.type === 'section' ? 'Título da secção' : 'Rótulo do campo'}
+                      placeholder={f.type === 'section' ? 'Título da secção' : f.type === 'document' ? 'Texto do documento (ex.: Regulamento)' : 'Rótulo do campo'}
                       value={f.label ?? ''}
                       onChange={(e) => updateField(i, { label: e.target.value })}
                     />
@@ -299,6 +299,8 @@ export function RsvpEditor({ content, onChange }) {
                         <input className={inputCls} placeholder="Placeholder (opcional)" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} />
                       ) : f.type === 'checkbox' ? (
                         <input className={inputCls} placeholder="Link (opcional, ex. política de privacidade)" value={f.link ?? ''} onChange={(e) => updateField(i, { link: e.target.value })} />
+                      ) : f.type === 'document' ? (
+                        <input className={inputCls} placeholder="Link do documento (URL)" value={f.url ?? ''} onChange={(e) => updateField(i, { url: e.target.value })} />
                       ) : (
                         <span />
                       )}
@@ -306,9 +308,9 @@ export function RsvpEditor({ content, onChange }) {
                     </div>
                   ) : null}
 
-                  {f.type !== 'section' || eligible.length > 0 ? (
+                  {(f.type !== 'section' && f.type !== 'document') || eligible.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      {f.type !== 'section' ? (
+                      {f.type !== 'section' && f.type !== 'document' ? (
                         <label className="inline-flex items-center gap-1.5 text-sm text-foreground">
                           <input type="checkbox" checked={!!f.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
                           Obrigatório

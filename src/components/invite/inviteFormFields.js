@@ -19,6 +19,7 @@ export const FIELD_TYPES = [
   { type: 'radio', label: 'Escolha única' },
   { type: 'multiselect', label: 'Escolha múltipla' },
   { type: 'checkbox', label: 'Confirmação / consentimento' },
+  { type: 'document', label: 'Documento (link)' },
   { type: 'children', label: 'Crianças (repetível)' },
 ]
 
@@ -143,7 +144,7 @@ export function visibleKeys(fields, values) {
 export function initialValues(fields) {
   const v = {}
   for (const f of fields) {
-    if (f.type === 'section') continue
+    if (f.type === 'section' || f.type === 'document') continue
     if (f.type === 'checkbox') v[f.key] = false
     else if (f.type === 'children' || f.type === 'multiselect') v[f.key] = []
     else v[f.key] = ''
@@ -156,7 +157,7 @@ export function initialValues(fields) {
 export function validateForm(fields, values) {
   const visible = visibleKeys(fields, values)
   for (const f of fields) {
-    if (f.type === 'section' || !visible.has(f.key)) continue
+    if (f.type === 'section' || f.type === 'document' || !visible.has(f.key)) continue
     const val = values[f.key]
     const empty =
       f.type === 'checkbox'
@@ -186,7 +187,7 @@ export function validateFields(fields, values) {
   const visible = visibleKeys(fields, values)
   const errors = {}
   for (const f of fields) {
-    if (f.type === 'section' || !visible.has(f.key)) continue
+    if (f.type === 'section' || f.type === 'document' || !visible.has(f.key)) continue
     const val = values[f.key]
     const empty =
       f.type === 'checkbox'
@@ -223,7 +224,7 @@ export function buildSubmission(fields, values) {
   let email = null
   let phone = null
   for (const f of fields) {
-    if (f.type === 'section' || !visible.has(f.key)) continue
+    if (f.type === 'section' || f.type === 'document' || !visible.has(f.key)) continue
     const val = values[f.key]
     if (f.key === 'name') name = String(val ?? '').trim()
     else if (f.key === 'email') email = String(val ?? '').trim() || null

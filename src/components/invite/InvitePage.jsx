@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users, Smartphone, ExternalLink } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users, Smartphone, ExternalLink, FileText } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
@@ -304,6 +304,24 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       return (
         <div key={f.key} className="mt-2 border-b border-border pb-1">
           <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">{f.label}</h3>
+        </div>
+      )
+    }
+    if (f.type === 'document') {
+      if (!f.url) return null
+      return (
+        <div key={f.key} id={`f_${f.key}`} className="text-sm">
+          <a
+            href={f.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 font-medium underline"
+            style={{ color: accent }}
+          >
+            <FileText className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {f.label || 'Documento'}
+          </a>
+          {f.help ? <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{f.help}</span> : null}
         </div>
       )
     }

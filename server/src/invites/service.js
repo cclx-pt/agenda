@@ -651,7 +651,7 @@ function assertSubmissionValid(fields, values) {
       sectionVisible = fieldVisible(f, values)
       continue
     }
-    if (!sectionVisible || !f.required || !fieldVisible(f, values)) continue
+    if (f.type === 'document' || !sectionVisible || !f.required || !fieldVisible(f, values)) continue
     const val = values[f.key]
     let empty
     if (f.type === 'checkbox') empty = !val
