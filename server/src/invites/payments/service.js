@@ -2,7 +2,7 @@ import { z } from 'zod'
 import * as repo from './repository.js'
 import * as invitesRepo from '../repository.js'
 import { getConnector, DEFAULT_PROVIDER, ConnectorError } from './connector.js'
-import { getInvitePaymentInfo } from '../../settings/service.js'
+import { getInvitePaymentInfo, getActivePaymentMethods } from '../../settings/service.js'
 import { config } from '../../config.js'
 
 // Reutiliza o erro de domínio do módulo de convites para respostas HTTP coerentes.
@@ -81,16 +81,33 @@ export async function initiate(slug, guestToken, input) {
   if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
 
   const { method } = initiateSchema.parse(input)
+
+  // Resolve o TIPO do método (a partir da lista ativa) — decide o comportamento
+  // (integração vs manual) e a config associada (números MB WAY, etc.).
+  const activeMethods = await getActivePaymentMethods().catch(() => [])
+  const methodDef = activeMethods.find((m) => m.key === method) || null
+  const methodType = methodDef?.type || null
+  const numbers = methodDef?.numbers || []
+
   const connector = getConnector(invite.paymentProvider || DEFAULT_PROVIDER)
   const supported =
     typeof connector.supports === 'function'
-      ? connector.supports(method)
+      ? connector.supports(method, methodType)
       : connector.supportedMethods.includes(method)
   if (!supported) {
     throw new InviteError(409, 'Método de pagamento indisponível de momento.')
   }
   const amount = await chargeAmount(invite, guest)
   const currency = invite.costCurrency || 'EUR'
+
+  // Entidade + referência do BILHETE (só para o tipo 'referencia-multibanco').
+  let ticketEntity = null
+  let ticketReference = null
+  if (methodType === 'referencia-multibanco' && guest.ticketId) {
+    const ticket = await invitesRepo.findTicketById(guest.ticketId)
+    ticketEntity = ticket?.mbEntity ?? null
+    ticketReference = ticket?.mbReference ?? null
+  }
 
   // Cria o registo (pending) e pede a cobrança ao conector.
   const payment = await repo.insert({
@@ -107,7 +124,19 @@ export async function initiate(slug, guestToken, input) {
   const paymentInfo = await getInvitePaymentInfo().catch(() => null)
   let result
   try {
-    result = await connector.createCharge({ invite, guest, payment, method, amount, currency, paymentInfo })
+    result = await connector.createCharge({
+      invite,
+      guest,
+      payment,
+      method,
+      type: methodType,
+      amount,
+      currency,
+      paymentInfo,
+      numbers,
+      ticketEntity,
+      ticketReference,
+    })
   } catch (err) {
     await repo.update(payment.id, { status: 'failed' })
     if (err instanceof ConnectorError) throw new InviteError(409, err.message)
@@ -158,7 +187,7 @@ export async function getForGuest(slug, guestToken) {
   if (!guest || guest.inviteId !== invite.id) return null
   const payment = await repo.findLatestByGuest(guest.id)
   if (!payment) return null
-  return safePayment(payment, payment.providerPayload ? { type: payment.method === 'referencia' ? 'reference' : 'transfer', ...payment.providerPayload } : null)
+  return safePayment(payment, payment.providerPayload ? { type: payment.providerPayload.instrType || 'transfer', ...payment.providerPayload } : null)
 }
 
 // ── Organizador (autenticado) ────────────────────────────────────

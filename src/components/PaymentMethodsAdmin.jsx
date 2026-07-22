@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-import { Loader2, CreditCard, Plus, Trash2, Lock } from 'lucide-react'
+import { Loader2, CreditCard, Plus, Trash2 } from 'lucide-react'
 import { getPaymentMethods, updatePaymentMethods } from '../services/eventsService'
 import { Switch } from '@/components/ui/switch'
 
@@ -24,15 +24,27 @@ function slugPreview(value) {
   return /^[a-z]/.test(slug) ? slug : `m-${slug}`
 }
 
+// Tipos de pagamento permitidos (espelham o backend server/src/settings/service.js).
+// A integração e a exigência de comprovativo derivam do TIPO. Todos exigem
+// comprovativo; só 'mbway-contribuir' tem integração (JotForm).
+const METHOD_TYPES = [
+  { type: 'mbway-contribuir', label: 'MB WAY — Contribuir (JotForm)', integrated: true },
+  { type: 'mbway', label: 'MB WAY (manual)', integrated: false },
+  { type: 'transferencia', label: 'Transferência bancária', integrated: false },
+  { type: 'referencia-multibanco', label: 'Referência Multibanco', integrated: false },
+  { type: 'numerario', label: 'Numerário', integrated: false },
+]
+const TYPE_INTEGRATED = new Set(METHOD_TYPES.filter((t) => t.integrated).map((t) => t.type))
+
 // Gestão dos métodos de pagamento dos convites (dentro da Administração de
-// convites). Os 3 métodos INTEGRADOS (MB WAY, Transferência, Referência) têm
-// comportamento próprio no código: renomeiam-se e ativam/desativam mas não se
-// eliminam. Além destes, pode CRIAR novos tipos de pagamento (manuais). Só os
-// métodos ativos aparecem para configurar nos bilhetes.
+// convites). Cada método tem um TIPO fixo (da lista permitida) que define a
+// integração e a exigência de comprovativo; podem existir vários métodos do
+// mesmo tipo. Só os métodos ativos aparecem para configurar nos bilhetes.
 export default function PaymentMethodsAdmin() {
   const [methods, setMethods] = useState(null)
   const [busy, setBusy] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('numerario')
   const tmpId = useRef(0)
 
   useEffect(() => {
@@ -47,30 +59,50 @@ export default function PaymentMethodsAdmin() {
     }
   }, [])
 
-  const setLabel = (id, label) => setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, label } : m)))
-  const setActive = (id, active) => setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, active } : m)))
-  const setRequireReceipt = (id, requireReceipt) =>
-    setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, requireReceipt } : m)))
+  const patch = (id, chg) => setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, ...chg } : m)))
+  const setLabel = (id, label) => patch(id, { label })
+  const setActive = (id, active) => patch(id, { active })
+  const setType = (id, type) => patch(id, { type })
   const removeMethod = (id) => setMethods((ms) => ms.filter((m) => m._id !== id))
+
+  // Números MB WAY (só para o tipo 'mbway'; até 4).
+  const setNumber = (id, idx, value) =>
+    setMethods((ms) =>
+      ms.map((m) => {
+        if (m._id !== id) return m
+        const numbers = [...(m.numbers || [])]
+        numbers[idx] = value
+        return { ...m, numbers }
+      })
+    )
+  const addNumber = (id) =>
+    setMethods((ms) => ms.map((m) => (m._id === id && (m.numbers || []).length < 4 ? { ...m, numbers: [...(m.numbers || []), ''] } : m)))
+  const removeNumber = (id, idx) =>
+    setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, numbers: (m.numbers || []).filter((_, i) => i !== idx) } : m)))
 
   const addMethod = () => {
     const label = newName.trim()
     if (!label) return
     tmpId.current += 1
-    setMethods((ms) => [...ms, { _id: `tmp-${tmpId.current}`, key: '', label, active: true, builtin: false, integrated: false, requireReceipt: true }])
+    setMethods((ms) => [...ms, { _id: `tmp-${tmpId.current}`, key: '', label, active: true, type: newType, numbers: [] }])
     setNewName('')
   }
 
   const save = async () => {
-    // Valida: nenhum método personalizado sem nome.
-    if (methods.some((m) => !m.builtin && !m.label.trim())) {
+    if (methods.some((m) => !m.label.trim())) {
       toast.error('Indique o nome de todos os métodos de pagamento.')
       return
     }
     setBusy(true)
     try {
       const saved = await updatePaymentMethods(
-        methods.map((m) => ({ key: m.key, label: m.label, active: m.active, requireReceipt: m.requireReceipt !== false }))
+        methods.map((m) => ({
+          key: m.key || undefined,
+          label: m.label,
+          active: m.active,
+          type: m.type,
+          numbers: m.type === 'mbway' ? (m.numbers || []).map((n) => String(n).trim()).filter(Boolean) : [],
+        }))
       )
       setMethods(saved.map((x) => ({ ...x, _id: x.key }))) // rechaveia com as chaves reais
       toast.success('Métodos de pagamento guardados.')
@@ -88,49 +120,57 @@ export default function PaymentMethodsAdmin() {
   return (
     <div className="flex flex-col gap-4">
       <p className="m-0 text-sm text-muted-foreground">
-        Faça a gestão dos métodos de pagamento dos convites. Os 3 métodos base (MB WAY, Transferência e
-        Referência) podem renomear-se e ativar/desativar; pode ainda criar novos tipos. Só o <strong>MB WAY</strong>{' '}
-        tem integração automática — os restantes são manuais. Ative <strong>Exigir comprovativo</strong> se o
-        convidado tiver de carregar o comprovativo de pagamento. Só os métodos ativos aparecem nos bilhetes.
+        Faça a gestão dos métodos de pagamento dos convites. Cada método tem um <strong>tipo</strong> da lista
+        permitida, que define automaticamente se tem integração e se exige comprovativo. Só{' '}
+        <strong>MB WAY — Contribuir</strong> tem integração (JotForm); os restantes são manuais. Todos exigem
+        comprovativo. Pode criar vários métodos do mesmo tipo. Só os métodos ativos aparecem nos bilhetes.
       </p>
 
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {methods.map((m) => {
-          const previewKey = m.builtin ? m.key : m.key || slugPreview(m.label)
+          const previewKey = m.key || slugPreview(m.label)
+          const integrated = TYPE_INTEGRATED.has(m.type)
           return (
-            <li key={m._id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-              {m.builtin ? (
-                <Lock className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-              ) : (
+            <li key={m._id} className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <CreditCard className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-              )}
-              <input
-                className={inputCls + ' w-auto max-w-[240px] flex-1'}
-                value={m.label}
-                onChange={(e) => setLabel(m._id, e.target.value)}
-                placeholder="Nome do método"
-                aria-label={`Nome do método ${previewKey || 'novo'}`}
-              />
-              <span className="text-xs text-muted-foreground">{previewKey ? `(${previewKey})` : '(novo)'}</span>
-              <span
-                className={
-                  'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
-                  (m.integrated
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
-                    : 'bg-muted text-muted-foreground')
-                }
-              >
-                {m.integrated ? 'Integração' : 'Sem integração'}
-              </span>
-              <label className="ml-auto inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                <Switch checked={m.requireReceipt !== false} onCheckedChange={(v) => setRequireReceipt(m._id, v)} />
-                Exigir comprovativo
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                <Switch checked={m.active} onCheckedChange={(v) => setActive(m._id, v)} />
-                {m.active ? 'Ativo' : 'Inativo'}
-              </label>
-              {!m.builtin ? (
+                <input
+                  className={inputCls + ' w-auto max-w-[220px] flex-1'}
+                  value={m.label}
+                  onChange={(e) => setLabel(m._id, e.target.value)}
+                  placeholder="Nome do método"
+                  aria-label={`Nome do método ${previewKey || 'novo'}`}
+                />
+                <select
+                  className={inputCls + ' w-auto'}
+                  value={m.type}
+                  onChange={(e) => setType(m._id, e.target.value)}
+                  aria-label="Tipo de pagamento"
+                >
+                  {METHOD_TYPES.map((t) => (
+                    <option key={t.type} value={t.type}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">{previewKey ? `(${previewKey})` : '(novo)'}</span>
+                <span
+                  className={
+                    'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
+                    (integrated
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
+                      : 'bg-muted text-muted-foreground')
+                  }
+                >
+                  {integrated ? 'Integração (JotForm)' : 'Sem integração'}
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-[3px] text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-400">
+                  Comprovativo obrigatório
+                </span>
+                <label className="ml-auto inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Switch checked={m.active} onCheckedChange={(v) => setActive(m._id, v)} />
+                  {m.active ? 'Ativo' : 'Inativo'}
+                </label>
                 <button
                   type="button"
                   onClick={() => removeMethod(m._id)}
@@ -139,6 +179,47 @@ export default function PaymentMethodsAdmin() {
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
+              </div>
+
+              {m.type === 'mbway' ? (
+                <div className="flex flex-col gap-1.5 rounded-lg bg-muted/40 p-2">
+                  <span className="text-xs font-semibold text-muted-foreground">Números MB WAY (até 4)</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(m.numbers || []).map((n, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded-lg border border-border bg-background pl-2">
+                        <input
+                          className="w-32 bg-transparent py-1.5 text-sm text-foreground outline-none"
+                          value={n}
+                          onChange={(e) => setNumber(m._id, i, e.target.value)}
+                          placeholder="9XX XXX XXX"
+                          inputMode="numeric"
+                          aria-label={`Número MB WAY ${i + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeNumber(m._id, i)}
+                          className="rounded p-1 text-destructive hover:bg-destructive/10"
+                          aria-label="Remover número"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                    {(m.numbers || []).length < 4 ? (
+                      <button type="button" onClick={() => addNumber(m._id)} className={ghostBtn + ' py-1.5'}>
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        Número
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {m.type === 'transferencia' ? (
+                <p className="m-0 text-xs text-muted-foreground">O NIB/beneficiário define-se nas Definições de convites.</p>
+              ) : null}
+              {m.type === 'referencia-multibanco' ? (
+                <p className="m-0 text-xs text-muted-foreground">A entidade e a referência definem-se em cada bilhete.</p>
               ) : null}
             </li>
           )
@@ -146,6 +227,13 @@ export default function PaymentMethodsAdmin() {
       </ul>
 
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border p-3">
+        <select className={inputCls + ' w-auto'} value={newType} onChange={(e) => setNewType(e.target.value)} aria-label="Tipo do novo método">
+          {METHOD_TYPES.map((t) => (
+            <option key={t.type} value={t.type}>
+              {t.label}
+            </option>
+          ))}
+        </select>
         <input
           className={inputCls + ' w-auto max-w-[240px] flex-1'}
           value={newName}
@@ -156,7 +244,7 @@ export default function PaymentMethodsAdmin() {
               addMethod()
             }
           }}
-          placeholder="Novo tipo de pagamento (ex.: Numerário, PayPal)"
+          placeholder="Nome do método (ex.: Numerário — livraria)"
           aria-label="Nome do novo método de pagamento"
         />
         <button type="button" onClick={addMethod} disabled={!newName.trim()} className={ghostBtn}>

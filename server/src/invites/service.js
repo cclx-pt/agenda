@@ -195,6 +195,9 @@ const ticketSchema = z.object({
   description: z.string().trim().max(500).optional().nullable(),
   paymentMethod: paymentMethodKeySchema.optional().nullable(),
   paymentMethods: z.array(paymentMethodKeySchema).max(10).optional().nullable(),
+  // Entidade + referência Multibanco (tipo 'referencia-multibanco') definidas no bilhete.
+  mbEntity: z.string().trim().max(10).optional().nullable(),
+  mbReference: z.string().trim().max(30).optional().nullable(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -448,7 +451,17 @@ export async function getPreview(user, id) {
   ])
   const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
   const paymentMethodReceipt = Object.fromEntries(activeMethods.map((m) => [m.key, m.requireReceipt !== false]))
-  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets, paymentMethodLabels, paymentMethodReceipt })
+  const paymentMethodType = Object.fromEntries(activeMethods.map((m) => [m.key, m.type]))
+  const paymentMethodNumbers = Object.fromEntries(activeMethods.filter((m) => m.type === 'mbway').map((m) => [m.key, m.numbers || []]))
+  return renderPayload(invite, blocks, null, {
+    preview: true,
+    bannerUrl,
+    tickets,
+    paymentMethodLabels,
+    paymentMethodReceipt,
+    paymentMethodType,
+    paymentMethodNumbers,
+  })
 }
 
 // ── Leitura pública ──────────────────────────────────────────────
@@ -516,7 +529,17 @@ function renderPayload(
   invite,
   blocks,
   guest,
-  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null, paymentMethodLabels = {}, paymentMethodReceipt = {} } = {}
+  {
+    preview = false,
+    bannerUrl = null,
+    tickets = [],
+    spotsLeft = null,
+    community = null,
+    paymentMethodLabels = {},
+    paymentMethodReceipt = {},
+    paymentMethodType = {},
+    paymentMethodNumbers = {},
+  } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
@@ -544,6 +567,10 @@ function renderPayload(
       paymentMethodLabels,
       // Se cada método exige comprovativo (chave → bool). Falso = comprovativo opcional.
       paymentMethodReceipt,
+      // Tipo de cada método ativo (chave → tipo) — decide o fluxo (JotForm vs manual).
+      paymentMethodType,
+      // Números MB WAY (chave → [números]) dos métodos do tipo 'mbway' (manual).
+      paymentMethodNumbers,
       // Igreja + evento associado (para o fluxo de pagamento MB WAY / JotForm).
       community: community ?? invite.community ?? null,
       eventId: invite.eventId ?? null,
@@ -571,6 +598,8 @@ function renderPayload(
         description: t.description,
         paymentMethod: t.paymentMethod ?? null,
         paymentMethods: ticketMethods(t),
+        mbEntity: t.mbEntity ?? null,
+        mbReference: t.mbReference ?? null,
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
@@ -606,6 +635,8 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   const activeMethods = await getActivePaymentMethods().catch(() => [])
   const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
   const paymentMethodReceipt = Object.fromEntries(activeMethods.map((m) => [m.key, m.requireReceipt !== false]))
+  const paymentMethodType = Object.fromEntries(activeMethods.map((m) => [m.key, m.type]))
+  const paymentMethodNumbers = Object.fromEntries(activeMethods.filter((m) => m.type === 'mbway').map((m) => [m.key, m.numbers || []]))
   return {
     invite,
     payload: renderPayload(invite, blocks, guest, {
@@ -615,6 +646,8 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
       community,
       paymentMethodLabels,
       paymentMethodReceipt,
+      paymentMethodType,
+      paymentMethodNumbers,
     }),
   }
 }
@@ -667,15 +700,15 @@ function assertSubmissionValid(fields, values) {
 }
 
 // Envia (em background) a confirmação de inscrição ao convidado com o link pessoal.
-function notifyGuestConfirmation(invite, guest, status) {
+function notifyGuestConfirmation(invite, guest, status, methodType) {
   if (!guest?.email) return
   const base = (config.appUrl || '').replace(/\/+$/, '')
   const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
   // Página onde se paga (MB WAY/IBAN/ref) E se carrega o comprovativo.
   const receiptLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
-  // Link de pagamento: MB WAY → direto ao JotForm (pré-preenchido); outros → a página.
+  // Link de pagamento: MB WAY Contribuir (JotForm) → direto ao formulário; outros → a página.
   const payUrl =
-    status?.paymentMethod === 'mbway'
+    methodType === 'mbway-contribuir'
       ? buildJotformUrl({
           local: resolveJotformCommunity(invite, guest, invite.community),
           mobile: guest.phone,
@@ -792,7 +825,12 @@ export async function submitRsvp(slug, input) {
     })
   }
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket))
-  notifyGuestConfirmation(invite, guest, status)
+  let methodType = null
+  if (status?.paymentMethod) {
+    const activeMethods = await getActivePaymentMethods().catch(() => [])
+    methodType = activeMethods.find((m) => m.key === status.paymentMethod)?.type ?? null
+  }
+  notifyGuestConfirmation(invite, guest, status, methodType)
   let spotsLeft = null
   if (invite.capacity) {
     const taken = await repo.countConfirmedSeats(invite.id)

@@ -614,6 +614,11 @@ function receiptRequired(invite, method) {
   return invite?.paymentMethodReceipt?.[method] !== false
 }
 
+// Tipo de um método de pagamento (chave → tipo), definido no Admin. Decide o fluxo.
+function methodType(invite, method) {
+  return invite?.paymentMethodType?.[method] || null
+}
+
 // URL do formulário JotForm que processa os pagamentos MB WAY.
 const JOTFORM_MBWAY_URL = 'https://form.jotform.com/240093000783346'
 
@@ -729,7 +734,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             ) : (
               <Upload className="h-4 w-4" aria-hidden="true" />
             )}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, 'mbway') ? ' (obrigatório)' : ' (opcional)'}`}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, guestStatus?.paymentMethod) ? ' (obrigatório)' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
           <a
@@ -794,9 +799,9 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
     )
   }
 
-  // MB WAY: fluxo dedicado (confirmar telemóvel → JotForm → confirmar pagamento).
+  // MB WAY Contribuir (integração JotForm): fluxo dedicado (telemóvel → JotForm → comprovativo).
   const payMethod = guestStatus.paymentMethod || invite.paymentMethod || null
-  if (payMethod === 'mbway') {
+  if (methodType(invite, payMethod) === 'mbway-contribuir') {
     return (
       <MbwayFlow
         slug={slug}
@@ -913,6 +918,58 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
           <p className="m-0 text-xs text-muted-foreground">
             Pague no homebanking ou Multibanco. Confirmamos a inscrição assim que recebermos o pagamento.
           </p>
+        </div>
+      ) : instr.type === 'mbway' ? (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-sm text-muted-foreground">
+            {instr.note || 'Envie o valor por MB WAY para um dos números indicados e depois carregue o comprovativo.'}
+          </p>
+          {(instr.numbers || []).length ? (
+            <div className="flex flex-col gap-1">
+              {instr.numbers.map((n) => (
+                <div key={n} className={rowCls}>
+                  <span className="text-muted-foreground">MB WAY</span>
+                  <span className="font-mono font-semibold text-foreground">{n}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="m-0 text-sm text-muted-foreground">Sem números configurados. Contacte o organizador.</p>
+          )}
+          {instr.amount != null ? (
+            <div className={rowCls}>
+              <span className="text-muted-foreground">Valor</span>
+              <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
+            </div>
+          ) : null}
+          <label
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+          </label>
+        </div>
+      ) : instr.type === 'cash' ? (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-sm text-muted-foreground">
+            {instr.note || 'Pague em numerário junto de um líder, banca da igreja ou livraria, e depois carregue o comprovativo.'}
+          </p>
+          {instr.amount != null ? (
+            <div className={rowCls}>
+              <span className="text-muted-foreground">Valor</span>
+              <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
+            </div>
+          ) : null}
+          <label
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+          </label>
         </div>
       ) : instr.type === 'custom' ? (
         <div className="flex flex-col gap-2">

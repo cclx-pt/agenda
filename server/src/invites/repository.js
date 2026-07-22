@@ -439,6 +439,8 @@ function mapTicket(row) {
     groupSize: row.group_size ?? null,
     partyType: row.party_type ?? 'single',
     description: row.description ?? null,
+    mbEntity: row.mb_entity ?? null,
+    mbReference: row.mb_reference ?? null,
     paymentMethod: row.payment_method ?? null,
     paymentMethods: Array.isArray(row.payment_methods)
       ? row.payment_methods
@@ -518,18 +520,21 @@ export async function replaceTickets(inviteId, tickets) {
         `UPDATE invite_tickets SET
            name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
            group_size = $7, description = $8, active = $9, sort_order = $10,
-           payment_method = $11, party_type = $13, payment_methods = $14, updated_at = now()
+           payment_method = $11, party_type = $13, payment_methods = $14,
+           mb_entity = $15, mb_reference = $16, updated_at = now()
          WHERE id = $1 AND invite_id = $12`,
         [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
-          t.groupSize ?? null, t.description ?? null, t.active !== false, order, pmFirst, inviteId, t.partyType ?? 'single', pmsJson]
+          t.groupSize ?? null, t.description ?? null, t.active !== false, order, pmFirst, inviteId, t.partyType ?? 'single', pmsJson,
+          t.mbEntity ?? null, t.mbReference ?? null]
       )
     } else {
       await pool.query(
         `INSERT INTO invite_tickets
-          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods, mb_entity, mb_reference)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
-          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, pmFirst, t.active !== false, order, t.partyType ?? 'single', pmsJson]
+          t.capacity ?? null, t.groupSize ?? null, t.description ?? null, pmFirst, t.active !== false, order, t.partyType ?? 'single', pmsJson,
+          t.mbEntity ?? null, t.mbReference ?? null]
       )
     }
     order += 1

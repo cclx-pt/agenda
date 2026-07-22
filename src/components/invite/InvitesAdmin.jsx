@@ -321,7 +321,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -373,6 +373,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
               normalizePartyType(t) !== 'single' ? (t.groupSize === '' || t.groupSize == null ? null : Number(t.groupSize)) : null,
             paymentMethods: ticketIsFree(t) ? [] : ticketMethods(t),
             paymentMethod: ticketIsFree(t) ? null : ticketMethods(t)[0] || null,
+            mbEntity: (t.mbEntity || '').trim() || null,
+            mbReference: (t.mbReference || '').trim() || null,
             active: t.active !== false,
           }))
       )
@@ -516,6 +518,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
       // Rótulos dos métodos de pagamento configurados (para a pré-visualização
       // mostrar os mesmos nomes que a página pública, incl. renomeados/personalizados).
       paymentMethodLabels: Object.fromEntries((paymentMethodOptions || []).map((m) => [m.key, m.label])),
+      paymentMethodType: Object.fromEntries((paymentMethodOptions || []).map((m) => [m.key, m.type])),
+      paymentMethodNumbers: Object.fromEntries((paymentMethodOptions || []).filter((m) => m.type === 'mbway').map((m) => [m.key, m.numbers || []])),
       rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
       rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
     },
@@ -530,6 +534,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
         partyType: normalizePartyType(t),
         groupSize: t.groupSize ? Number(t.groupSize) : null,
         paymentMethods: ticketMethods(t),
+        mbEntity: t.mbEntity || null,
+        mbReference: t.mbReference || null,
         soldOut: false,
       })),
   }
@@ -915,6 +921,28 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         )}
                         <span className="text-xs font-normal text-muted-foreground">
                           Escolha os métodos disponíveis para este bilhete (o convidado escolhe um). Processamento a desenvolver.
+                        </span>
+                      </div>
+                    ) : null}
+                    {!ticketIsFree(t) &&
+                    paymentMethodOptions.some((pm) => pm.type === 'referencia-multibanco' && (t.paymentMethods || []).includes(pm.key)) ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <input
+                            className={inputCls}
+                            placeholder="Entidade (Ref. Multibanco)"
+                            value={t.mbEntity || ''}
+                            onChange={(e) => setTicketField(i, 'mbEntity', e.target.value)}
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="Referência"
+                            value={t.mbReference || ''}
+                            onChange={(e) => setTicketField(i, 'mbReference', e.target.value)}
+                          />
+                        </div>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Entidade e referência Multibanco deste bilhete (mostradas ao convidado que escolher este método).
                         </span>
                       </div>
                     ) : null}

@@ -486,6 +486,8 @@ CREATE TABLE IF NOT EXISTS invite_tickets (
   description TEXT,
   payment_method TEXT,
   payment_methods JSONB,
+  mb_entity   TEXT,
+  mb_reference TEXT,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -503,6 +505,9 @@ ALTER TABLE invite_tickets ADD CONSTRAINT invite_tickets_kind_check
 -- Composição do bilhete: 'single' (individual), 'family' (família) ou 'group' (grupo).
 -- Family/group abrem a lista de membros (nome, idade, observações se < 11) no formulário.
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS party_type TEXT NOT NULL DEFAULT 'single';
+-- Entidade + referência Multibanco definidas no bilhete (método 'referencia-multibanco').
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_entity TEXT;
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_reference TEXT;
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;

@@ -131,33 +131,35 @@ export async function updateBranding(input, actorId) {
 }
 
 // ── Métodos de pagamento (geridos na Administração de convites) ──
-// app_settings key 'payment_methods' = [{ key, label, active, builtin }].
-// Há 3 métodos INTEGRADOS (mbway/transferencia/referencia) com comportamento
-// próprio no código (MB WAY → JotForm; transferência/referência → conector
-// manual): não se podem eliminar nem mudar a chave, mas renomeiam-se e
-// ativam/desativam. Além destes, o admin pode CRIAR métodos personalizados
-// (nome à escolha), que funcionam como pagamento manual (o convidado segue as
-// instruções e carrega o comprovativo). A lista ativa alimenta a configuração
-// dos bilhetes dos convites.
+// app_settings key 'payment_methods' = [{ key, label, active, type, numbers? }].
+// Cada método tem um TIPO de uma lista FIXA de comportamentos permitidos. A
+// integração e a exigência de comprovativo são DERIVADAS do tipo (não são
+// toggles livres). Pode haver VÁRIOS métodos do mesmo tipo (ex.: dois pontos de
+// numerário). Só 'mbway-contribuir' tem integração (JotForm); TODOS os tipos
+// exigem comprovativo. A lista ativa alimenta a configuração dos bilhetes.
 const PAYMENT_METHODS_KEY = 'payment_methods'
-const BUILTIN_PAYMENT_METHODS = [
-  { key: 'mbway', label: 'MB WAY' },
-  { key: 'transferencia', label: 'Transferência bancária' },
-  { key: 'referencia', label: 'Referência Multibanco' },
-]
-const BUILTIN_PAYMENT_KEYS = new Set(BUILTIN_PAYMENT_METHODS.map((m) => m.key))
-// Só o MB WAY tem integração real (JotForm); os restantes são manuais.
-const INTEGRATED_PAYMENT_KEYS = new Set(['mbway'])
 const MAX_PAYMENT_METHODS = 24
+const MAX_MBWAY_NUMBERS = 4
 
-// Compat: export antigo (defaults dos métodos integrados, todos ativos).
-export const PAYMENT_METHOD_DEFAULTS = BUILTIN_PAYMENT_METHODS.map((m) => ({
-  ...m,
-  active: true,
-  builtin: true,
-  integrated: INTEGRATED_PAYMENT_KEYS.has(m.key),
-  requireReceipt: true,
+// Tipos permitidos e as suas regras (integração + comprovativo derivam daqui).
+export const PAYMENT_METHOD_TYPES = {
+  'mbway-contribuir': { label: 'MB WAY — Contribuir', integrated: true, requireReceipt: true },
+  mbway: { label: 'MB WAY', integrated: false, requireReceipt: true },
+  transferencia: { label: 'Transferência bancária', integrated: false, requireReceipt: true },
+  'referencia-multibanco': { label: 'Referência Multibanco', integrated: false, requireReceipt: true },
+  numerario: { label: 'Numerário', integrated: false, requireReceipt: true },
+}
+export const PAYMENT_METHOD_TYPE_KEYS = Object.keys(PAYMENT_METHOD_TYPES)
+
+// Semente por omissão: um método por cada tipo permitido.
+const DEFAULT_PAYMENT_METHODS = PAYMENT_METHOD_TYPE_KEYS.map((type) => ({
+  key: type,
+  label: PAYMENT_METHOD_TYPES[type].label,
+  type,
 }))
+
+// Compat: export antigo (defaults enriquecidos, todos ativos).
+export const PAYMENT_METHOD_DEFAULTS = DEFAULT_PAYMENT_METHODS.map((m) => enrichPaymentMethod({ ...m, active: true }))
 
 // Gera uma chave (slug) estável e válida a partir de um nome/chave. Garante que
 // começa por uma letra (prefixo 'm-') para não colidir com o formato dos slugs.
@@ -173,36 +175,44 @@ export function paymentMethodKey(value) {
   return /^[a-z]/.test(slug) ? slug : `m-${slug}`
 }
 
-// Funde os métodos INTEGRADOS (label/active editáveis, chave fixa, no topo) com
-// os PERSONALIZADOS guardados, gerando chaves únicas e válidas.
+// Limpa e limita os números MB WAY (só dígitos, mín. 9, até 4, sem repetidos).
+function cleanMbwayNumbers(value) {
+  if (!Array.isArray(value)) return []
+  const out = []
+  for (const n of value) {
+    const digits = String(n ?? '').replace(/\D/g, '').slice(0, 15)
+    if (digits.length >= 9 && !out.includes(digits)) out.push(digits)
+    if (out.length >= MAX_MBWAY_NUMBERS) break
+  }
+  return out
+}
+
+// Acrescenta a um método os campos DERIVADOS do tipo (integração/comprovativo) e
+// normaliza os números (só para o tipo 'mbway').
+function enrichPaymentMethod(m) {
+  const rules = PAYMENT_METHOD_TYPES[m.type]
+  return {
+    key: m.key,
+    label: m.label,
+    active: m.active !== false,
+    type: m.type,
+    integrated: rules.integrated,
+    requireReceipt: rules.requireReceipt,
+    numbers: m.type === 'mbway' ? cleanMbwayNumbers(m.numbers) : [],
+  }
+}
+
+// Normaliza a lista guardada: descarta entradas sem tipo válido (reset dos dados
+// antigos) e gera chaves únicas. Sem métodos válidos → semeia os defaults.
 function normalizePaymentMethods(stored) {
   const list = Array.isArray(stored) ? stored : []
-  const byKey = new Map()
-  for (const m of list) if (m && typeof m.key === 'string') byKey.set(m.key, m)
-
   const result = []
   const used = new Set()
-  // 1) Integrados — sempre presentes, ordem fixa.
-  for (const b of BUILTIN_PAYMENT_METHODS) {
-    const s = byKey.get(b.key)
-    const label = s && typeof s.label === 'string' && s.label.trim() ? s.label.trim().slice(0, 60) : b.label
-    const active = s ? s.active !== false : true
-    result.push({
-      key: b.key,
-      label,
-      active,
-      builtin: true,
-      integrated: INTEGRATED_PAYMENT_KEYS.has(b.key),
-      requireReceipt: s ? s.requireReceipt !== false : true,
-    })
-    used.add(b.key)
-  }
-  // 2) Personalizados — qualquer entrada com chave não-integrada e nome válido.
   for (const m of list) {
     if (!m || typeof m !== 'object') continue
-    if (m.key && BUILTIN_PAYMENT_KEYS.has(m.key)) continue // já tratado acima
+    if (!PAYMENT_METHOD_TYPE_KEYS.includes(m.type)) continue // tipo inválido/ausente → descartado
     const label = typeof m.label === 'string' ? m.label.trim().slice(0, 60) : ''
-    if (!label) continue // sem nome não é um método válido
+    if (!label) continue
     let key = paymentMethodKey(m.key || label)
     if (!key) continue
     if (used.has(key)) {
@@ -211,20 +221,14 @@ function normalizePaymentMethods(stored) {
       key = `${key}-${i}`
     }
     used.add(key)
-    result.push({
-      key,
-      label,
-      active: m.active !== false,
-      builtin: false,
-      integrated: false,
-      requireReceipt: m.requireReceipt !== false,
-    })
+    result.push(enrichPaymentMethod({ key, label, active: m.active, type: m.type, numbers: m.numbers }))
     if (result.length >= MAX_PAYMENT_METHODS) break
   }
+  if (!result.length) return DEFAULT_PAYMENT_METHODS.map((m) => enrichPaymentMethod({ ...m, active: true }))
   return result
 }
 
-/** Lista completa de métodos de pagamento (integrados + personalizados) para o Admin. */
+/** Lista completa de métodos de pagamento para o Admin. */
 export async function getPaymentMethods() {
   return normalizePaymentMethods(await repo.get(PAYMENT_METHODS_KEY))
 }
@@ -234,7 +238,7 @@ export async function getActivePaymentMethods() {
   return (await getPaymentMethods()).filter((m) => m.active)
 }
 
-/** Valida e persiste os métodos de pagamento (admin). Integrados fixos; personalizados CRUD. */
+/** Valida e persiste os métodos de pagamento (admin). */
 export async function updatePaymentMethods(input, actorId) {
   const next = normalizePaymentMethods(Array.isArray(input) ? input : [])
   await repo.set(PAYMENT_METHODS_KEY, next, actorId)

@@ -45,20 +45,22 @@ export class ConnectorError extends Error {
 // ── Conector "manual" (por omissão) ──────────────────────────────
 const manualConnector = {
   name: 'manual',
-  // Métodos integrados que o conector manual mostra por omissão.
-  supportedMethods: ['transferencia', 'referencia'],
-  // Suporta qualquer método EXCETO MB WAY (que precisa de fornecedor real): os
-  // métodos personalizados criados no Admin usam o fluxo manual genérico.
-  supports(method) {
-    return method !== 'mbway'
+  // Tipos que o conector manual trata (todos exceto o integrado mbway-contribuir).
+  supportedMethods: ['mbway', 'transferencia', 'referencia-multibanco', 'numerario'],
+  // Suporta qualquer TIPO exceto o integrado (mbway-contribuir → JotForm no frontend).
+  supports(method, type) {
+    return type !== 'mbway-contribuir'
   },
 
-  async createCharge({ method, amount, currency, paymentInfo }) {
+  // O comportamento é decidido pelo TIPO do método (não pela chave): assim podem
+  // existir vários métodos do mesmo tipo com nomes diferentes.
+  async createCharge({ method, type, amount, currency, paymentInfo, numbers, ticketEntity, ticketReference }) {
     // Dados de pagamento das Definições de convites; recurso a config (env).
     const iban = paymentInfo?.iban || config.payments.iban
     const beneficiary = paymentInfo?.beneficiary || config.payments.beneficiary
     const mbEntity = paymentInfo?.mbEntity || config.payments.mbEntity
-    if (method === 'transferencia') {
+
+    if (type === 'transferencia') {
       return {
         status: 'pending',
         instructions: {
@@ -71,27 +73,54 @@ const manualConnector = {
         },
       }
     }
-    if (method === 'referencia') {
-      // Referência LOCAL de exemplo (9 dígitos). Um conector real substitui isto
-      // por uma referência Multibanco emitida pelo fornecedor.
-      const reference = String(Math.floor(100000000 + Math.random() * 900000000))
-      const entity = mbEntity
+    if (type === 'referencia-multibanco') {
+      // Entidade + referência DEFINIDAS NO BILHETE (recurso à entidade global).
+      const entity = ticketEntity || mbEntity
+      const reference = ticketReference || ''
       return {
         status: 'pending',
-        providerRef: reference,
-        providerPayload: { entity, reference },
-        instructions: { type: 'reference', entity, reference, amount, currency },
+        providerRef: reference || null,
+        providerPayload: { instrType: 'reference', entity, reference },
+        instructions: {
+          type: 'reference',
+          entity,
+          reference,
+          amount,
+          currency,
+          note: 'Pague por referência Multibanco e depois carregue o comprovativo.',
+        },
       }
     }
-    if (method === 'mbway') {
-      throw new ConnectorError(
-        'Método indisponível. Configure um conector de pagamento para MB WAY.',
-        'METHOD_UNSUPPORTED'
-      )
+    if (type === 'mbway') {
+      // MB WAY manual: enviar o valor para um dos números indicados + comprovativo.
+      const nums = Array.isArray(numbers) ? numbers : []
+      return {
+        status: 'pending',
+        providerPayload: { instrType: 'mbway', numbers: nums },
+        instructions: {
+          type: 'mbway',
+          numbers: nums,
+          amount,
+          currency,
+          note: 'Envie o valor por MB WAY para um dos números indicados e depois carregue o comprovativo.',
+        },
+      }
     }
-    // Método personalizado (criado no Admin): pagamento manual genérico — o
-    // convidado segue as instruções do organizador e carrega o comprovativo;
-    // o organizador valida manualmente → 'paid'.
+    if (type === 'numerario') {
+      return {
+        status: 'pending',
+        instructions: {
+          type: 'cash',
+          amount,
+          currency,
+          note: 'Pague em numerário junto de um líder, banca da igreja ou livraria, e depois carregue o comprovativo.',
+        },
+      }
+    }
+    if (type === 'mbway-contribuir') {
+      throw new ConnectorError('Método com integração (JotForm). Use o fluxo dedicado.', 'METHOD_UNSUPPORTED')
+    }
+    // Tipo desconhecido (dados antigos) → pagamento manual genérico.
     return {
       status: 'pending',
       instructions: {
