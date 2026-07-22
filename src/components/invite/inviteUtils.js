@@ -54,6 +54,43 @@ export function ticketPrice(t) {
   return t.price != null && t.price > 0 ? `${Number(t.price).toFixed(2)} ${t.currency || 'EUR'}` : 'Grátis'
 }
 
+// Situação (estado combinado) de uma inscrição, derivada de rsvpState + paymentState:
+//  - Confirmada (rsvp confirmado + pagamento não aplicável/pago → grátis/doação ou pago aprovado)
+//  - Pendente comprovativo (rsvp confirmado + pagamento pendente → bilhete Pago à espera do comprovativo)
+//  - Aprovação de comprovativo pendente (comprovativo carregado, a aguardar o organizador)
+//  - Lista de espera / Cancelada / Expirada / Pendente
+export const SITUACAO_LABEL = {
+  confirmada: 'Confirmada',
+  comprovativo: 'Pendente comprovativo',
+  validacao: 'Aprovação de comprovativo pendente',
+  espera: 'Lista de espera',
+  cancelada: 'Cancelada',
+  expirada: 'Expirada',
+  pendente: 'Pendente',
+}
+export const SITUACAO_BADGE = {
+  confirmada: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
+  comprovativo: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  validacao: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
+  espera: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  cancelada: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+  expirada: 'bg-muted text-muted-foreground',
+  pendente: 'bg-muted text-muted-foreground',
+}
+export function inscricaoSituacao(guest) {
+  const rsvp = guest?.rsvpState
+  const pay = guest?.paymentState
+  if (rsvp === 'declined') return 'cancelada'
+  if (rsvp === 'waitlisted') return 'espera'
+  if (rsvp === 'confirmed') {
+    if (pay === 'pending') return 'comprovativo'
+    if (pay === 'awaiting_validation') return 'validacao'
+    if (pay === 'expired') return 'expirada'
+    return 'confirmada'
+  }
+  return 'pendente'
+}
+
 // Converte um link de YouTube/Vimeo num URL de embed, ou devolve null.
 export function toEmbed(url) {
   if (!url) return null

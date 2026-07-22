@@ -591,6 +591,11 @@ function payLabel(invite, method) {
   return invite?.paymentMethodLabels?.[method] || PAYMENT_METHOD_LABEL[method] || method
 }
 
+// Se o método exige comprovativo de pagamento (config no Admin; por omissão sim).
+function receiptRequired(invite, method) {
+  return invite?.paymentMethodReceipt?.[method] !== false
+}
+
 // URL do formulário JotForm que processa os pagamentos MB WAY.
 const JOTFORM_MBWAY_URL = 'https://form.jotform.com/240093000783346'
 
@@ -706,7 +711,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             ) : (
               <Upload className="h-4 w-4" aria-hidden="true" />
             )}
-            {uploading ? 'A enviar…' : 'Carregar comprovativo (obrigatório)'}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, 'mbway') ? ' (obrigatório)' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
           <a
@@ -867,7 +872,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
             style={{ backgroundColor: accent }}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : 'Carregar comprovativo'}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
         </div>
@@ -907,7 +912,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
             style={{ backgroundColor: accent }}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : 'Carregar comprovativo'}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
 import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2 } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
+import { inscricaoSituacao, SITUACAO_LABEL, SITUACAO_BADGE } from './inviteUtils'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -13,18 +14,20 @@ const selectCls = 'rounded-lg border border-input bg-background px-3 py-2 text-s
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
 const labelCls = 'flex flex-col gap-1 text-xs font-medium text-muted-foreground'
 
-const RSVP_STATE_LABEL = { confirmed: 'Confirmada', waitlisted: 'Lista de espera', declined: 'Cancelada', pending: 'Pendente' }
-const RSVP_BADGE = {
-  confirmed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
-  waitlisted: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
-  declined: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
-  pending: 'bg-muted text-muted-foreground',
-}
+// Estado editável (rsvpState em bruto) do formulário de edição.
 const RSVP_STATE_OPTIONS = [
   { value: 'confirmed', label: 'Confirmada' },
   { value: 'pending', label: 'Pendente' },
   { value: 'waitlisted', label: 'Lista de espera' },
   { value: 'declined', label: 'Cancelada' },
+]
+// Opções do filtro por situação (estado combinado da inscrição).
+const SITUACAO_OPTIONS = [
+  { value: 'confirmada', label: 'Confirmada' },
+  { value: 'comprovativo', label: 'Pendente comprovativo' },
+  { value: 'validacao', label: 'Aprovação de comprovativo pendente' },
+  { value: 'espera', label: 'Lista de espera' },
+  { value: 'cancelada', label: 'Cancelada' },
 ]
 const PAY_LABEL = {
   pending: 'Pendente',
@@ -35,12 +38,6 @@ const PAY_LABEL = {
   cancelled: 'Cancelado',
   not_applicable: 'Sem pagamento',
 }
-const PAY_STATE_OPTIONS = [
-  { value: 'pending', label: 'Pendente de pagamento' },
-  { value: 'awaiting_validation', label: 'Em validação' },
-  { value: 'paid', label: 'Pago' },
-  { value: 'not_applicable', label: 'Sem pagamento' },
-]
 
 // Data + hora (para a lista e o Excel).
 function fmtDateTime(iso) {
@@ -81,8 +78,7 @@ export default function InviteSubmissionsAdmin() {
   const [rows, setRows] = useState(null)
   const [invites, setInvites] = useState([])
   const [filterInvite, setFilterInvite] = useState('')
-  const [filterState, setFilterState] = useState('')
-  const [filterPay, setFilterPay] = useState('')
+  const [filterSituacao, setFilterSituacao] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [expanded, setExpanded] = useState(null) // { id, mode: 'details' | 'edit' }
@@ -120,20 +116,21 @@ export default function InviteSubmissionsAdmin() {
 
   const filtered = (rows || []).filter((r) => {
     if (filterInvite && r.inviteId !== filterInvite) return false
-    if (filterState && (r.rsvpState || 'pending') !== filterState) return false
-    if (filterPay && (r.paymentState || 'not_applicable') !== filterPay) return false
+    if (filterSituacao && inscricaoSituacao(r) !== filterSituacao) return false
     return true
   })
 
   // Estatísticas do evento selecionado (contam TODAS as inscrições desse convite,
-  // independentemente dos filtros de estado/pagamento).
+  // por situação, independentemente do filtro de situação).
   const eventRows = filterInvite ? (rows || []).filter((r) => r.inviteId === filterInvite) : []
+  const countSit = (key) => eventRows.filter((r) => inscricaoSituacao(r) === key).length
   const eventStats = {
     total: eventRows.length,
-    confirmed: eventRows.filter((r) => r.rsvpState === 'confirmed').length,
-    pending: eventRows.filter((r) => (r.rsvpState || 'pending') === 'pending').length,
-    waitlisted: eventRows.filter((r) => r.rsvpState === 'waitlisted').length,
-    declined: eventRows.filter((r) => r.rsvpState === 'declined').length,
+    confirmada: countSit('confirmada'),
+    comprovativo: countSit('comprovativo'),
+    validacao: countSit('validacao'),
+    espera: countSit('espera'),
+    cancelada: countSit('cancelada'),
   }
 
   const openDetails = (g) =>
@@ -201,7 +198,7 @@ export default function InviteSubmissionsAdmin() {
       ['Nome', (g) => g.name || ''],
       ['Email', (g) => g.email || ''],
       ['Telemóvel', (g) => g.phone || ''],
-      ['Estado', (g) => RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState || ''],
+      ['Estado', (g) => SITUACAO_LABEL[inscricaoSituacao(g)] || ''],
       ['Pagamento', (g) => payLabel(g.paymentState)],
       ['Lugares', (g) => g.guestsCount ?? ''],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
@@ -244,21 +241,10 @@ export default function InviteSubmissionsAdmin() {
             </select>
           </label>
           <label className={labelCls}>
-            Estado da inscrição
-            <select className={selectCls} value={filterState} onChange={(e) => setFilterState(e.target.value)}>
-              <option value="">Todos os estados</option>
-              {RSVP_STATE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={labelCls}>
-            Pagamento
-            <select className={selectCls} value={filterPay} onChange={(e) => setFilterPay(e.target.value)}>
-              <option value="">Todos os pagamentos</option>
-              {PAY_STATE_OPTIONS.map((o) => (
+            Situação da inscrição
+            <select className={selectCls} value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)}>
+              <option value="">Todas as situações</option>
+              {SITUACAO_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -279,13 +265,14 @@ export default function InviteSubmissionsAdmin() {
       </div>
 
       {filterInvite ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { label: 'Inscrições do evento', value: eventStats.total, cls: 'text-foreground' },
-            { label: 'Confirmadas', value: eventStats.confirmed, cls: 'text-emerald-700 dark:text-emerald-400' },
-            { label: 'Pendentes', value: eventStats.pending, cls: 'text-foreground' },
-            { label: 'Lista de espera', value: eventStats.waitlisted, cls: 'text-amber-700 dark:text-amber-400' },
-            { label: 'Canceladas', value: eventStats.declined, cls: 'text-red-700 dark:text-red-400' },
+            { label: 'Confirmadas', value: eventStats.confirmada, cls: 'text-emerald-700 dark:text-emerald-400' },
+            { label: 'Pendente comprovativo', value: eventStats.comprovativo, cls: 'text-amber-700 dark:text-amber-400' },
+            { label: 'Aprovação pendente', value: eventStats.validacao, cls: 'text-sky-700 dark:text-sky-400' },
+            { label: 'Lista de espera', value: eventStats.espera, cls: 'text-amber-700 dark:text-amber-400' },
+            { label: 'Canceladas', value: eventStats.cancelada, cls: 'text-red-700 dark:text-red-400' },
           ].map((s) => (
             <div key={s.label} className="rounded-lg border border-border bg-card p-3 text-center">
               <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
@@ -331,8 +318,8 @@ export default function InviteSubmissionsAdmin() {
                       <td className="p-2 text-muted-foreground">{g.email || ''}</td>
                       <td className="p-2 text-muted-foreground">{g.phone || ''}</td>
                       <td className="p-2">
-                        <span className={`rounded-full px-2 py-[3px] text-[11px] font-semibold ${RSVP_BADGE[g.rsvpState] || 'bg-muted text-muted-foreground'}`}>
-                          {RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState || '—'}
+                        <span className={`rounded-full px-2 py-[3px] text-[11px] font-semibold ${SITUACAO_BADGE[inscricaoSituacao(g)]}`}>
+                          {SITUACAO_LABEL[inscricaoSituacao(g)]}
                         </span>
                       </td>
                       <td className="p-2 text-muted-foreground">{payLabel(g.paymentState) || '—'}</td>

@@ -235,12 +235,11 @@ function normalizePayment(data) {
   data.paymentMethods = data.paymentMethod ? [data.paymentMethod] : null
 }
 
-// Um bilhete é gratuito se for do tipo "grátis" ou (não-doação) sem preço > 0.
-function ticketIsFree(t) {
-  if (!t) return true
-  if (t.kind === 'gratis') return true
-  if (t.kind === 'voluntaria') return false
-  return !(Number(t.price) > 0)
+// Um bilhete EXIGE pagamento (comprovativo) só quando é "Pago" com preço > 0.
+// Grátis e Doação confirmam automaticamente a inscrição (a doação regista o
+// valor mas não bloqueia a inscrição num pagamento).
+function ticketNeedsPayment(t) {
+  return !!t && t.kind === 'individual' && Number(t.price) > 0
 }
 
 // Banner efetivo: o do evento associado (se "usar imagem do evento") ou o próprio.
@@ -448,7 +447,8 @@ export async function getPreview(user, id) {
     getActivePaymentMethods().catch(() => []),
   ])
   const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
-  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets, paymentMethodLabels })
+  const paymentMethodReceipt = Object.fromEntries(activeMethods.map((m) => [m.key, m.requireReceipt !== false]))
+  return renderPayload(invite, blocks, null, { preview: true, bannerUrl, tickets, paymentMethodLabels, paymentMethodReceipt })
 }
 
 // ── Leitura pública ──────────────────────────────────────────────
@@ -516,7 +516,7 @@ function renderPayload(
   invite,
   blocks,
   guest,
-  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null, paymentMethodLabels = {} } = {}
+  { preview = false, bannerUrl = null, tickets = [], spotsLeft = null, community = null, paymentMethodLabels = {}, paymentMethodReceipt = {} } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
@@ -542,6 +542,8 @@ function renderPayload(
       // Rótulos públicos dos métodos de pagamento ativos (chave → nome), para
       // mostrar os métodos personalizados com o nome escolhido no Admin.
       paymentMethodLabels,
+      // Se cada método exige comprovativo (chave → bool). Falso = comprovativo opcional.
+      paymentMethodReceipt,
       // Igreja + evento associado (para o fluxo de pagamento MB WAY / JotForm).
       community: community ?? invite.community ?? null,
       eventId: invite.eventId ?? null,
@@ -603,6 +605,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   }
   const activeMethods = await getActivePaymentMethods().catch(() => [])
   const paymentMethodLabels = Object.fromEntries(activeMethods.map((m) => [m.key, m.label]))
+  const paymentMethodReceipt = Object.fromEntries(activeMethods.map((m) => [m.key, m.requireReceipt !== false]))
   return {
     invite,
     payload: renderPayload(invite, blocks, guest, {
@@ -611,6 +614,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
       spotsLeft,
       community,
       paymentMethodLabels,
+      paymentMethodReceipt,
     }),
   }
 }
@@ -744,10 +748,10 @@ export async function submitRsvp(slug, input) {
       throw new InviteError(400, 'Bilhete inválido.')
     }
   }
-  // Pagamento (a desenvolver): aplicável se o bilhete escolhido for pago, ou —
-  // sem bilhete — se o convite tiver custo. Bilhetes grátis → não aplicável.
+  // Pagamento (a desenvolver): aplicável só se o bilhete for "Pago" (preço > 0),
+  // ou — sem bilhete — se o convite tiver custo. Grátis/Doação → confirma logo.
   const paymentState =
-    (ticket ? !ticketIsFree(ticket) : invite.costType !== 'gratuito') ? 'pending' : 'not_applicable'
+    (ticket ? ticketNeedsPayment(ticket) : invite.costType !== 'gratuito') ? 'pending' : 'not_applicable'
 
   // Capacidade: do bilhete escolhido (se houver) ou global do convite. Excedendo → lista de espera.
   let rsvpState = data.attend ? 'confirmed' : 'declined'

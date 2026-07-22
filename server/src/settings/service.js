@@ -146,6 +146,8 @@ const BUILTIN_PAYMENT_METHODS = [
   { key: 'referencia', label: 'Referência Multibanco' },
 ]
 const BUILTIN_PAYMENT_KEYS = new Set(BUILTIN_PAYMENT_METHODS.map((m) => m.key))
+// Só o MB WAY tem integração real (JotForm); os restantes são manuais.
+const INTEGRATED_PAYMENT_KEYS = new Set(['mbway'])
 const MAX_PAYMENT_METHODS = 24
 
 // Compat: export antigo (defaults dos métodos integrados, todos ativos).
@@ -153,6 +155,8 @@ export const PAYMENT_METHOD_DEFAULTS = BUILTIN_PAYMENT_METHODS.map((m) => ({
   ...m,
   active: true,
   builtin: true,
+  integrated: INTEGRATED_PAYMENT_KEYS.has(m.key),
+  requireReceipt: true,
 }))
 
 // Gera uma chave (slug) estável e válida a partir de um nome/chave. Garante que
@@ -183,7 +187,14 @@ function normalizePaymentMethods(stored) {
     const s = byKey.get(b.key)
     const label = s && typeof s.label === 'string' && s.label.trim() ? s.label.trim().slice(0, 60) : b.label
     const active = s ? s.active !== false : true
-    result.push({ key: b.key, label, active, builtin: true })
+    result.push({
+      key: b.key,
+      label,
+      active,
+      builtin: true,
+      integrated: INTEGRATED_PAYMENT_KEYS.has(b.key),
+      requireReceipt: s ? s.requireReceipt !== false : true,
+    })
     used.add(b.key)
   }
   // 2) Personalizados — qualquer entrada com chave não-integrada e nome válido.
@@ -200,7 +211,14 @@ function normalizePaymentMethods(stored) {
       key = `${key}-${i}`
     }
     used.add(key)
-    result.push({ key, label, active: m.active !== false, builtin: false })
+    result.push({
+      key,
+      label,
+      active: m.active !== false,
+      builtin: false,
+      integrated: false,
+      requireReceipt: m.requireReceipt !== false,
+    })
     if (result.length >= MAX_PAYMENT_METHODS) break
   }
   return result

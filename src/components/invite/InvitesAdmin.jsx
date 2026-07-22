@@ -17,6 +17,7 @@ import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
+import { inscricaoSituacao, SITUACAO_LABEL, SITUACAO_BADGE } from './inviteUtils'
 import { Switch } from '@/components/ui/switch'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
@@ -153,8 +154,6 @@ function fmtEventWhen(start, end) {
   }
   return out
 }
-
-const RSVP_STATE_LABEL = { confirmed: 'Confirmado', waitlisted: 'Lista de espera', declined: 'Não vai', pending: 'Pendente' }
 
 // Data + hora (para a lista de inscrições e o Excel).
 function fmtDateTime(iso) {
@@ -546,7 +545,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ['Nome', (g) => g.name || ''],
       ['Email', (g) => g.email || ''],
       ['Telemóvel', (g) => g.phone || ''],
-      ['Estado', (g) => RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState || ''],
+      ['Estado', (g) => SITUACAO_LABEL[inscricaoSituacao(g)] || ''],
       ['Pagamento', (g) => (g.paymentState === 'not_applicable' ? '' : PAY_LABEL[g.paymentState] || g.paymentState || '')],
       ['Bilhete', (g) => ticketName(g.ticketId)],
       ['Tipo de inscrição', (g) => g.extra?.tipoInscricao || ''],
@@ -1154,8 +1153,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         </button>
                         {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
                         <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
-                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                          {RSVP_STATE_LABEL[g.rsvpState] || g.rsvpState}
+                        <span className={'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ' + SITUACAO_BADGE[inscricaoSituacao(g)]}>
+                          {SITUACAO_LABEL[inscricaoSituacao(g)]}
                         </span>
                       </div>
                       {open ? (

@@ -49,13 +49,15 @@ export default function PaymentMethodsAdmin() {
 
   const setLabel = (id, label) => setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, label } : m)))
   const setActive = (id, active) => setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, active } : m)))
+  const setRequireReceipt = (id, requireReceipt) =>
+    setMethods((ms) => ms.map((m) => (m._id === id ? { ...m, requireReceipt } : m)))
   const removeMethod = (id) => setMethods((ms) => ms.filter((m) => m._id !== id))
 
   const addMethod = () => {
     const label = newName.trim()
     if (!label) return
     tmpId.current += 1
-    setMethods((ms) => [...ms, { _id: `tmp-${tmpId.current}`, key: '', label, active: true, builtin: false }])
+    setMethods((ms) => [...ms, { _id: `tmp-${tmpId.current}`, key: '', label, active: true, builtin: false, integrated: false, requireReceipt: true }])
     setNewName('')
   }
 
@@ -67,7 +69,9 @@ export default function PaymentMethodsAdmin() {
     }
     setBusy(true)
     try {
-      const saved = await updatePaymentMethods(methods.map((m) => ({ key: m.key, label: m.label, active: m.active })))
+      const saved = await updatePaymentMethods(
+        methods.map((m) => ({ key: m.key, label: m.label, active: m.active, requireReceipt: m.requireReceipt !== false }))
+      )
       setMethods(saved.map((x) => ({ ...x, _id: x.key }))) // rechaveia com as chaves reais
       toast.success('Métodos de pagamento guardados.')
     } catch (err) {
@@ -84,9 +88,10 @@ export default function PaymentMethodsAdmin() {
   return (
     <div className="flex flex-col gap-4">
       <p className="m-0 text-sm text-muted-foreground">
-        Faça a gestão dos métodos de pagamento dos convites. Os 3 métodos integrados (MB WAY, Transferência e
-        Referência) podem renomear-se e ativar/desativar. Pode ainda criar novos tipos de pagamento. Só os
-        métodos ativos aparecem para configurar nos bilhetes (podem oferecer-se vários por bilhete).
+        Faça a gestão dos métodos de pagamento dos convites. Os 3 métodos base (MB WAY, Transferência e
+        Referência) podem renomear-se e ativar/desativar; pode ainda criar novos tipos. Só o <strong>MB WAY</strong>{' '}
+        tem integração automática — os restantes são manuais. Ative <strong>Exigir comprovativo</strong> se o
+        convidado tiver de carregar o comprovativo de pagamento. Só os métodos ativos aparecem nos bilhetes.
       </p>
 
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -106,11 +111,22 @@ export default function PaymentMethodsAdmin() {
                 placeholder="Nome do método"
                 aria-label={`Nome do método ${previewKey || 'novo'}`}
               />
-              <span className="text-xs text-muted-foreground">
-                {previewKey ? `(${previewKey})` : '(novo)'}
-                {m.builtin ? ' · integrado' : ''}
+              <span className="text-xs text-muted-foreground">{previewKey ? `(${previewKey})` : '(novo)'}</span>
+              <span
+                className={
+                  'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
+                  (m.integrated
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
+                    : 'bg-muted text-muted-foreground')
+                }
+              >
+                {m.integrated ? 'Integração' : 'Sem integração'}
               </span>
               <label className="ml-auto inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                <Switch checked={m.requireReceipt !== false} onCheckedChange={(v) => setRequireReceipt(m._id, v)} />
+                Exigir comprovativo
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
                 <Switch checked={m.active} onCheckedChange={(v) => setActive(m._id, v)} />
                 {m.active ? 'Ativo' : 'Inativo'}
               </label>
