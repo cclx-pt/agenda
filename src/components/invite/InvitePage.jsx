@@ -194,7 +194,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     return wanted && tickets.some((t) => t.id === wanted) ? wanted : ''
   })
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
-  const [paymentChoice, setPaymentChoice] = useState('')
   const [busy, setBusy] = useState(false)
 
   // Já respondeu (tem estado): mostra o estado + os dados do bilhete (email/código/QR/link).
@@ -279,9 +278,9 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       : 'single'
   const hasMembers = partyType === 'group'
   const membersCap = selectedTicket?.groupSize || null
-  // Métodos de pagamento oferecidos pelo bilhete (vários → o convidado escolhe um).
+  // Métodos de pagamento oferecidos pelo bilhete — mostrados só como informação;
+  // o pagamento é despoletado depois, a partir do bilhete enviado por email.
   const ticketPayMethods = selectedTicket?.paymentMethods || []
-  const effectiveMethod = ticketPayMethods.includes(paymentChoice) ? paymentChoice : ticketPayMethods[0] || ''
 
   const submit = async (e) => {
     e.preventDefault()
@@ -319,7 +318,6 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       finalExtra.membros = cleanMembers
       finalExtra.tipoInscricao = 'Grupo'
     }
-    if (effectiveMethod) finalExtra.paymentMethod = effectiveMethod
     const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values, ticketId)
     // Lista de espera: se a lotação estiver esgotada, avisa e pede confirmação.
     let acceptWaitlist = false
@@ -595,22 +593,15 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               inputCls={inputCls}
             />
           ) : null}
-          {/* Método de pagamento: se o bilhete oferecer vários, o convidado escolhe um. */}
-          {ticketPayMethods.length > 1 ? (
-            <fieldset className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-              <legend className="mb-1">Método de pagamento *</legend>
-              {ticketPayMethods.map((m) => (
-                <label key={m} className="inline-flex items-center gap-2 font-normal text-foreground">
-                  <input
-                    type="radio"
-                    name="paymentChoice"
-                    checked={effectiveMethod === m}
-                    onChange={() => setPaymentChoice(m)}
-                  />
-                  {payLabel(page.invite, m)}
-                </label>
-              ))}
-            </fieldset>
+          {/* Métodos de pagamento: só informação. O pagamento faz-se depois, a partir do bilhete (email). */}
+          {ticketPayMethods.length > 0 ? (
+            <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <span className="font-semibold text-foreground">Métodos de pagamento</span>
+              <span className="text-muted-foreground">{ticketPayMethods.map((m) => payLabel(page.invite, m)).join(' · ')}</span>
+              <span className="text-xs text-muted-foreground">
+                O pagamento é feito depois, a partir do teu bilhete (enviado por email após a inscrição).
+              </span>
+            </div>
           ) : null}
           {fields.map(renderField)}
           <button
