@@ -35,6 +35,9 @@ function mapInvite(row) {
     rsvpDeadline: row.rsvp_deadline ?? null,
     useEventBanner: !!row.use_event_banner,
     capacity: row.capacity ?? null,
+    waitlistEnabled: !!row.waitlist_enabled,
+    spotsOnLanding: !!row.spots_on_landing,
+    spotsOnRegistration: !!row.spots_on_registration,
     community: row.community ?? null,
     jotformCommunity: row.jotform_community ?? null,
     status: row.status,
@@ -65,6 +68,7 @@ function mapGuest(row) {
     id: row.id,
     inviteId: row.invite_id,
     token: row.token,
+    code: row.code ?? null,
     name: row.name ?? null,
     email: row.email ?? null,
     phone: row.phone ?? null,
@@ -94,8 +98,9 @@ export async function insert(data, actorId) {
        location, meta_title, meta_description, meta_image_url, cost_type, cost_amount,
        cost_currency, payment_methods, rsvp_enabled, rsvp_deadline, capacity, community,
        created_by, rsvp_start_datetime, use_event_banner, payment_method, payment_provider, map_url,
-       registration_mode, registration_url, jotform_community)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
+       registration_mode, registration_url, jotform_community,
+       waitlist_enabled, spots_on_landing, spots_on_registration)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
     [
       id,
       data.eventId ?? null,
@@ -126,6 +131,9 @@ export async function insert(data, actorId) {
       data.registrationMode ?? 'internal',
       data.registrationUrl ?? null,
       data.jotformCommunity ?? null,
+      data.waitlistEnabled ?? false,
+      data.spotsOnLanding ?? false,
+      data.spotsOnRegistration ?? false,
     ]
   )
   return findById(id)
@@ -211,6 +219,9 @@ export async function update(id, data) {
        registration_mode = $24,
        registration_url = $25,
        jotform_community = $26,
+       waitlist_enabled = $27,
+       spots_on_landing = $28,
+       spots_on_registration = $29,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -240,6 +251,9 @@ export async function update(id, data) {
       data.registrationMode ?? 'internal',
       data.registrationUrl ?? null,
       data.jotformCommunity ?? null,
+      data.waitlistEnabled ?? false,
+      data.spotsOnLanding ?? false,
+      data.spotsOnRegistration ?? false,
     ]
   )
   return findById(id)
@@ -300,12 +314,13 @@ export async function insertGuest(inviteId, data) {
   const id = randomUUID()
   await pool.query(
     `INSERT INTO invite_guests
-      (id, invite_id, token, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, responded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())`,
+      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, responded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())`,
     [
       id,
       inviteId,
       data.token,
+      data.code ?? null,
       data.name ?? null,
       data.email ?? null,
       data.phone ?? null,

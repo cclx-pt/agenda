@@ -73,10 +73,13 @@ function escapeHtml(s) {
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(
   to,
-  { name, eventTitle, when, location, statusMessage, link, paymentPending = false, payUrl, receiptLink }
+  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket }
 ) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
+  const appBase = (config.appUrl || '').replace(/\/+$/, '')
+  const bilheteLink = uniqueLink || link
+  const bannerSrc = bannerUrl ? (bannerUrl.startsWith('http') ? bannerUrl : `${appBase}${bannerUrl}`) : ''
   let whenText = ''
   if (when) {
     const d = new Date(when)
@@ -91,46 +94,89 @@ export async function sendRsvpConfirmationEmail(
       })
     }
   }
-  const payHref = payUrl || link
-  const receiptHref = receiptLink || link
+  // Linha de valor do bilhete: Pago → valor; Doação → sem valor; Grátis → grátis.
+  const valueLine = ticket
+    ? ticket.isPaid && ticket.valueText
+      ? `Valor: ${ticket.valueText}`
+      : ticket.isDonation
+        ? 'Doação (valor à tua escolha)'
+        : ticket.isFree
+          ? 'Grátis'
+          : ''
+    : ''
+  const methods = ticket && !ticket.isFree ? ticket.methods || [] : []
+
   const text =
     `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
     (whenText ? `\nQuando: ${whenText}` : '') +
     (location ? `\nLocal: ${location}` : '') +
     (statusMessage ? `\n\n${statusMessage}` : '') +
-    `\n\nVê o convite e o estado da tua inscrição aqui:\n${link}` +
-    (paymentPending
-      ? `\n\nFalta concluir o pagamento:\n- Pagar: ${payHref}\n- Anexar o comprovativo (obrigatório): ${receiptHref}`
+    (ticket?.name ? `\n\nBilhete: ${ticket.name}` : '') +
+    (valueLine ? `\n${valueLine}` : '') +
+    (code ? `\nCódigo do bilhete: ${code}` : '') +
+    (methods.length
+      ? `\n\nComo pagar:\n${methods.map((m) => `- ${m.label}${m.detail ? `: ${m.detail}` : ''}`).join('\n')}`
       : '') +
-    `\n\nGuarda este link — é pessoal.\n\nAgenda CCLX`
+    (ticket?.isPaid ? `\n\nAnexa o comprovativo do pagamento aqui:\n${bilheteLink}` : '') +
+    `\n\nO teu bilhete (link único):\n${bilheteLink}` +
+    `\n\nVerifica este email — tem os dados do teu bilhete.\n\nAgenda CCLX`
+
+  const methodsHtml = methods.length
+    ? `<div style="margin:12px 0;padding:12px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">
+        <p style="margin:0 0 6px;font-weight:700;color:#111827">Como pagar</p>
+        ${methods
+          .map(
+            (m) =>
+              `<p style="margin:0 0 4px;color:#374151;font-size:14px"><strong>${escapeHtml(m.label)}</strong>${
+                m.detail ? ` — ${escapeHtml(m.detail)}` : ''
+              }</p>`
+          )
+          .join('')}
+      </div>`
+    : ''
+
+  const ticketHtml = ticket
+    ? `<div style="margin:16px 0;padding:14px;border:1px solid #e5e7eb;border-radius:10px">
+        <p style="margin:0 0 4px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Bilhete</p>
+        <p style="margin:0 0 4px;font-weight:700;color:#111827">${escapeHtml(ticket.name || '')}</p>
+        ${valueLine ? `<p style="margin:0 0 4px;color:#374151">${escapeHtml(valueLine)}</p>` : ''}
+        ${code ? `<p style="margin:6px 0 0;color:#111827">Código: <strong style="font-family:monospace;font-size:15px">${escapeHtml(code)}</strong></p>` : ''}
+      </div>`
+    : ''
+
   const html = `
-    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#111827">
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+      ${bannerSrc ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(title)}" style="width:100%;max-width:560px;border-radius:12px;margin:0 0 16px" />` : ''}
       <h2 style="color:#1f3864;margin:0 0 12px">Inscrição registada</h2>
       <p style="margin:0 0 8px">${name ? `Olá ${escapeHtml(name)},` : 'Olá,'}</p>
       <p style="margin:0 0 8px">Recebemos a tua inscrição em <strong>${escapeHtml(title)}</strong>.</p>
       ${whenText ? `<p style="margin:0 0 4px;color:#6b7280"><strong>Quando:</strong> ${escapeHtml(whenText)}</p>` : ''}
       ${location ? `<p style="margin:0 0 8px;color:#6b7280"><strong>Local:</strong> ${escapeHtml(location)}</p>` : ''}
       ${statusMessage ? `<p style="margin:12px 0;padding:12px;background:#f3f4f6;border-radius:8px">${escapeHtml(statusMessage)}</p>` : ''}
-      <p style="margin:16px 0">
-        <a href="${escapeHtml(link)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Ver o convite</a>
-      </p>
+      ${ticketHtml}
+      ${methodsHtml}
       ${
-        paymentPending
+        ticket?.isPaid
           ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
         <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
         <p style="margin:0 0 10px;color:#92400e;font-size:14px">Paga e depois anexa o comprovativo (<strong>obrigatório</strong>) para confirmarmos a tua inscrição.</p>
-        <a href="${escapeHtml(payHref)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:0 8px 8px 0">Pagar</a>
-        <a href="${escapeHtml(receiptHref)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>
+        <a href="${escapeHtml(ticket.payUrl || bilheteLink)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:0 8px 8px 0">Pagar</a>
+        <a href="${escapeHtml(bilheteLink)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>
       </div>`
           : ''
       }
-      <p style="margin:8px 0;color:#6b7280;font-size:13px">Guarda este link — é pessoal e mostra sempre o estado atual.</p>
+      <div style="margin:20px 0;text-align:center">
+        ${qrUrl ? `<img src="${escapeHtml(qrUrl)}" alt="QR do bilhete" width="200" height="200" style="border:1px solid #e5e7eb;border-radius:12px" />` : ''}
+        <p style="margin:8px 0 0;color:#6b7280;font-size:13px">Lê o QR ou abre o teu bilhete:</p>
+        <p style="margin:4px 0 0"><a href="${escapeHtml(bilheteLink)}" style="color:#1f3864;font-weight:600">${escapeHtml(bilheteLink)}</a></p>
+      </div>
+      <p style="margin:8px 0;color:#6b7280;font-size:13px">Guarda este email — tem os dados do teu bilhete. O link é pessoal e único desta inscrição.</p>
       <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Agenda CCLX</p>
     </div>`
 
   const tx = getTransporter()
   if (!tx) {
-    console.log(`\n[email:mock] Confirmação de inscrição para: ${to}\n[email:mock] Link: ${link}\n`)
+    console.log(`\n[email:mock] Confirmação de inscrição para: ${to}\n[email:mock] Link: ${bilheteLink}\n`)
     return { mocked: true }
   }
   await tx.sendMail({ from: config.smtp.from, to, subject, text, html })

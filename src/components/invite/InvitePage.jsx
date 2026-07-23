@@ -197,12 +197,52 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [paymentChoice, setPaymentChoice] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // Já respondeu (tem estado): mostra o cartão de estado em vez do formulário.
+  // Já respondeu (tem estado): mostra o estado + os dados do bilhete (email/código/QR/link).
   if (guestStatus) {
+    const ticketLink = typeof window !== 'undefined' ? window.location.href : ''
+    const qrSrc = ticketLink
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(ticketLink)}`
+      : ''
     return (
-      <div id="inscricoes" className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="m-0 mb-3 text-xl font-bold text-foreground">Inscrição</h2>
+      <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
         <StatusCard status={guestStatus} />
+        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-foreground">
+          <strong>Verifica o teu email</strong> — enviámos os dados do bilhete e o link único da tua inscrição.
+        </p>
+        {guestStatus.code ? (
+          <p className="m-0 text-sm text-muted-foreground">
+            Código do bilhete: <span className="font-mono font-bold text-foreground">{guestStatus.code}</span>
+          </p>
+        ) : null}
+        {qrSrc ? (
+          <div className="flex justify-center">
+            <img src={qrSrc} alt="QR do bilhete" width={180} height={180} className="rounded-xl border border-border" />
+          </div>
+        ) : null}
+        {ticketLink ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">O teu link (único):</span>
+            <div className="flex items-center gap-2">
+              <input readOnly value={ticketLink} className="w-full truncate rounded-lg border border-input bg-background px-3 py-2 text-xs text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    navigator.clipboard?.writeText(ticketLink)
+                    toast.success('Link copiado.')
+                  } catch {
+                    /* clipboard indisponível */
+                  }
+                }}
+                className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white"
+                style={{ backgroundColor: accent }}
+              >
+                Copiar
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -219,8 +259,12 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
   const visible = visibleKeys(fields, values, ticketId)
   const selectedTicket = tickets.find((t) => t.id === ticketId) || null
-  const partyType = selectedTicket ? (selectedTicket.kind === 'grupo' ? 'group' : selectedTicket.partyType || 'single') : 'single'
-  const hasMembers = partyType === 'family' || partyType === 'group'
+  const partyType =
+    selectedTicket &&
+    (selectedTicket.kind === 'grupo' || selectedTicket.partyType === 'family' || selectedTicket.partyType === 'group')
+      ? 'group'
+      : 'single'
+  const hasMembers = partyType === 'group'
   const membersCap = selectedTicket?.groupSize || null
   // Métodos de pagamento oferecidos pelo bilhete (vários → o convidado escolhe um).
   const ticketPayMethods = selectedTicket?.paymentMethods || []
@@ -245,7 +289,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     }
     const cleanMembers = hasMembers ? members.filter((m) => (m.nome || '').trim()) : []
     if (hasMembers && cleanMembers.length === 0) {
-      toast.error(partyType === 'family' ? 'Indique pelo menos um membro da família.' : 'Indique pelo menos um membro do grupo.')
+      toast.error('Indique pelo menos um membro do grupo.')
       return
     }
     const { name, email, phone, extra } = buildSubmission(fields, values, ticketId)
@@ -260,10 +304,26 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     const finalExtra = { ...extra }
     if (cleanMembers.length) {
       finalExtra.membros = cleanMembers
-      finalExtra.tipoInscricao = partyType === 'family' ? 'Família' : 'Grupo'
+      finalExtra.tipoInscricao = 'Grupo'
     }
     if (effectiveMethod) finalExtra.paymentMethod = effectiveMethod
     const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values, ticketId)
+    // Lista de espera: se a lotação estiver esgotada, avisa e pede confirmação.
+    let acceptWaitlist = false
+    const cap = page.invite?.capacity
+    const left = page.invite?.spotsLeft
+    if (cap && left != null && peopleCount > left) {
+      if (page.invite?.waitlistEnabled) {
+        const ok =
+          typeof window !== 'undefined' &&
+          window.confirm('As vagas estão esgotadas. Queres inscrever-te na lista de espera?')
+        if (!ok) return
+        acceptWaitlist = true
+      } else {
+        toast.error('As inscrições estão esgotadas.')
+        return
+      }
+    }
     setBusy(true)
     try {
       const res = await invitesService.submitRsvp(page.slug, {
@@ -273,6 +333,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
         guestsCount: peopleCount,
         attend: true,
         ticketId: ticketId || null,
+        acceptWaitlist,
         extra: Object.keys(finalExtra).length ? finalExtra : null,
       })
       onSubmitted(res)
@@ -498,12 +559,12 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               <select className={inputCls} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
                 <option value="">— Escolha o bilhete —</option>
                 {tickets.map((t) => {
-                  const pt = t.kind === 'grupo' ? 'group' : t.partyType || 'single'
+                  const pt = t.kind === 'grupo' || t.partyType === 'family' || t.partyType === 'group' ? 'group' : 'single'
                   return (
                     <option key={t.id} value={t.id}>
                       {t.name}
                       {ticketPriceLabel(t)}
-                      {pt !== 'single' ? ` · ${pt === 'family' ? 'Família' : 'Grupo'}${t.groupSize ? ` até ${t.groupSize}` : ''}` : ''}
+                      {pt !== 'single' ? ` · Grupo${t.groupSize ? ` até ${t.groupSize}` : ''}` : ''}
                     </option>
                   )
                 })}
@@ -511,10 +572,10 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
             </label>
           ) : null}
 
-          {/* Secção de membros (bilhete de família ou grupo) */}
+          {/* Secção de membros (bilhete de grupo) */}
           {hasMembers ? (
             <MembersSection
-              title={partyType === 'family' ? 'Inscrição da família' : 'Inscrição do grupo'}
+              title="Inscrição do grupo"
               members={members}
               setMembers={setMembers}
               max={membersCap}
@@ -546,7 +607,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
             style={{ backgroundColor: accent }}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Ticket className="h-4 w-4" aria-hidden="true" />}
-            {ctaText(c)}
+            Confirmar inscrição
           </button>
         </form>
       )}
@@ -983,6 +1044,7 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
     <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
       {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
+      {invite.spotsOnLanding ? <SpotsCounter invite={invite} accent={accent} /> : null}
       {guestStatus ? (
         <>
           <StatusCard status={guestStatus} />
@@ -1111,13 +1173,12 @@ export default function InvitePage({ slug, view = 'landing' }) {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Voltar ao convite
           </a>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h1 className="m-0 text-lg font-bold text-foreground">{page.invite.title}</h1>
-            {fmtDateRange(page.invite.startDatetime, page.invite.endDatetime) ? (
-              <p className="m-0 text-sm text-muted-foreground">{fmtDateRange(page.invite.startDatetime, page.invite.endDatetime)}</p>
-            ) : null}
-          </div>
-          <SpotsCounter invite={page.invite} accent={accent} />
+          <BannerCard
+            block={page.blocks.find((b) => b.type === 'banner' || b.type === 'cabecalho') || { content: {} }}
+            page={page}
+            accent={accent}
+          />
+          {page.invite.spotsOnRegistration ? <SpotsCounter invite={page.invite} accent={accent} /> : null}
           <RsvpCard block={rsvpBlock} page={page} accent={accent} guestStatus={guestStatus} onSubmitted={onRsvpSubmitted} />
           <PaymentFlowCard
             slug={page.slug}

@@ -301,7 +301,7 @@ function PaymentCard({ block, page, accent }) {
                   <span className="flex min-w-0 flex-col">
                     <span className="text-sm font-semibold text-foreground">{t.name}</span>
                     {(t.partyType === 'family' || t.partyType === 'group' || t.kind === 'grupo') && t.groupSize ? (
-                      <span className="text-xs text-muted-foreground">{t.partyType === 'family' ? 'Família' : 'Grupo'} até {t.groupSize} pessoas</span>
+                      <span className="text-xs text-muted-foreground">Grupo até {t.groupSize} pessoas</span>
                     ) : null}
                     {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
                   </span>

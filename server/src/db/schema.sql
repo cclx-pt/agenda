@@ -371,6 +371,9 @@ CREATE TABLE IF NOT EXISTS invites (
   rsvp_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
   rsvp_deadline    TIMESTAMPTZ,
   capacity         INTEGER,
+  waitlist_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  spots_on_landing BOOLEAN NOT NULL DEFAULT FALSE,
+  spots_on_registration BOOLEAN NOT NULL DEFAULT FALSE,
   community        TEXT,
   jotform_community TEXT,
   status           TEXT NOT NULL DEFAULT 'rascunho'
@@ -468,6 +471,10 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_mode TEXT NOT NULL DEF
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS registration_url TEXT;
 -- Comunidade enviada ao JotForm do MB WAY (conjunto do JotForm; NULL = automático).
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS jotform_community TEXT;
+-- Lista de espera (opt-in) + onde mostrar o contador de vagas (landing / inscrição).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_landing BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_registration BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual/pago (com valor), grátis
 -- (0€), doação (valor à escolha) ou grupo. Cada tipo tem preço, capacidade
@@ -514,3 +521,5 @@ ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_numbers JSONB;
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;
+-- Código curto único do bilhete (mostrado ao convidado / QR / validação à entrada).
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS code TEXT;

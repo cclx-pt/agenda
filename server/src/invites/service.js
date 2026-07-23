@@ -5,7 +5,7 @@ import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
 import { config } from '../config.js'
 import { sendRsvpConfirmationEmail } from '../auth/email.js'
-import { getActivePaymentMethods } from '../settings/service.js'
+import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -177,6 +177,9 @@ const inviteInputSchema = z.object({
   rsvpDeadline: isoDate,
   useEventBanner: z.boolean().optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
+  waitlistEnabled: z.boolean().optional(),
+  spotsOnLanding: z.boolean().optional(),
+  spotsOnRegistration: z.boolean().optional(),
   community: z.string().trim().max(120).optional().nullable(),
   jotformCommunity: z.enum(JOTFORM_COMMUNITIES).nullable().optional(),
 })
@@ -191,7 +194,7 @@ const ticketSchema = z.object({
   currency: z.string().trim().max(8).optional(),
   capacity: z.number().int().min(1).max(1000000).optional().nullable(),
   groupSize: z.number().int().min(1).max(1000).optional().nullable(),
-  partyType: z.enum(['single', 'family', 'group']).optional().default('single'),
+  partyType: z.enum(['single', 'group']).optional().default('single'),
   description: z.string().trim().max(500).optional().nullable(),
   paymentMethod: paymentMethodKeySchema.optional().nullable(),
   paymentMethods: z.array(paymentMethodKeySchema).max(10).optional().nullable(),
@@ -219,6 +222,8 @@ const rsvpSchema = z.object({
   attend: z.boolean().optional().default(true),
   ticketId: z.string().uuid().optional().nullable(),
   extra: z.record(z.any()).optional().nullable(),
+  // Confirma a entrada em lista de espera quando a lotação está esgotada.
+  acceptWaitlist: z.boolean().optional(),
 })
 
 // ── Auxiliares de evento associado e pagamento ───────────────────
@@ -241,6 +246,15 @@ function normalizePayment(data) {
 }
 
 // Um bilhete EXIGE pagamento (comprovativo) só quando é "Pago" com preço > 0.
+// Código curto e legível do bilhete (para o convidado / QR / validação à entrada).
+const GUEST_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function genGuestCode() {
+  const b = randomBytes(8)
+  let s = ''
+  for (let i = 0; i < 8; i += 1) s += GUEST_CODE_ALPHABET[b[i] % GUEST_CODE_ALPHABET.length]
+  return `${s.slice(0, 4)}-${s.slice(4)}`
+}
+
 // Grátis e Doação confirmam automaticamente a inscrição (a doação regista o
 // valor mas não bloqueia a inscrição num pagamento).
 function ticketNeedsPayment(t) {
@@ -522,6 +536,7 @@ function guestStatusPayload(guest, paymentMethod = null) {
     paymentMethod: paymentMethod ?? null,
     phone: guest.phone ?? null,
     ticketId: guest.ticketId ?? null,
+    code: guest.code ?? null,
     nextAction,
     message,
   }
@@ -584,6 +599,9 @@ function renderPayload(
       rsvpDeadline: invite.rsvpDeadline,
       capacity: invite.capacity,
       spotsLeft,
+      waitlistEnabled: invite.waitlistEnabled,
+      spotsOnLanding: invite.spotsOnLanding,
+      spotsOnRegistration: invite.spotsOnRegistration,
     },
     meta: buildMeta(invite, banner),
     // Bilhetes ativos (só relevante para eventos pagos).
@@ -713,13 +731,42 @@ function assertSubmissionValid(fields, values, ticketId) {
 }
 
 // Envia (em background) a confirmação de inscrição ao convidado com o link pessoal.
-function notifyGuestConfirmation(invite, guest, status, methodType) {
-  if (!guest?.email) return
-  const base = (config.appUrl || '').replace(/\/+$/, '')
-  const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
-  // Página onde se paga (MB WAY/IBAN/ref) E se carrega o comprovativo.
-  const receiptLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
-  // Link de pagamento: MB WAY Contribuir (JotForm) → direto ao formulário; outros → a página.
+// Dados de pagamento do bilhete para o email de confirmação (todos exceto o
+// grátis). Doação → sem valor; Pago → valor calculado; métodos com as suas
+// modalidades configuradas (IBAN, números MB WAY, entidade/referência).
+function buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentInfo, { uniqueLink, methodType }) {
+  if (!ticket) return null
+  const isDonation = ticket.kind === 'voluntaria'
+  const isPaid = ticketNeedsPayment(ticket)
+  const isFree = !isDonation && !isPaid
+  const currency = ticket.currency || invite.costCurrency || 'EUR'
+  const valueText = isPaid && ticket.price != null ? `${Number(ticket.price).toFixed(2)} ${currency}` : null
+  const byKey = new Map((activeMethods || []).map((m) => [m.key, m]))
+  const methods = []
+  if (!isFree) {
+    for (const key of ticketMethods(ticket)) {
+      const def = byKey.get(key)
+      if (!def) continue
+      let detail = ''
+      if (def.type === 'transferencia') {
+        const iban = paymentInfo?.iban || ''
+        const benef = paymentInfo?.beneficiary || ''
+        detail = [iban ? `IBAN: ${iban}` : '', benef ? `Beneficiário: ${benef}` : ''].filter(Boolean).join(' · ')
+      } else if (def.type === 'mbway') {
+        const nums = Array.isArray(ticket.mbNumbers) && ticket.mbNumbers.length ? ticket.mbNumbers : def.numbers || []
+        detail = nums.length ? `MB WAY: ${nums.join(' · ')}` : ''
+      } else if (def.type === 'referencia-multibanco') {
+        detail = [ticket.mbEntity ? `Entidade: ${ticket.mbEntity}` : '', ticket.mbReference ? `Referência: ${ticket.mbReference}` : '']
+          .filter(Boolean)
+          .join(' · ')
+      } else if (def.type === 'mbway-contribuir') {
+        detail = 'Pagamento MB WAY — usa o botão na página da inscrição.'
+      } else if (def.type === 'numerario') {
+        detail = 'Pagamento em numerário, presencialmente.'
+      }
+      methods.push({ label: def.label || key, detail })
+    }
+  }
   const payUrl =
     methodType === 'mbway-contribuir'
       ? buildJotformUrl({
@@ -728,18 +775,44 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
           eventId: invite.eventId || invite.slug,
           ticketId: guest.ticketId,
         })
-      : receiptLink
-  const p = sendRsvpConfirmationEmail(guest.email, {
-    name: guest.name,
-    eventTitle: invite.title,
-    when: invite.startDatetime,
-    location: invite.location ?? null,
-    statusMessage: status?.message ?? '',
-    link,
-    paymentPending: status?.paymentState === 'pending',
-    payUrl,
-    receiptLink,
-  }).catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
+      : uniqueLink
+  return { name: ticket.name ?? null, isFree, isDonation, isPaid, valueText, methods, payUrl }
+}
+
+function notifyGuestConfirmation(invite, guest, status, methodType) {
+  if (!guest?.email) return
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  // Link ÚNICO desta inscrição (abre o bilhete/estado) — no email e dentro do QR.
+  const uniqueLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
+  const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
+  const p = (async () => {
+    const [ticket, activeMethods, paymentInfo, banner] = await Promise.all([
+      guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
+      getActivePaymentMethods().catch(() => []),
+      getInvitePaymentInfo().catch(() => null),
+      resolveInviteBanner(invite).catch(() => invite.bannerUrl ?? null),
+    ])
+    const ticketInfo = buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentInfo, {
+      uniqueLink,
+      methodType,
+    })
+    // QR com o LINK único da inscrição (abre o bilhete ao ler).
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(uniqueLink)}`
+    await sendRsvpConfirmationEmail(guest.email, {
+      name: guest.name,
+      eventTitle: invite.title,
+      when: invite.startDatetime,
+      location: invite.location ?? null,
+      statusMessage: status?.message ?? '',
+      link,
+      uniqueLink,
+      code: guest.code ?? null,
+      bannerUrl: banner ?? null,
+      qrUrl,
+      ticket: ticketInfo,
+      paymentPending: status?.paymentState === 'pending',
+    })
+  })().catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
   try {
     waitUntil(p)
   } catch {
@@ -803,44 +876,40 @@ export async function submitRsvp(slug, input) {
   const paymentState =
     (ticket ? ticketNeedsPayment(ticket) : invite.costType !== 'gratuito') ? 'pending' : 'not_applicable'
 
-  // Capacidade: do bilhete escolhido (se houver) ou global do convite. Excedendo → lista de espera.
+  // Capacidade: do bilhete escolhido (se houver) ou global do convite.
   let rsvpState = data.attend ? 'confirmed' : 'declined'
   if (rsvpState === 'confirmed') {
+    let wouldExceed = false
     if (ticket && ticket.capacity != null) {
       const sold = await repo.countTicketSold(ticket.id)
-      if (sold + (data.guestsCount ?? 1) > ticket.capacity) rsvpState = 'waitlisted'
+      if (sold + (data.guestsCount ?? 1) > ticket.capacity) wouldExceed = true
     } else if (invite.capacity) {
       const taken = await repo.countConfirmedSeats(invite.id)
-      if (taken + (data.guestsCount ?? 1) > invite.capacity) rsvpState = 'waitlisted'
+      if (taken + (data.guestsCount ?? 1) > invite.capacity) wouldExceed = true
+    }
+    if (wouldExceed) {
+      // Lotação esgotada: com lista de espera ativa → lista de espera; senão, bloqueia.
+      if (!invite.waitlistEnabled) {
+        throw new InviteError(409, 'A lotação está esgotada. As inscrições estão completas.')
+      }
+      rsvpState = 'waitlisted'
     }
   }
 
-  // Idempotente por email: atualiza a resposta existente em vez de duplicar.
-  const existing = data.email ? await repo.findGuestByEmail(invite.id, data.email) : null
-  let guest
-  if (existing) {
-    guest = await repo.updateGuest(existing.id, {
-      name: data.name,
-      phone: data.phone ?? null,
-      guestsCount: data.guestsCount ?? 1,
-      rsvpState,
-      paymentState: existing.paymentState === 'not_applicable' ? paymentState : existing.paymentState,
-      ticketId: ticket?.id ?? null,
-      extra: data.extra ?? null,
-    })
-  } else {
-    guest = await repo.insertGuest(invite.id, {
-      token: randomBytes(24).toString('hex'),
-      name: data.name,
-      email: data.email ?? null,
-      phone: data.phone ?? null,
-      guestsCount: data.guestsCount ?? 1,
-      rsvpState,
-      paymentState,
-      ticketId: ticket?.id ?? null,
-      extra: data.extra ?? null,
-    })
-  }
+  // Cada inscrição é Única (não idempotente): cria sempre um novo registo, com o seu
+  // próprio token pessoal e código de bilhete.
+  const guest = await repo.insertGuest(invite.id, {
+    token: randomBytes(24).toString('hex'),
+    code: genGuestCode(),
+    name: data.name,
+    email: data.email ?? null,
+    phone: data.phone ?? null,
+    guestsCount: data.guestsCount ?? 1,
+    rsvpState,
+    paymentState,
+    ticketId: ticket?.id ?? null,
+    extra: data.extra ?? null,
+  })
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket))
   let methodType = null
   if (status?.paymentMethod) {

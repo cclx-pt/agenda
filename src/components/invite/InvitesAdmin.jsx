@@ -51,17 +51,16 @@ const PAY_BADGE = {
 }
 
 // Tipo de PREÇO do bilhete: Pago (com valor), Grátis (0€) ou Doação (valor à
-// escolha do doador). A composição (individual/família/grupo) é um campo à parte.
+// escolha do doador). A composição (individual/grupo) é um campo à parte.
 const TICKET_KINDS = [
   { value: 'individual', label: 'Pago' },
   { value: 'gratis', label: 'Grátis' },
   { value: 'voluntaria', label: 'Doação' },
 ]
-// Composição do bilhete: individual, família ou grupo. Família/grupo abrem a lista
-// de membros (nome, idade e observações se < 11) no formulário de inscrição.
+// Composição do bilhete: individual ou grupo. O grupo abre a lista de membros
+// (nome, idade e observações se < 11) no formulário de inscrição.
 const PARTY_TYPES = [
   { value: 'single', label: 'Individual' },
-  { value: 'family', label: 'Família' },
   { value: 'group', label: 'Grupo' },
 ]
 // Normaliza o tipo de preço; tipos legados de composição ('grupo'/'campanha') → pago.
@@ -71,9 +70,9 @@ function normalizeKind(kind) {
 }
 // Composição efetiva de um bilhete (deriva de tipos legados baseados no kind).
 function normalizePartyType(t) {
-  // Legado: bilhetes com kind 'grupo'/'campanha' são grupo (o party_type ainda é o default 'single').
+  // Legado: kind 'grupo'/'campanha' e o antigo party_type 'family' → grupo.
   if (t.kind === 'grupo' || t.kind === 'campanha') return 'group'
-  if (t.partyType === 'family' || t.partyType === 'group') return t.partyType
+  if (t.partyType === 'family' || t.partyType === 'group') return 'group'
   return 'single'
 }
 // Um bilhete é gratuito se for do tipo "grátis" ou (não-voluntária) sem preço > 0.
@@ -218,6 +217,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     rsvpEndDate: toDateInput(invite.rsvpDeadline),
     rsvpEndTime: toTimeInput(invite.rsvpDeadline),
     capacity: invite.capacity ?? '',
+    waitlistEnabled: invite.waitlistEnabled === true,
+    spotsOnLanding: invite.spotsOnLanding === true,
+    spotsOnRegistration: invite.spotsOnRegistration === true,
     metaDescription: invite.metaDescription ?? '',
   }))
   const [tickets, setTickets] = useState(() =>
@@ -380,6 +382,9 @@ function InviteEditor({ invite, onBack, onSaved }) {
     rsvpStartDatetime: settings.rsvpStartDate ? combineDateTime(settings.rsvpStartDate, settings.rsvpStartTime || '00:00') : null,
     rsvpDeadline: settings.rsvpEndDate ? combineDateTime(settings.rsvpEndDate, settings.rsvpEndTime || '23:59') : null,
     capacity: settings.capacity ? Number(settings.capacity) : null,
+    waitlistEnabled: settings.waitlistEnabled,
+    spotsOnLanding: settings.spotsOnLanding,
+    spotsOnRegistration: settings.spotsOnRegistration,
     // Sem override por convite: usa a comunidade da inscrição (resolvida no backend).
     jotformCommunity: null,
   })
@@ -920,7 +925,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
                     </div>
                     {normalizePartyType(t) !== 'single' ? (
                       <p className="m-0 text-xs text-muted-foreground">
-                        No formulário público, este bilhete abre a lista de {normalizePartyType(t) === 'family' ? 'membros da família' : 'membros do grupo'} — pede nome, idade e (se for menor de 11) observações.
+                        No formulário público, este bilhete abre a lista de membros do grupo — pede nome, idade e (se for menor de 11) observações.
                       </p>
                     ) : null}
                     {t.kind === 'voluntaria' ? (
@@ -1101,6 +1106,29 @@ function InviteEditor({ invite, onBack, onSaved }) {
                   As inscrições só abrem depois de publicar o convite.
                 </span>
               ) : null}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
+                <Switch checked={settings.waitlistEnabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, waitlistEnabled: v }))} />
+                Lista de espera {settings.waitlistEnabled ? 'ativa' : 'inativa'}
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {settings.waitlistEnabled
+                  ? 'Com a lotação esgotada, o convidado pode inscrever-se em lista de espera (é avisado antes).'
+                  : 'Com a lotação esgotada, as inscrições ficam indisponíveis.'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Contador de vagas</span>
+              <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
+                <Switch checked={settings.spotsOnLanding} onCheckedChange={(v) => setSettings((s) => ({ ...s, spotsOnLanding: v }))} />
+                Mostrar na página inicial
+              </label>
+              <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
+                <Switch checked={settings.spotsOnRegistration} onCheckedChange={(v) => setSettings((s) => ({ ...s, spotsOnRegistration: v }))} />
+                Mostrar na inscrição
+              </label>
+              <span className="text-xs text-muted-foreground">Requer capacidade definida.</span>
             </div>
           </div>
         </section>
