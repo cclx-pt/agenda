@@ -587,6 +587,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const exportGuests = () => {
     if (!guests || guests.length === 0) return
     const cols = [
+      ['Nº do bilhete', (g) => g.code || ''],
       ['Nome', (g) => g.name || ''],
       ['Email', (g) => g.email || ''],
       ['Telemóvel', (g) => g.phone || ''],
@@ -598,6 +599,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ['Doação (€)', (g) => fmtDonation(g.extra?.donationAmount)],
       ['Lugares', (g) => g.guestsCount ?? ''],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
+      ['Check-in', (g) => (g.checkedInAt ? fmtDateTime(g.checkedInAt) : '')],
       ...answerFields.map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),
       ...extraAnswerKeys.map((k) => [k, (g) => formatAnswer(null, g.extra?.[k])]),
     ]

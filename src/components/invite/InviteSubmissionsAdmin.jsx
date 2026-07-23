@@ -70,6 +70,18 @@ function formatAnswer(value) {
   return String(value)
 }
 
+// Chaves do `extra` já mostradas em colunas próprias (não repetir em "Respostas").
+const DEDICATED_EXTRA_KEYS = new Set(['tipoInscricao', 'membros', 'donationAmount'])
+
+// Junta as restantes respostas do formulário (chave: valor) numa só célula do Excel.
+function extraAnswersText(g) {
+  const extra = g.extra || {}
+  return Object.entries(extra)
+    .filter(([k, v]) => !DEDICATED_EXTRA_KEYS.has(k) && formatAnswer(v) !== '')
+    .map(([k, v]) => `${k}: ${formatAnswer(v)}`)
+    .join('; ')
+}
+
 // Vista GLOBAL das inscrições de TODOS os convites. Agrega os convidados de cada
 // convite (não há endpoint agregado — carrega convite a convite), filtra por
 // convite/estado/pagamento, permite ver detalhes, editar, cancelar ou eliminar
@@ -194,14 +206,20 @@ export default function InviteSubmissionsAdmin() {
   const exportRows = () => {
     if (!filtered.length) return
     const cols = [
+      ['Nº do bilhete', (g) => g.code || ''],
       ['Convite', (g) => g.inviteTitle || ''],
       ['Nome', (g) => g.name || ''],
       ['Email', (g) => g.email || ''],
       ['Telemóvel', (g) => g.phone || ''],
       ['Estado', (g) => SITUACAO_LABEL[inscricaoSituacao(g)] || ''],
       ['Pagamento', (g) => payLabel(g.paymentState)],
+      ['Tipo de inscrição', (g) => g.extra?.tipoInscricao || ''],
+      ['Membros', (g) => formatAnswer(g.extra?.membros)],
+      ['Doação (€)', (g) => (g.extra?.donationAmount != null && g.extra?.donationAmount !== '' ? String(g.extra.donationAmount) : '')],
       ['Lugares', (g) => g.guestsCount ?? ''],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
+      ['Check-in', (g) => (g.checkedInAt ? fmtDateTime(g.checkedInAt) : '')],
+      ['Respostas', (g) => extraAnswersText(g)],
     ]
     const cell = (v) => {
       const s = String(v ?? '')
