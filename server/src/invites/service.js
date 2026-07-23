@@ -570,7 +570,7 @@ function resolveGuestMethod(guest, ticket) {
 
 // Estado do convidado (calculado, não persistido como bloco). `paymentMethod` = o
 // método do bilhete escolhido (mbway/transferencia/referencia); null se grátis.
-function guestStatusPayload(guest, paymentMethod = null) {
+function guestStatusPayload(guest, paymentMethod = null, ticket = null) {
   if (!guest) return null
   const hasPayment = !!paymentMethod
   let nextAction = 'none'
@@ -593,6 +593,8 @@ function guestStatusPayload(guest, paymentMethod = null) {
   } else if (guest.rsvpState === 'declined') {
     message = 'Registámos que não vais poder estar presente.'
   }
+  const isDonation = ticket?.kind === 'voluntaria'
+  const isPaid = ticketNeedsPayment(ticket)
   return {
     rsvpState: guest.rsvpState,
     paymentState: guest.paymentState,
@@ -600,6 +602,10 @@ function guestStatusPayload(guest, paymentMethod = null) {
     phone: guest.phone ?? null,
     ticketId: guest.ticketId ?? null,
     code: guest.code ?? null,
+    isDonation,
+    // Mostra a secção de pagamento/comprovativo quando o bilhete NÃO é grátis
+    // (pago ou doação) — o anexo do comprovativo está sempre ligado ao bilhete.
+    showReceipt: !!ticket && (isDonation || isPaid),
     nextAction,
     message,
   }
@@ -664,7 +670,7 @@ function renderPayload(
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
-  const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket))
+  const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket), guestTicket)
   if (guestStatus) {
     guestStatus.jotformCommunity = resolveJotformCommunity(invite, guest, community)
     guestStatus.data = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
@@ -1021,7 +1027,7 @@ export async function submitRsvp(slug, input) {
     ticketId: ticket?.id ?? null,
     extra: data.extra ?? null,
   })
-  const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket))
+  const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)
   let methodType = null
   if (status?.paymentMethod) {
     const activeMethods = await getActivePaymentMethods().catch(() => [])

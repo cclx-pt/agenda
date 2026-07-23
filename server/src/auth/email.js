@@ -173,7 +173,14 @@ export async function sendRsvpConfirmationEmail(
       ${dataHtml}
       ${methodsHtml}
       ${
-        ticket?.showPay
+        ticket?.isDonation
+          ? `<div style="margin:16px 0;padding:14px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px">
+        <p style="margin:0 0 6px;font-weight:700;color:#065f46">Contribuição voluntária</p>
+        <p style="margin:0 0 10px;color:#065f46;font-size:14px">A tua inscrição está confirmada. Se quiseres contribuir, usa o método abaixo e, se quiseres, anexa o comprovativo.</p>
+        <a href="${escapeHtml(ticket.payUrl || bilheteLink)}" style="display:inline-block;background:#047857;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:0 8px 8px 0">Contribuir</a>
+        <a href="${escapeHtml(bilheteLink)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>
+      </div>`
+          : ticket?.showPay
           ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
         <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
         <p style="margin:0 0 10px;color:#92400e;font-size:14px">Paga${ticket.requireReceipt ? ' e depois anexa o comprovativo (<strong>obrigatório</strong>)' : ''} para confirmarmos a tua inscrição.</p>

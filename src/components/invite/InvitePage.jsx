@@ -786,8 +786,9 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
 // Fluxo de pagamento do convidado (aparece só para eventos pagos, a quem já se
 // inscreveu). Escolha do método → instruções (IBAN/referência) → comprovativo.
 function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
-  const applicable =
-    invite.costType !== 'gratuito' && !!guestToken && !!guestStatus && guestStatus.paymentState !== 'not_applicable'
+  // Mostra a secção de pagamento/comprovativo quando o bilhete do convidado NÃO
+  // é grátis (pago OU doação). O anexo do comprovativo está sempre ligado ao bilhete.
+  const applicable = !!guestToken && !!guestStatus && guestStatus.showReceipt
   const [payment, setPayment] = useState(null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -873,20 +874,47 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
     }
   }
 
-  const methods = invite.paymentMethod ? [invite.paymentMethod] : []
+  // Método do bilhete (o convidado já não escolhe — vem resolvido do bilhete).
+  const isDonation = !!guestStatus.isDonation
+  // Doação = contribuição voluntária → comprovativo sempre OPCIONAL. Caso
+  // contrário, respeita a configuração do método (paymentMethodReceipt).
+  const receiptReq = !isDonation && receiptRequired(invite, payMethod)
+  const methods = payMethod ? [payMethod] : []
   const instr = payment?.instructions
+
+  // Anexar comprovativo — sempre disponível, ligado ao bilhete (mostra se é
+  // obrigatório ou opcional). Não obriga a "iniciar" o pagamento primeiro.
+  const receiptBlock = (
+    <div className="mt-3 flex flex-col gap-1.5 border-t border-border/60 pt-3">
+      <p className="m-0 text-sm text-foreground">
+        {receiptReq ? 'Este bilhete exige comprovativo de pagamento.' : 'Comprovativo opcional para este bilhete.'}
+      </p>
+      <label
+        className="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+        style={{ backgroundColor: accent }}
+      >
+        {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+        {uploading ? 'A enviar…' : `Anexar comprovativo${receiptReq ? ' (obrigatório)' : ' (opcional)'}`}
+        <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
+      </label>
+    </div>
+  )
 
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
         <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        Pagamento
+        {isDonation ? 'Contribuição' : 'Pagamento'}
       </h2>
+      {isDonation ? (
+        <p className="m-0 mb-3 text-sm text-muted-foreground">
+          A tua inscrição está confirmada. A contribuição é voluntária — se quiseres contribuir, usa o método abaixo.
+        </p>
+      ) : null}
       {!instr ? (
         <div className="flex flex-col gap-2">
-          <p className="m-0 text-sm text-muted-foreground">Escolha como quer pagar:</p>
           {methods.length === 0 ? (
-            <p className="m-0 text-sm text-muted-foreground">Sem métodos configurados. Contacte o organizador.</p>
+            <p className="m-0 text-sm text-muted-foreground">Sem método de pagamento configurado. Contacta o organizador.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {methods.map((m) => (
@@ -898,7 +926,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
                   className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: accent }}
                 >
-                  {payLabel(invite, m)}
+                  {busy ? 'A carregar…' : `Como pagar — ${payLabel(invite, m)}`}
                 </button>
               ))}
             </div>
@@ -920,14 +948,6 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
               <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
             </div>
           ) : null}
-          <label
-            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
-            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
-          </label>
         </div>
       ) : instr.type === 'reference' ? (
         <div className="flex flex-col gap-2">
@@ -946,13 +966,13 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
             </div>
           ) : null}
           <p className="m-0 text-xs text-muted-foreground">
-            Pague no homebanking ou Multibanco. Confirmamos a inscrição assim que recebermos o pagamento.
+            Paga no homebanking ou Multibanco. Confirmamos a inscrição assim que recebermos o pagamento.
           </p>
         </div>
       ) : instr.type === 'mbway' ? (
         <div className="flex flex-col gap-2">
           <p className="m-0 text-sm text-muted-foreground">
-            {instr.note || 'Envie o valor por MB WAY para um dos números indicados e depois carregue o comprovativo.'}
+            {instr.note || 'Envia o valor por MB WAY para um dos números indicados e depois anexa o comprovativo.'}
           </p>
           {(instr.numbers || []).length ? (
             <div className="flex flex-col gap-1">
@@ -964,7 +984,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
               ))}
             </div>
           ) : (
-            <p className="m-0 text-sm text-muted-foreground">Sem números configurados. Contacte o organizador.</p>
+            <p className="m-0 text-sm text-muted-foreground">Sem números configurados. Contacta o organizador.</p>
           )}
           {instr.amount != null ? (
             <div className={rowCls}>
@@ -972,19 +992,11 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
               <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
             </div>
           ) : null}
-          <label
-            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
-            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
-          </label>
         </div>
       ) : instr.type === 'cash' ? (
         <div className="flex flex-col gap-2">
           <p className="m-0 text-sm text-muted-foreground">
-            {instr.note || 'Pague em numerário junto de um líder, banca da igreja ou livraria, e depois carregue o comprovativo.'}
+            {instr.note || 'Paga em numerário junto de um líder, banca da igreja ou livraria, e depois anexa o comprovativo.'}
           </p>
           {instr.amount != null ? (
             <div className={rowCls}>
@@ -992,19 +1004,11 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
               <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
             </div>
           ) : null}
-          <label
-            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
-            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
-          </label>
         </div>
       ) : instr.type === 'custom' ? (
         <div className="flex flex-col gap-2">
           <p className="m-0 text-sm text-muted-foreground">
-            {instr.note || 'Siga as instruções do organizador para concluir o pagamento e depois carregue o comprovativo.'}
+            {instr.note || 'Segue as instruções do organizador para concluir o pagamento e depois anexa o comprovativo.'}
           </p>
           {instr.amount != null ? (
             <div className={rowCls}>
@@ -1012,16 +1016,9 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
               <span className="font-semibold text-foreground">{Number(instr.amount).toFixed(2)} {instr.currency}</span>
             </div>
           ) : null}
-          <label
-            className="mt-2 inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, payMethod) ? '' : ' (opcional)'}`}
-            <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
-          </label>
         </div>
       ) : null}
+      {receiptBlock}
     </div>
   )
 }
