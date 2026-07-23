@@ -78,6 +78,7 @@ function mapGuest(row) {
     ticketId: row.ticket_id ?? null,
     extra: row.extra ?? null,
     respondedAt: row.responded_at ?? null,
+    checkedInAt: row.checked_in_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -350,6 +351,24 @@ export async function findGuestByEmail(inviteId, email) {
     [inviteId, email]
   )
   return mapGuest(rows[0])
+}
+
+// Procura por código curto do bilhete (case-insensitive), dentro do convite.
+export async function findGuestByCode(inviteId, code) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_guests WHERE invite_id = $1 AND upper(code) = upper($2) LIMIT 1',
+    [inviteId, code]
+  )
+  return mapGuest(rows[0])
+}
+
+// Marca (ou desmarca) o check-in de uma inscrição.
+export async function setCheckedIn(id, on = true) {
+  await pool.query(
+    `UPDATE invite_guests SET checked_in_at = ${on ? 'now()' : 'NULL'}, updated_at = now() WHERE id = $1`,
+    [id]
+  )
+  return findGuestById(id)
 }
 
 export async function listGuests(inviteId) {

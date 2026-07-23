@@ -523,3 +523,5 @@ ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_numbers JSONB;
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;
 -- Código curto único do bilhete (mostrado ao convidado / QR / validação à entrada).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS code TEXT;
+-- Data/hora do check-in (validação à entrada); NULL = ainda não fez check-in.
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;

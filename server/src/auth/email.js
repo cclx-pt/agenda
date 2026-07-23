@@ -73,7 +73,7 @@ function escapeHtml(s) {
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(
   to,
-  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket }
+  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket, data }
 ) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
@@ -117,7 +117,10 @@ export async function sendRsvpConfirmationEmail(
     (methods.length
       ? `\n\nComo pagar:\n${methods.map((m) => `- ${m.label}${m.detail ? `: ${m.detail}` : ''}`).join('\n')}`
       : '') +
-    (ticket?.isPaid ? `\n\nAnexa o comprovativo do pagamento aqui:\n${bilheteLink}` : '') +
+    (ticket?.requireReceipt ? `\n\nAnexa o comprovativo do pagamento aqui:\n${bilheteLink}` : '') +
+    (Array.isArray(data) && data.length
+      ? `\n\nDados da inscrição:\n${data.map((d) => `- ${d.label}: ${d.value}`).join('\n')}`
+      : '') +
     `\n\nO teu bilhete (link único):\n${bilheteLink}` +
     `\n\nVerifica este email — tem os dados do teu bilhete.\n\nAgenda CCLX`
 
@@ -144,6 +147,19 @@ export async function sendRsvpConfirmationEmail(
       </div>`
     : ''
 
+  const dataHtml =
+    Array.isArray(data) && data.length
+      ? `<div style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px">
+        <p style="margin:0 0 6px;font-weight:700;color:#111827">Dados da inscrição</p>
+        ${data
+          .map(
+            (d) =>
+              `<p style="margin:0 0 3px;color:#374151;font-size:14px"><strong>${escapeHtml(d.label)}:</strong> ${escapeHtml(String(d.value))}</p>`
+          )
+          .join('')}
+      </div>`
+      : ''
+
   const html = `
     <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
       ${bannerSrc ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(title)}" style="width:100%;max-width:560px;border-radius:12px;margin:0 0 16px" />` : ''}
@@ -154,14 +170,15 @@ export async function sendRsvpConfirmationEmail(
       ${location ? `<p style="margin:0 0 8px;color:#6b7280"><strong>Local:</strong> ${escapeHtml(location)}</p>` : ''}
       ${statusMessage ? `<p style="margin:12px 0;padding:12px;background:#f3f4f6;border-radius:8px">${escapeHtml(statusMessage)}</p>` : ''}
       ${ticketHtml}
+      ${dataHtml}
       ${methodsHtml}
       ${
-        ticket?.isPaid
+        ticket?.showPay
           ? `<div style="margin:16px 0;padding:14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
         <p style="margin:0 0 6px;font-weight:700;color:#92400e">Falta concluir o pagamento</p>
-        <p style="margin:0 0 10px;color:#92400e;font-size:14px">Paga e depois anexa o comprovativo (<strong>obrigatório</strong>) para confirmarmos a tua inscrição.</p>
+        <p style="margin:0 0 10px;color:#92400e;font-size:14px">Paga${ticket.requireReceipt ? ' e depois anexa o comprovativo (<strong>obrigatório</strong>)' : ''} para confirmarmos a tua inscrição.</p>
         <a href="${escapeHtml(ticket.payUrl || bilheteLink)}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:0 8px 8px 0">Pagar</a>
-        <a href="${escapeHtml(bilheteLink)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>
+        ${ticket.requireReceipt ? `<a href="${escapeHtml(bilheteLink)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Anexar comprovativo</a>` : ''}
       </div>`
           : ''
       }

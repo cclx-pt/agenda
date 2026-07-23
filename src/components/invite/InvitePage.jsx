@@ -243,6 +243,19 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
             </div>
           </div>
         ) : null}
+        {Array.isArray(guestStatus.data) && guestStatus.data.length ? (
+          <div className="flex flex-col gap-1 rounded-lg border border-border p-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados da inscrição</span>
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+              {guestStatus.data.map((d, i) => (
+                <div key={i} className="flex flex-col">
+                  <dt className="text-xs text-muted-foreground">{d.label}</dt>
+                  <dd className="m-0 text-foreground">{d.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
       </div>
     )
   }

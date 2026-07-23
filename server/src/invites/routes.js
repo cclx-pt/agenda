@@ -207,6 +207,23 @@ invitesRouter.post(
   })
 )
 
+// ── Check-in (validação à entrada) ─────────────────────
+invitesRouter.get(
+  '/:id/checkin/lookup',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ result: await service.checkinLookup(req.user, req.params.id, req.query.code) })
+  })
+)
+
+invitesRouter.post(
+  '/:id/checkin/:guestId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ guest: await service.acceptCheckin(req.user, req.params.id, req.params.guestId, { on: req.body?.on !== false }) })
+  })
+)
+
 invitesRouter.delete(
   '/:id',
   manageRoles,

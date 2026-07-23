@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { waitUntil } from '@vercel/functions'
 import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
+import * as paymentsRepo from './payments/repository.js'
 import { config } from '../config.js'
 import { sendRsvpConfirmationEmail } from '../auth/email.js'
 import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
@@ -451,6 +452,68 @@ export async function removeGuest(user, inviteId, guestId) {
   await repo.deleteGuest(guest.id)
 }
 
+// ── Check-in (validação à entrada) ───────────────────────────────
+// Procura uma inscrição pelo código curto do bilhete OU pelo token do link (QR).
+export async function checkinLookup(user, inviteId, rawCode) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const code = String(rawCode || '').trim()
+  if (!code) throw new InviteError(400, 'Indique o código do bilhete.')
+  // Aceita o código curto (XXXX-XXXX) OU um link/token do QR (extrai o token 'g').
+  let token = null
+  const m = code.match(/[?&]g=([^&\s]+)/)
+  if (m) token = decodeURIComponent(m[1])
+  else if (/^[a-f0-9]{32,}$/i.test(code)) token = code
+  let guest = await repo.findGuestByCode(inviteId, code)
+  if (!guest && token) {
+    const g = await repo.findGuestByToken(token)
+    if (g && g.inviteId === inviteId) guest = g
+  }
+  if (!guest) throw new InviteError(404, 'Bilhete não encontrado neste convite.')
+  const [ticket, payment, blocks] = await Promise.all([
+    guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
+    paymentsRepo.findLatestByGuest(guest.id).catch(() => null),
+    repo.listBlocks(inviteId).catch(() => []),
+  ])
+  const fields = blocks.find((b) => b.type === 'rsvp')?.content?.fields || []
+  return {
+    guest: {
+      id: guest.id,
+      name: guest.name,
+      email: guest.email,
+      phone: guest.phone,
+      code: guest.code,
+      rsvpState: guest.rsvpState,
+      paymentState: guest.paymentState,
+      guestsCount: guest.guestsCount,
+      checkedInAt: guest.checkedInAt,
+      respondedAt: guest.respondedAt,
+    },
+    ticket: ticket
+      ? { id: ticket.id, name: ticket.name, kind: ticket.kind, price: ticket.price, currency: ticket.currency }
+      : null,
+    payment: payment
+      ? {
+          id: payment.id,
+          status: payment.status,
+          receiptUrl: payment.receiptUrl,
+          amount: payment.amount,
+          currency: payment.currency,
+          method: payment.method,
+        }
+      : null,
+    data: buildGuestDataSummary(guest, fields),
+  }
+}
+
+// Aceita (ou anula) o check-in de uma inscrição.
+export async function acceptCheckin(user, inviteId, guestId, { on = true } = {}) {
+  const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  return repo.setCheckedIn(guest.id, on)
+}
+
 // Pré-visualização (organizador): mesma forma do payload público, sem exigir publicação.
 export async function getPreview(user, id) {
   ensureCanManage(user)
@@ -542,6 +605,47 @@ function guestStatusPayload(guest, paymentMethod = null) {
   }
 }
 
+// Formata um valor de resposta do formulário para texto legível.
+function fmtGuestValue(v) {
+  if (v == null || v === '') return ''
+  if (Array.isArray(v)) {
+    return v
+      .map((m) =>
+        m && typeof m === 'object'
+          ? [m.nome, m.idade ? `${m.idade} anos` : '', m.telefone, m.email, m.observacoes].filter(Boolean).join(' — ')
+          : String(m)
+      )
+      .filter(Boolean)
+      .join('; ')
+  }
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não'
+  return String(v)
+}
+
+// Resumo COMPLETO da inscrição (nome/contactos + respostas do formulário +
+// membros) para o email, a página do bilhete e o check-in (validação posterior).
+export function buildGuestDataSummary(guest, fields) {
+  if (!guest) return []
+  const extra = guest.extra || {}
+  const rows = []
+  if (guest.name) rows.push({ label: 'Nome', value: guest.name })
+  if (guest.email) rows.push({ label: 'Email', value: guest.email })
+  if (guest.phone) rows.push({ label: 'Telemóvel', value: guest.phone })
+  const sysKeys = new Set(['name', 'email', 'phone'])
+  const shown = new Set()
+  for (const f of fields || []) {
+    if (!f || f.type === 'section' || f.type === 'document' || sysKeys.has(f.key)) continue
+    const val = fmtGuestValue(extra[f.key])
+    if (!val) continue
+    rows.push({ label: f.label || f.key, value: val })
+    shown.add(f.key)
+  }
+  if (Array.isArray(extra.membros) && extra.membros.length && !shown.has('membros')) {
+    rows.push({ label: extra.tipoInscricao || 'Membros', value: fmtGuestValue(extra.membros) })
+  }
+  return rows
+}
+
 function renderPayload(
   invite,
   blocks,
@@ -561,7 +665,10 @@ function renderPayload(
   const banner = bannerUrl ?? invite.bannerUrl
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
   const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket))
-  if (guestStatus) guestStatus.jotformCommunity = resolveJotformCommunity(invite, guest, community)
+  if (guestStatus) {
+    guestStatus.jotformCommunity = resolveJotformCommunity(invite, guest, community)
+    guestStatus.data = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
+  }
   return {
     slug: invite.slug,
     status: invite.status,
@@ -767,6 +874,8 @@ function buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentIn
       methods.push({ label: def.label || key, detail })
     }
   }
+  const resolvedDef = byKey.get(resolveGuestMethod(guest, ticket))
+  const requireReceipt = resolvedDef ? resolvedDef.requireReceipt !== false : true
   const payUrl =
     methodType === 'mbway-contribuir'
       ? buildJotformUrl({
@@ -776,7 +885,7 @@ function buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentIn
           ticketId: guest.ticketId,
         })
       : uniqueLink
-  return { name: ticket.name ?? null, isFree, isDonation, isPaid, valueText, methods, payUrl }
+  return { name: ticket.name ?? null, isFree, isDonation, isPaid, valueText, methods, payUrl, showPay: !isFree, requireReceipt }
 }
 
 function notifyGuestConfirmation(invite, guest, status, methodType) {
@@ -786,16 +895,18 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
   const uniqueLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
   const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
   const p = (async () => {
-    const [ticket, activeMethods, paymentInfo, banner] = await Promise.all([
+    const [ticket, activeMethods, paymentInfo, banner, blocks] = await Promise.all([
       guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
       getActivePaymentMethods().catch(() => []),
       getInvitePaymentInfo().catch(() => null),
       resolveInviteBanner(invite).catch(() => invite.bannerUrl ?? null),
+      repo.listBlocks(invite.id).catch(() => []),
     ])
     const ticketInfo = buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentInfo, {
       uniqueLink,
       methodType,
     })
+    const dataSummary = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
     // QR com o LINK único da inscrição (abre o bilhete ao ler).
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(uniqueLink)}`
     await sendRsvpConfirmationEmail(guest.email, {
@@ -810,7 +921,7 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
       bannerUrl: banner ?? null,
       qrUrl,
       ticket: ticketInfo,
-      paymentPending: status?.paymentState === 'pending',
+      data: dataSummary,
     })
   })().catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
   try {

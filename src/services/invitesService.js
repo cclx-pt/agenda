@@ -100,6 +100,17 @@ export async function deleteInviteGuest(inviteId, guestId) {
   await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'DELETE' })
 }
 
+// ── Check-in (organizador) ──────────────────────────────
+export async function checkinLookup(inviteId, code) {
+  const { result } = await request(`/data/invites/${inviteId}/checkin/lookup?code=${encodeURIComponent(code)}`)
+  return result
+}
+
+export async function acceptCheckin(inviteId, guestId, on = true) {
+  const { guest } = await request(`/data/invites/${inviteId}/checkin/${guestId}`, { method: 'POST', body: { on } })
+  return guest
+}
+
 // ── Definições gerais dos convites (admin) ───────────────────────
 
 export async function getInviteSettings() {
