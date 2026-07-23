@@ -195,7 +195,7 @@ function loopSlugify(str) {
     .replace(/^-+|-+$/g, '')
 }
 
-const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, churches: null, privacyTags: null }
+const emptyUser = { email: '', name: '', role: 'editor', canViewPrivate: false, canManageInvites: false, churches: null, privacyTags: null }
 
 const emptyChurch = { name: '', externalId: '', address: '', postalCode: '' }
 const emptyCategory = { slug: '', label: '', color: '#F5A800', sortOrder: '', requiresSubcategory: false }
@@ -447,7 +447,7 @@ function PrivacyTagPicker({ value, onChange, disabled, tags }) {
  * Lista, cria/edita eventos e gere o fluxo de aprovação conforme o papel.
  */
 export default function ManagePanel({ onClose, initialView = 'home', initialEditEvent = null }) {
-  const { user, hasRole } = useAuth()
+  const { user, hasRole, canManageInvites } = useAuth()
   const { t, entity, entities, refreshTranslations, logoUrl, subcategoryColors, refreshBranding } = useI18n()
   // Dentro de qualquer sub-vista (tudo o que não seja o menu 'home') o painel NÃO
   // fecha por clique fora nem por Esc — evita sair da opção sem querer. Só o botão
@@ -1180,6 +1180,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         name: newUser.name.trim() || null,
         role: newUser.role,
         canViewPrivate: newUser.canViewPrivate,
+        canManageInvites: newUser.role === 'admin' || newUser.canManageInvites,
         churches: SCOPED_ROLES.includes(newUser.role) ? newUser.churches : null,
         privacyTags:
           SEES_ALL_PRIVATE.includes(newUser.role) || newUser.canViewPrivate
@@ -1325,6 +1326,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       name: u.name || '',
       role: u.role,
       canViewPrivate: SEES_ALL_PRIVATE.includes(u.role) || u.canViewPrivate,
+      canManageInvites: u.role === 'admin' || u.canManageInvites,
       churches: u.churches ?? null,
       privacyTags: u.privacyTags ?? null,
     })
@@ -1344,6 +1346,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       const patch = {
         role,
         canViewPrivate: editingUser.canViewPrivate,
+        canManageInvites: editingUser.role === 'admin' || editingUser.canManageInvites,
         churches: SCOPED_ROLES.includes(role) ? editingUser.churches : null,
         privacyTags:
           SEES_ALL_PRIVATE.includes(role) || editingUser.canViewPrivate
@@ -1890,7 +1893,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <span className={styles.menuDesc}>{t('manageLoopDesc')}</span>
                 </button>
               )}
-              {isManager && (
+              {canManageInvites && (
                 <button className={styles.menuCard} onClick={() => setView('invites')} disabled={busy}>
                   <i className="ti ti-mail" aria-hidden="true" />
                   <span className={styles.menuTitle}>{t('manageInvites')}</span>
@@ -2286,6 +2289,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   />
                   Pode ver eventos privados
                 </label>
+                <label className={`${styles.check} ${styles.checkInline}`}>
+                  <input
+                    type="checkbox"
+                    checked={newUser.role === 'admin' || newUser.canManageInvites}
+                    disabled={newUser.role === 'admin'}
+                    onChange={setNewUserField('canManageInvites')}
+                  />
+                  Pode criar e gerir convites
+                </label>
               </div>
               {SCOPED_ROLES.includes(newUser.role) && (
                 <div className={styles.churchRow}>
@@ -2453,6 +2465,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                             onChange={setEditUserField('canViewPrivate')}
                           />
                           Pode ver eventos privados
+                        </label>
+                        <label className={`${styles.check} ${styles.checkInline}`}>
+                          <input
+                            type="checkbox"
+                            checked={editingUser.role === 'admin' || editingUser.canManageInvites}
+                            disabled={editingUser.role === 'admin'}
+                            onChange={setEditUserField('canManageInvites')}
+                          />
+                          Pode criar e gerir convites
                         </label>
                         {SCOPED_ROLES.includes(editingUser.role) && (
                           <div className={styles.churchRow}>

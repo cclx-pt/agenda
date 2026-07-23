@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
                      CHECK (role IN ('admin', 'aprovador', 'editor', 'visitante')),
   is_active        BOOLEAN NOT NULL DEFAULT TRUE,
   can_view_private BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Pode criar e gerir convites (os admins podem sempre, independentemente da flag).
+  can_manage_invites BOOLEAN NOT NULL DEFAULT FALSE,
   -- Acesso por igreja: NULL = todas; array = igrejas permitidas.
   churches         TEXT[],
   -- Etiquetas de privacidade visíveis: NULL = todas; array = lista permitida.
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at    TIMESTAMPTZ
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_token TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_invites BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS otp_codes (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

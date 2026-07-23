@@ -32,7 +32,7 @@ import { compareChurches } from './utils/churches'
 import logoUrl from './assets/cclx_line_logo.png'
 import {
   AlertCircle, CalendarCog, CalendarSync, CalendarX, ChevronDown, ChevronLeft, ChevronRight,
-  ClipboardCheck, Eye, Lock, LogOut, Menu, Moon, MoreVertical, PanelLeftClose, PanelLeftOpen,
+  ClipboardCheck, Eye, Lock, LogOut, Mail, Menu, Moon, MoreVertical, PanelLeftClose, PanelLeftOpen,
   RefreshCw, Settings, Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -73,7 +73,7 @@ const ENV_BADGE = (() => {
 export default function App() {
   const { toggle, isDark } = useTheme()
   const { t, lang, setLang, languages, logoUrl: customLogoUrl } = useI18n()
-  const { user, isAuthenticated, logout, canViewPrivate } = useAuth()
+  const { user, isAuthenticated, logout, canViewPrivate, canManageInvites } = useAuth()
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -338,6 +338,12 @@ export default function App() {
               <span className="max-[980px]:hidden">{t('events')}</span>
             </Button>
           )}
+          {canManageInvites && (
+            <Button variant="outline" size="sm" onClick={() => { setManageView('invites'); setManageOpen(true) }} title={t('manageInvites')}>
+              <Mail className="h-4 w-4" aria-hidden="true" />
+              <span className="max-[980px]:hidden">{t('manageInvites')}</span>
+            </Button>
+          )}
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => setApprovalsOpen(true)} title={t('approvals')}>
               <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
@@ -390,6 +396,12 @@ export default function App() {
                       <CalendarCog className="h-4 w-4" aria-hidden="true" />
                       {t('events')}
                     </DropdownMenuItem>
+                    {canManageInvites && (
+                      <DropdownMenuItem onClick={() => { setManageView('invites'); setManageOpen(true) }}>
+                        <Mail className="h-4 w-4" aria-hidden="true" />
+                        {t('manageInvites')}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setApprovalsOpen(true)}>
                       <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
                       {t('approvals')}
@@ -400,6 +412,12 @@ export default function App() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
+                )}
+                {canManageInvites && !canManage && (
+                  <DropdownMenuItem onClick={() => { setManageView('invites'); setManageOpen(true) }}>
+                    <Mail className="h-4 w-4" aria-hidden="true" />
+                    {t('manageInvites')}
+                  </DropdownMenuItem>
                 )}
                 {isAuthenticated ? (
                   <DropdownMenuItem onClick={handleLogout}>

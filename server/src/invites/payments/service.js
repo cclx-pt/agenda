@@ -10,7 +10,7 @@ import { InviteError } from '../service.js'
 
 // ── Permissões (mesmo modelo dos convites/eventos) ───────────────
 const isAdmin = (role) => role === 'admin'
-const canManage = (role) => ['admin', 'aprovador', 'editor'].includes(role)
+const canManage = (user) => user?.role === 'admin' || !!user?.canManageInvites
 function canAccessChurch(user, community) {
   if (isAdmin(user.role)) return true
   if (!community) return true
@@ -198,7 +198,7 @@ export async function getForGuest(slug, guestToken) {
 // ── Organizador (autenticado) ────────────────────────────────────
 
 async function ensureCanManageInvite(user, inviteId) {
-  if (!canManage(user.role)) throw new InviteError(403, 'Sem permissão.')
+  if (!canManage(user)) throw new InviteError(403, 'Sem permissão.')
   const invite = await invitesRepo.findById(inviteId)
   if (!invite) throw new InviteError(404, 'Convite não encontrado.')
   if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')

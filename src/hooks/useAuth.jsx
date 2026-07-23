@@ -39,6 +39,7 @@ export function AuthProvider({ children }) {
     canViewPrivate:
       !!user &&
       (user.role === 'admin' || user.role === 'visitante' || user.canViewPrivate === true),
+    canManageInvites: !!user && (user.role === 'admin' || user.canManageInvites === true),
     requestCode,
     verifyCode,
     logout,

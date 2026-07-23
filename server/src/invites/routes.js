@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import multer from 'multer'
-import { requireAuth, requireRole } from '../middleware/auth.js'
+import { requireAuth } from '../middleware/auth.js'
 import * as service from './service.js'
 import { InviteError } from './service.js'
 import * as payments from './payments/service.js'
@@ -24,7 +24,13 @@ function asyncHandler(fn) {
   }
 }
 
-const manageRoles = requireRole('admin', 'aprovador', 'editor')
+// Gerir convites: administradores (sempre) ou utilizadores com a flag
+// can_manage_invites. Substitui o antigo gate por papel.
+const manageRoles = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Autenticação necessária.' })
+  if (req.user.role === 'admin' || req.user.canManageInvites) return next()
+  return res.status(403).json({ error: 'Sem permissão para gerir convites.' })
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Comprovativos de pagamento: PDF/PNG/JPG até 5MB, em memória (→ Supabase Storage).

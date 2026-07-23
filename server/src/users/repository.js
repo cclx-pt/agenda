@@ -11,6 +11,7 @@ function mapRow(row) {
     role: row.role,
     isActive: !!row.is_active,
     canViewPrivate: !!row.can_view_private,
+    canManageInvites: !!row.can_manage_invites,
     churches: row.churches ?? null,
     privacyTags: row.privacy_tags ?? null,
     createdAt: row.created_at,
@@ -20,7 +21,7 @@ function mapRow(row) {
 
 export async function list() {
   const { rows } = await pool.query(
-    `SELECT id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at
+    `SELECT id, email, name, role, is_active, can_view_private, can_manage_invites, churches, privacy_tags, created_at, last_login_at
      FROM users
      ORDER BY role, email`
   )
@@ -29,7 +30,7 @@ export async function list() {
 
 export async function findById(id) {
   const { rows } = await pool.query(
-    `SELECT id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at
+    `SELECT id, email, name, role, is_active, can_view_private, can_manage_invites, churches, privacy_tags, created_at, last_login_at
      FROM users WHERE id = $1`,
     [id]
   )
@@ -38,7 +39,7 @@ export async function findById(id) {
 
 export async function findByEmail(email) {
   const { rows } = await pool.query(
-    `SELECT id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at
+    `SELECT id, email, name, role, is_active, can_view_private, can_manage_invites, churches, privacy_tags, created_at, last_login_at
      FROM users WHERE email = $1`,
     [email]
   )
@@ -59,7 +60,7 @@ export async function setCalendarToken(id, token) {
 export async function findByCalendarToken(token) {
   if (!token) return null
   const { rows } = await pool.query(
-    `SELECT id, email, name, role, is_active, can_view_private, churches, privacy_tags, created_at, last_login_at
+    `SELECT id, email, name, role, is_active, can_view_private, can_manage_invites, churches, privacy_tags, created_at, last_login_at
      FROM users WHERE calendar_token = $1 AND is_active = TRUE`,
     [token]
   )
@@ -69,8 +70,8 @@ export async function findByCalendarToken(token) {
 export async function insert(data) {
   const id = randomUUID()
   await pool.query(
-    `INSERT INTO users (id, email, name, role, is_active, can_view_private, churches, privacy_tags)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO users (id, email, name, role, is_active, can_view_private, can_manage_invites, churches, privacy_tags)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       id,
       data.email,
@@ -78,6 +79,7 @@ export async function insert(data) {
       data.role,
       data.isActive ?? true,
       data.canViewPrivate ?? false,
+      data.canManageInvites ?? false,
       data.churches ?? null,
       data.privacyTags ?? null,
     ]

@@ -75,6 +75,7 @@ export const createSchema = z.object({
   role: z.enum(ROLES),
   isActive: z.boolean().optional(),
   canViewPrivate: z.boolean().optional(),
+  canManageInvites: z.boolean().optional(),
   churches: churchesSchema,
   privacyTags: privacyTagsSchema,
 })
@@ -85,6 +86,7 @@ export const updateSchema = z
     role: z.enum(ROLES).optional(),
     isActive: z.boolean().optional(),
     canViewPrivate: z.boolean().optional(),
+    canManageInvites: z.boolean().optional(),
     churches: churchesSchema,
     privacyTags: privacyTagsSchema,
   })
@@ -151,6 +153,7 @@ export async function update(actor, id, input) {
   if (data.role !== undefined) fields.role = data.role
   if (data.isActive !== undefined) fields.is_active = data.isActive
   if (data.canViewPrivate !== undefined) fields.can_view_private = data.canViewPrivate
+  if (data.canManageInvites !== undefined) fields.can_manage_invites = data.canManageInvites
   // Recalcula o acesso por igreja se mudou o papel ou a lista de igrejas.
   if (data.churches !== undefined || data.role !== undefined) {
     const sourceChurches = data.churches !== undefined ? data.churches : target.churches

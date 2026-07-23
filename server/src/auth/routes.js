@@ -28,7 +28,7 @@ const requestLimiter = rateLimit({
 
 async function findActiveUser(email) {
   const { rows } = await pool.query(
-    'SELECT id, email, name, role, can_view_private, churches, privacy_tags FROM users WHERE email = $1 AND is_active = TRUE',
+    'SELECT id, email, name, role, can_view_private, can_manage_invites, churches, privacy_tags FROM users WHERE email = $1 AND is_active = TRUE',
     [email]
   )
   return rows[0] ?? null
@@ -97,6 +97,7 @@ authRouter.post('/verify', requestLimiter, async (req, res, next) => {
         name: user.name,
         role: user.role,
         canViewPrivate: !!user.can_view_private,
+        canManageInvites: !!user.can_manage_invites,
         churches: user.churches ?? null,
         privacyTags: user.privacy_tags ?? null,
       },
@@ -114,6 +115,7 @@ authRouter.get('/me', requireAuth, (req, res) => {
       name: req.user.name,
       role: req.user.role,
       canViewPrivate: !!req.user.canViewPrivate,
+      canManageInvites: !!req.user.canManageInvites,
       churches: req.user.churches ?? null,
       privacyTags: req.user.privacyTags ?? null,
     },

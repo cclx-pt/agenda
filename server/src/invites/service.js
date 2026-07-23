@@ -19,7 +19,7 @@ export class InviteError extends Error {
 
 // ── Permissões (mesmo modelo de papéis dos eventos) ──────────────
 const isAdmin = (role) => role === 'admin'
-const canManage = (role) => ['admin', 'aprovador', 'editor'].includes(role)
+const canManage = (user) => user?.role === 'admin' || !!user?.canManageInvites
 
 function userChurches(user) {
   const ch = user?.churches
@@ -32,7 +32,7 @@ function canAccessChurch(user, community) {
   return churches === null || churches.includes(community)
 }
 function ensureCanManage(user) {
-  if (!canManage(user.role)) throw new InviteError(403, 'Sem permissão para gerir convites.')
+  if (!canManage(user)) throw new InviteError(403, 'Sem permissão para gerir convites.')
 }
 
 // ── Slug ─────────────────────────────────────────────────────────

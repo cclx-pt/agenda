@@ -11,6 +11,7 @@ export function signSession(user) {
       role: user.role,
       name: user.name,
       canViewPrivate: !!user.can_view_private,
+      canManageInvites: !!user.can_manage_invites,
       churches: user.churches ?? null,
       privacyTags: user.privacy_tags ?? null,
     },
