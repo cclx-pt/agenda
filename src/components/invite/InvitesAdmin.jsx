@@ -1303,6 +1303,11 @@ function InviteEditor({ invite, onBack, onSaved }) {
                           )}
                           {g.name || '(sem nome)'}
                         </button>
+                        {g.code ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground" title="Nº do bilhete">
+                            {g.code}
+                          </span>
+                        ) : null}
                         {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
                         <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
                         <span className={'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ' + SITUACAO_BADGE[inscricaoSituacao(g)]}>

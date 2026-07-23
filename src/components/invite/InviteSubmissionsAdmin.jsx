@@ -314,6 +314,7 @@ export default function InviteSubmissionsAdmin() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                <th className="p-2 font-semibold">Nº do bilhete</th>
                 <th className="p-2 font-semibold">Convite</th>
                 <th className="p-2 font-semibold">Nome</th>
                 <th className="p-2 font-semibold">Email</th>
@@ -332,6 +333,7 @@ export default function InviteSubmissionsAdmin() {
                 return (
                   <Fragment key={g.id}>
                     <tr className="border-b border-border/60">
+                      <td className="p-2 font-mono text-xs font-semibold text-foreground">{g.code || '—'}</td>
                       <td className="p-2 text-foreground">{g.inviteTitle}</td>
                       <td className="p-2 font-medium text-foreground">{g.name || '—'}</td>
                       <td className="p-2 text-muted-foreground">{g.email || ''}</td>
@@ -378,7 +380,7 @@ export default function InviteSubmissionsAdmin() {
 
                     {isOpen && expanded.mode === 'details' ? (
                       <tr className="border-b border-border/60 bg-muted/20">
-                        <td colSpan={9} className="p-3">
+                        <td colSpan={10} className="p-3">
                           <div className="flex flex-col gap-2">
                             <p className="m-0 text-xs font-semibold uppercase text-muted-foreground">Detalhes da inscrição</p>
                             <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
@@ -408,7 +410,7 @@ export default function InviteSubmissionsAdmin() {
 
                     {isOpen && expanded.mode === 'edit' && editForm ? (
                       <tr className="border-b border-border/60 bg-muted/20">
-                        <td colSpan={9} className="p-3">
+                        <td colSpan={10} className="p-3">
                           <div className="flex flex-col gap-3">
                             <p className="m-0 text-xs font-semibold uppercase text-muted-foreground">Editar inscrição</p>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
