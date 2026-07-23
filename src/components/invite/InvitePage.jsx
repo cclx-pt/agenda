@@ -8,7 +8,7 @@ import {
 } from './InviteCards'
 import { fmtDateRange, inviteRsvpHref, inviteHomeHref } from './inviteUtils'
 import {
-  getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople,
+  getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople, countChildren,
 } from './inviteFormFields'
 
 // Mapa tipo → componente (rsvp é tratado à parte: precisa de estado/handlers).
@@ -318,7 +318,15 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       finalExtra.membros = cleanMembers
       finalExtra.tipoInscricao = 'Grupo'
     }
-    const peopleCount = hasMembers ? Math.max(1, cleanMembers.length) : countPeople(fields, values, ticketId)
+    // As crianças NÃO contam para a assistência (capacidade) — os dados ficam
+    // guardados e o nº de crianças é contabilizado à parte (numCriancas).
+    const isChildMember = (m) => m.idade !== '' && m.idade != null && Number(m.idade) < 11
+    const memberChildren = hasMembers ? cleanMembers.filter(isChildMember).length : 0
+    const childrenCount = countChildren(fields, values, ticketId) + memberChildren
+    if (childrenCount > 0) finalExtra.numCriancas = childrenCount
+    const peopleCount = hasMembers
+      ? Math.max(1, cleanMembers.length - memberChildren)
+      : countPeople(fields, values, ticketId)
     // Lista de espera: se a lotação estiver esgotada, avisa e pede confirmação.
     let acceptWaitlist = false
     const cap = page.invite?.capacity

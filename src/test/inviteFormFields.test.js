@@ -10,6 +10,7 @@ import {
   validateFields,
   buildSubmission,
   countPeople,
+  countChildren,
   hasOptions,
   SYSTEM_KEYS,
 } from '../components/invite/inviteFormFields'
@@ -166,17 +167,25 @@ describe('inviteFormFields', () => {
     expect(hasOptions('text')).toBe(false)
   })
 
-  it('countPeople conta o próprio + crianças visíveis', () => {
+  it('countPeople conta só o próprio — as crianças não contam para a assistência', () => {
     const fields = [
       { key: 'tem', type: 'checkbox' },
       { key: 'kids', type: 'children', visibleWhen: { field: 'tem', equals: true } },
     ]
     expect(countPeople(fields, { tem: false, kids: [] })).toBe(1)
-    expect(countPeople(fields, { tem: true, kids: [{ nome: 'A' }, { nome: 'B' }] })).toBe(3)
+    expect(countPeople(fields, { tem: true, kids: [{ nome: 'A' }, { nome: 'B' }] })).toBe(1)
+  })
+
+  it('countChildren conta as crianças visíveis (não vazias)', () => {
+    const fields = [
+      { key: 'tem', type: 'checkbox' },
+      { key: 'kids', type: 'children', visibleWhen: { field: 'tem', equals: true } },
+    ]
+    expect(countChildren(fields, { tem: true, kids: [{ nome: 'A' }, { nome: 'B' }] })).toBe(2)
     // crianças ocultas (tem=false) não contam mesmo que existam linhas
-    expect(countPeople(fields, { tem: false, kids: [{ nome: 'A' }] })).toBe(1)
+    expect(countChildren(fields, { tem: false, kids: [{ nome: 'A' }] })).toBe(0)
     // linhas vazias não contam
-    expect(countPeople(fields, { tem: true, kids: [{ nome: '', idade: '', alergias: '' }] })).toBe(1)
+    expect(countChildren(fields, { tem: true, kids: [{ nome: '', idade: '', alergias: '' }] })).toBe(0)
   })
 
   it('DEFAULT_RSVP_FIELDS inclui campos de sistema e consentimentos obrigatórios', () => {

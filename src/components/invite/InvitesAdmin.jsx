@@ -520,6 +520,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     known.add('donationAmount') // apresentado numa coluna própria "Doação"
     known.add('membros') // lista de membros (família/grupo) — coluna própria
     known.add('tipoInscricao') // individual/família/grupo — coluna própria
+    known.add('numCriancas') // nº de crianças — coluna própria (não conta p/ assistência)
     const keys = []
     for (const g of guests || []) {
       for (const k of Object.keys(g.extra || {})) {
@@ -598,6 +599,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ['Membros', (g) => formatAnswer(null, g.extra?.membros)],
       ['Doação (€)', (g) => fmtDonation(g.extra?.donationAmount)],
       ['Lugares', (g) => g.guestsCount ?? ''],
+      ['Nº de crianças', (g) => (g.extra?.numCriancas != null ? g.extra.numCriancas : '')],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
       ['Check-in', (g) => (g.checkedInAt ? fmtDateTime(g.checkedInAt) : '')],
       ...answerFields.map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),

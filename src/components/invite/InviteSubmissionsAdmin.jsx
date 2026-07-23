@@ -71,7 +71,7 @@ function formatAnswer(value) {
 }
 
 // Chaves do `extra` já mostradas em colunas próprias (não repetir em "Respostas").
-const DEDICATED_EXTRA_KEYS = new Set(['tipoInscricao', 'membros', 'donationAmount'])
+const DEDICATED_EXTRA_KEYS = new Set(['tipoInscricao', 'membros', 'donationAmount', 'numCriancas'])
 
 // Junta as restantes respostas do formulário (chave: valor) numa só célula do Excel.
 function extraAnswersText(g) {
@@ -217,6 +217,7 @@ export default function InviteSubmissionsAdmin() {
       ['Membros', (g) => formatAnswer(g.extra?.membros)],
       ['Doação (€)', (g) => (g.extra?.donationAmount != null && g.extra?.donationAmount !== '' ? String(g.extra.donationAmount) : '')],
       ['Lugares', (g) => g.guestsCount ?? ''],
+      ['Nº de crianças', (g) => (g.extra?.numCriancas != null ? g.extra.numCriancas : '')],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
       ['Check-in', (g) => (g.checkedInAt ? fmtDateTime(g.checkedInAt) : '')],
       ['Respostas', (g) => extraAnswersText(g)],

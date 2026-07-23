@@ -254,11 +254,18 @@ export function buildSubmission(fields, values, ticketId) {
   return { name, email, phone, extra }
 }
 
-// Nº de pessoas que a inscrição representa (1 = o próprio + crianças indicadas nos
-// campos do tipo 'children' visíveis). Alimenta a contagem de capacidade.
-export function countPeople(fields, values, ticketId) {
+// Nº de pessoas que CONTAM para a assistência (capacidade): apenas o próprio
+// inscrito. As crianças (campos do tipo 'children') NÃO contam — são
+// contabilizadas à parte (ver countChildren).
+export function countPeople() {
+  return 1
+}
+
+// Nº de crianças indicadas nos campos do tipo 'children' visíveis. Serve para a
+// contabilização à parte (Excel/admin) — NÃO conta para a assistência.
+export function countChildren(fields, values, ticketId) {
   const visible = visibleKeys(fields, values, ticketId)
-  let n = 1
+  let n = 0
   for (const f of fields) {
     if (f.type !== 'children' || !visible.has(f.key)) continue
     const rows = Array.isArray(values[f.key]) ? values[f.key] : []
