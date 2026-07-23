@@ -587,6 +587,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
   // Exporta as inscrições para CSV (abre no Excel): BOM UTF-8 + separador ';'.
   const exportGuests = () => {
     if (!guests || guests.length === 0) return
+    // Campos do tipo 'children' → expandidos em colunas por criança (Nome/Idade/
+    // Alergias), até ao máximo de crianças existente, para se poder contabilizar.
+    const childRowsOf = (g, key) =>
+      (Array.isArray(g.extra?.[key]) ? g.extra[key] : []).filter((c) => c && (c.nome || c.idade || c.alergias))
+    const childCols = []
+    for (const f of answerFields.filter((af) => af.type === 'children')) {
+      const max = guests.reduce((m, g) => Math.max(m, childRowsOf(g, f.key).length), 0)
+      const base = f.label || f.key
+      for (let k = 0; k < max; k += 1) {
+        childCols.push([`${base} ${k + 1} — Nome`, (g) => childRowsOf(g, f.key)[k]?.nome || ''])
+        childCols.push([`${base} ${k + 1} — Idade`, (g) => childRowsOf(g, f.key)[k]?.idade ?? ''])
+        childCols.push([`${base} ${k + 1} — Alergias`, (g) => childRowsOf(g, f.key)[k]?.alergias || ''])
+      }
+    }
     const cols = [
       ['Nº do bilhete', (g) => g.code || ''],
       ['Nome', (g) => g.name || ''],
@@ -602,7 +616,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ['Nº de crianças', (g) => (g.extra?.numCriancas != null ? g.extra.numCriancas : '')],
       ['Data de inscrição', (g) => fmtDateTime(g.respondedAt || g.createdAt)],
       ['Check-in', (g) => (g.checkedInAt ? fmtDateTime(g.checkedInAt) : '')],
-      ...answerFields.map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),
+      ...answerFields.filter((f) => f.type !== 'children').map((f) => [f.label || f.key, (g) => formatAnswer(f, g.extra?.[f.key])]),
+      ...childCols,
       ...extraAnswerKeys.map((k) => [k, (g) => formatAnswer(null, g.extra?.[k])]),
     ]
     const cell = (v) => {
