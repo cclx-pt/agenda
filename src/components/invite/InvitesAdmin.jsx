@@ -194,6 +194,14 @@ function fmtDonation(v) {
 }
 
 // ── Editor de um convite ─────────────────────────────────────────
+// Rótulo do botão de gravar consoante o separador ativo.
+const SAVE_LABEL = {
+  definicoes: 'Guardar definições',
+  bilhetes: 'Guardar bilhetes',
+  inscricao: 'Guardar inscrição',
+  pagina: 'Guardar página',
+}
+
 function InviteEditor({ invite, onBack, onSaved }) {
   const [settings, setSettings] = useState(() => ({
     eventId: invite.eventId ?? '',
@@ -253,6 +261,28 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([])
   // NIB/IBAN partilhado (Definições) — mostrado só-leitura no bilhete (transferência).
   const [inviteIban, setInviteIban] = useState('')
+
+  // Deteção de alterações por guardar: compara o estado gravável atual (definições
+  // + bilhetes + blocos, que inclui o formulário) com o último snapshot guardado.
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify({ settings, tickets, blocks }))
+  const dirty = savedSnapshot !== JSON.stringify({ settings, tickets, blocks })
+
+  // Avisa ao fechar/recarregar o browser com alterações por guardar.
+  useEffect(() => {
+    if (!dirty) return undefined
+    const handler = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  // Voltar: confirma se houver alterações por guardar.
+  const handleBack = () => {
+    if (dirty && !window.confirm('Tens alterações por guardar. Sair sem guardar?')) return
+    onBack()
+  }
 
   // Carrega os eventos associáveis (atuais/futuros), preservando o evento já
   // associado que possa estar fora dessa lista (ex.: já decorreu).
@@ -429,6 +459,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
           content: b.type === 'rsvp' ? { ...b.content, fields: getFormFields(b.content) } : b.content,
         }))
       )
+      setSavedSnapshot(JSON.stringify({ settings, tickets, blocks }))
       toast.success('Convite guardado.')
       onSaved?.(updated)
     } catch (err) {
@@ -669,7 +700,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onBack} className={ghostBtn}>
+        <button type="button" onClick={handleBack} className={ghostBtn}>
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Voltar
         </button>
@@ -698,9 +729,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </div>
       </div>
 
-      {/* Roteiro: semáforo de conclusão por etapa */}
+      {/* Semáforo de conclusão por etapa */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
-        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Roteiro</span>
         {roadmap.map((step, i) => (
           <button
             key={`${step.tabId}-${i}`}
@@ -1376,10 +1406,16 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ) : null}
 
       {/* Barra de ações fixa em baixo */}
-      <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-border bg-background/95 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-2 border-t border-border bg-background/95 py-3 backdrop-blur">
+        {dirty ? (
+          <span className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+            <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
+            Alterações por guardar
+          </span>
+        ) : null}
         <button type="button" onClick={save} disabled={busy} className={primaryBtn}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          Guardar convite
+          {SAVE_LABEL[activeTab] || 'Guardar convite'}
         </button>
       </div>
     </div>

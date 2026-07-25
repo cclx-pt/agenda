@@ -65,6 +65,21 @@ const STATUS_STYLE = {
   pending: 'border-border bg-muted text-muted-foreground',
 }
 
+// Data/hora por extenso (Europe/Lisbon) — mesmo formato do email de confirmação.
+function fmtWhenLong(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Lisbon',
+  })
+}
+
 function StatusCard({ status }) {
   if (!status) return null
   const cls = STATUS_STYLE[status.rsvpState] || STATUS_STYLE.pending
@@ -247,65 +262,93 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
   const [busy, setBusy] = useState(false)
 
-  // Já respondeu (tem estado): mostra o estado + os dados do bilhete (email/código/QR/link).
+  // Já respondeu (tem estado): confirmação com o MESMO layout do email.
   if (guestStatus) {
     const ticketLink = typeof window !== 'undefined' ? window.location.href : ''
-    const qrSrc = ticketLink
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(ticketLink)}`
+    const code = guestStatus.code || ''
+    // QR apenas com o NÚMERO do bilhete (código).
+    const qrSrc = code
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(code)}`
+      : ''
+    const guestTicket = (page.tickets || []).find((t) => t.id === guestStatus.ticketId) || null
+    const whenText = fmtWhenLong(inv.startDatetime)
+    const valueLine = guestTicket
+      ? guestTicket.kind === 'voluntaria'
+        ? 'Doação (valor à tua escolha)'
+        : guestTicket.kind === 'gratis'
+          ? 'Grátis'
+          : guestTicket.price != null && guestTicket.price > 0
+            ? `Valor: ${Number(guestTicket.price).toFixed(2)} ${guestTicket.currency || 'EUR'}`
+            : 'Grátis'
       : ''
     return (
-      <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
-        <StatusCard status={guestStatus} />
-        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-foreground">
-          <strong>Verifica o teu email</strong> — enviámos os dados do bilhete e o link único da tua inscrição.
-        </p>
-        {guestStatus.code ? (
-          <p className="m-0 text-sm text-muted-foreground">
-            Código do bilhete: <span className="font-mono font-bold text-foreground">{guestStatus.code}</span>
+      <div id="inscricoes" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        {inv.bannerUrl ? <img src={inv.bannerUrl} alt={inv.title} className="h-auto w-full object-cover" /> : null}
+        <div className="flex flex-col gap-3 p-6">
+          <h2 className="m-0 text-xl font-bold" style={{ color: accent }}>
+            Inscrição registada
+          </h2>
+          <p className="m-0 text-sm text-foreground">{guestStatus.name ? `Olá ${guestStatus.name},` : 'Olá,'}</p>
+          <p className="m-0 text-sm text-foreground">
+            Recebemos a tua inscrição em <strong>{inv.title}</strong>.
           </p>
-        ) : null}
-        {qrSrc ? (
-          <div className="flex justify-center">
-            <img src={qrSrc} alt="QR do bilhete" width={180} height={180} className="rounded-xl border border-border" />
-          </div>
-        ) : null}
-        {ticketLink ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-muted-foreground">O teu link (único):</span>
-            <div className="flex items-center gap-2">
-              <input readOnly value={ticketLink} className="w-full truncate rounded-lg border border-input bg-background px-3 py-2 text-xs text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    navigator.clipboard?.writeText(ticketLink)
-                    toast.success('Link copiado.')
-                  } catch {
-                    /* clipboard indisponível */
-                  }
-                }}
-                className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white"
-                style={{ backgroundColor: accent }}
-              >
-                Copiar
-              </button>
+          {whenText ? (
+            <p className="m-0 text-sm text-muted-foreground">
+              <strong className="text-foreground">Quando:</strong> {whenText}
+            </p>
+          ) : null}
+          {inv.location ? (
+            <p className="m-0 text-sm text-muted-foreground">
+              <strong className="text-foreground">Local:</strong> {inv.location}
+            </p>
+          ) : null}
+          {guestStatus.message ? (
+            <p className="m-0 rounded-lg bg-muted p-3 text-sm text-foreground">{guestStatus.message}</p>
+          ) : null}
+          {guestTicket ? (
+            <div className="rounded-lg border border-border p-3">
+              <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bilhete</p>
+              <p className="m-0 mt-0.5 font-bold text-foreground">{guestTicket.name}</p>
+              {valueLine ? <p className="m-0 text-sm text-foreground">{valueLine}</p> : null}
+              {code ? (
+                <p className="m-0 mt-1 text-sm text-foreground">
+                  Código: <span className="font-mono font-bold">{code}</span>
+                </p>
+              ) : null}
             </div>
-          </div>
-        ) : null}
-        {Array.isArray(guestStatus.data) && guestStatus.data.length ? (
-          <div className="flex flex-col gap-1 rounded-lg border border-border p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados da inscrição</span>
-            <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-              {guestStatus.data.map((d, i) => (
-                <div key={i} className="flex flex-col">
-                  <dt className="text-xs text-muted-foreground">{d.label}</dt>
-                  <dd className="m-0 text-foreground">{d.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
+          ) : code ? (
+            <p className="m-0 text-sm text-muted-foreground">
+              Código do bilhete: <span className="font-mono font-bold text-foreground">{code}</span>
+            </p>
+          ) : null}
+          {Array.isArray(guestStatus.data) && guestStatus.data.length ? (
+            <div className="flex flex-col gap-1 rounded-lg border border-border p-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados da inscrição</span>
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                {guestStatus.data.map((d, i) => (
+                  <div key={i} className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{d.label}</dt>
+                    <dd className="m-0 text-foreground">{d.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
+          {qrSrc ? (
+            <div className="flex flex-col items-center gap-2 pt-1">
+              <img src={qrSrc} alt="QR do bilhete" width={200} height={200} className="rounded-xl border border-border" />
+              <p className="m-0 text-xs text-muted-foreground">Lê o QR ou abre o teu bilhete:</p>
+              {ticketLink ? (
+                <a href={ticketLink} className="max-w-full break-all text-center text-xs font-semibold hover:underline" style={{ color: accent }}>
+                  {ticketLink}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+          <p className="m-0 text-xs text-muted-foreground">
+            Guarda esta página — tem os dados do teu bilhete. O link é pessoal e único desta inscrição.
+          </p>
+        </div>
       </div>
     )
   }
@@ -757,7 +800,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
     try {
       const p = await invitesService.uploadReceipt(slug, guestToken, file)
       onUpdate?.({ ...guestStatus, paymentState: p.status })
-      toast.success('Comprovativo enviado. Aguarda validação.')
+      toast.success(p.status === 'paid' ? 'Comprovativo enviado. Obrigado!' : 'Comprovativo enviado. Aguarda validação.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -923,7 +966,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
       const p = await invitesService.uploadReceipt(slug, guestToken, file)
       setPayment(p)
       onUpdate?.({ ...guestStatus, paymentState: p.status })
-      toast.success('Comprovativo enviado. Aguarda validação.')
+      toast.success(p.status === 'paid' ? 'Comprovativo enviado. Obrigado!' : 'Comprovativo enviado. Aguarda validação.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -1247,12 +1290,16 @@ export default function InvitePage({ slug, view = 'landing' }) {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Voltar ao convite
           </a>
-          <BannerCard
-            block={page.blocks.find((b) => b.type === 'banner' || b.type === 'cabecalho') || { content: {} }}
-            page={page}
-            accent={accent}
-          />
-          {page.invite.spotsOnRegistration ? <SpotsCounter invite={page.invite} accent={accent} /> : null}
+          {!guestStatus ? (
+            <>
+              <BannerCard
+                block={page.blocks.find((b) => b.type === 'banner' || b.type === 'cabecalho') || { content: {} }}
+                page={page}
+                accent={accent}
+              />
+              {page.invite.spotsOnRegistration ? <SpotsCounter invite={page.invite} accent={accent} /> : null}
+            </>
+          ) : null}
           <RsvpCard block={rsvpBlock} page={page} accent={accent} guestStatus={guestStatus} onSubmitted={onRsvpSubmitted} />
           <PaymentFlowCard
             slug={page.slug}
@@ -1279,6 +1326,10 @@ export default function InvitePage({ slug, view = 'landing' }) {
         {guestStatus ? <StatusCard status={guestStatus} /> : null}
         {page.blocks.map((block) => {
           if (block.type === 'rsvp') {
+            // Quando há bilhetes, o bloco "Bilhetes" (Custo) já lista os bilhetes com o
+            // botão "Inscrever-me" → não mostramos a secção redundante "Inscrição / Escolhe
+            // o teu bilhete" na landing. Sem bilhetes, mantém-se (é o único CTA de inscrição).
+            if ((page.tickets || []).length > 0) return null
             return (
               <RsvpTeaser
                 key={block.id}

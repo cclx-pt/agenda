@@ -600,6 +600,7 @@ function guestStatusPayload(guest, paymentMethod = null, ticket = null) {
     paymentState: guest.paymentState,
     paymentMethod: paymentMethod ?? null,
     phone: guest.phone ?? null,
+    name: guest.name ?? null,
     ticketId: guest.ticketId ?? null,
     code: guest.code ?? null,
     isDonation,
@@ -913,8 +914,10 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
       methodType,
     })
     const dataSummary = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
-    // QR com o LINK único da inscrição (abre o bilhete ao ler).
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(uniqueLink)}`
+    // QR apenas com o NÚMERO do bilhete (código) — para leitura no check-in.
+    const qrUrl = guest.code
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(guest.code)}`
+      : ''
     await sendRsvpConfirmationEmail(guest.email, {
       name: guest.name,
       eventTitle: invite.title,
@@ -1028,6 +1031,9 @@ export async function submitRsvp(slug, input) {
     extra: data.extra ?? null,
   })
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)
+  // Comunidade do JotForm (link "contribuir via MB WAY") — mesma resolução do
+  // email/renderPayload, para o link ficar correto já a seguir à inscrição.
+  status.jotformCommunity = resolveJotformCommunity(invite, guest, invite.community)
   let methodType = null
   if (status?.paymentMethod) {
     const activeMethods = await getActivePaymentMethods().catch(() => [])
