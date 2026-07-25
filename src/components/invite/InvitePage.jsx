@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'sonner'
-import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, Users, Smartphone, ExternalLink, FileText } from 'lucide-react'
+import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2, ArrowLeft, ArrowRight, Users, Smartphone, ExternalLink, FileText } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
-import { fmtDateRange, inviteRsvpHref, inviteHomeHref } from './inviteUtils'
+import { fmtDateRange, inviteRsvpHref, inviteHomeHref, ticketPrice } from './inviteUtils'
 import {
   getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople, countChildren,
 } from './inviteFormFields'
@@ -111,15 +111,64 @@ function SpotsCounter({ invite, accent }) {
   )
 }
 
-// Rótulo de preço/tipo de um bilhete para as opções do seletor.
-function ticketPriceLabel(t) {
-  if (t.kind === 'gratis') return ' — Grátis'
-  if (t.kind === 'voluntaria') {
-    return t.price != null && t.price > 0
-      ? ` — Doação (sugerido ${Number(t.price).toFixed(2)} ${t.currency})`
-      : ' — Doação (valor à escolha)'
-  }
-  return t.price != null && t.price > 0 ? ` — ${Number(t.price).toFixed(2)} ${t.currency}` : ' — Grátis'
+// Escolha do bilhete — 1º passo da inscrição. O utilizador começa por ESCOLHER o
+// bilhete; só depois se abre o formulário. Usa-se com `onSelect` (botão, na página
+// de inscrição) ou com `hrefFor` (link, na landing). Bilhetes esgotados aparecem
+// desativados.
+function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe o teu bilhete' }) {
+  const list = tickets || []
+  if (!list.length) return null
+  const cardCls =
+    'flex w-full flex-col gap-1 rounded-xl border border-border bg-background p-4 text-left shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1'
+  return (
+    <div className="flex flex-col gap-2">
+      {heading ? <p className="m-0 text-sm font-semibold text-foreground">{heading}</p> : null}
+      {list.map((t) => {
+        const isGroup = t.kind === 'grupo' || t.partyType === 'family' || t.partyType === 'group'
+        const body = (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <span className="font-semibold text-foreground">{t.name}</span>
+              <span className="shrink-0 text-sm font-bold" style={{ color: accent }}>
+                {ticketPrice(t)}
+              </span>
+            </div>
+            {t.description ? <span className="text-xs text-muted-foreground">{t.description}</span> : null}
+            {isGroup ? (
+              <span className="text-xs text-muted-foreground">Grupo{t.groupSize ? ` até ${t.groupSize} pessoas` : ''}</span>
+            ) : null}
+            {t.soldOut ? (
+              <span className="mt-1 text-xs font-semibold text-destructive">Esgotado</span>
+            ) : (
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: accent }}>
+                Escolher e continuar
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
+            )}
+          </>
+        )
+        if (t.soldOut) {
+          return (
+            <div key={t.id} className={cardCls + ' cursor-not-allowed opacity-60'} aria-disabled="true">
+              {body}
+            </div>
+          )
+        }
+        if (hrefFor) {
+          return (
+            <a key={t.id} href={hrefFor(t)} className={cardCls}>
+              {body}
+            </a>
+          )
+        }
+        return (
+          <button key={t.id} type="button" onClick={() => onSelect?.(t.id)} className={cardCls}>
+            {body}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 // Secção de membros (bilhete de família ou grupo): nome, idade e — se a pessoa
@@ -189,9 +238,11 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState(() => {
-    if (typeof window === 'undefined') return ''
+    if (typeof window === 'undefined') return preview && tickets.length ? tickets[0].id : ''
     const wanted = new URLSearchParams(window.location.search).get('ticket')
-    return wanted && tickets.some((t) => t.id === wanted) ? wanted : ''
+    if (wanted && tickets.some((t) => t.id === wanted)) return wanted
+    // Na pré-visualização do Admin, seleciona logo o 1.º bilhete para mostrar o formulário.
+    return preview && tickets.length ? tickets[0].id : ''
   })
   const [members, setMembers] = useState([{ nome: '', idade: '', observacoes: '' }])
   const [busy, setBusy] = useState(false)
@@ -570,25 +621,32 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
       ) : notOpenYet ? (
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
+      ) : hasTickets && !ticketId ? (
+        <TicketChooser
+          tickets={tickets}
+          accent={accent}
+          onSelect={setTicketId}
+          heading={c.ticketHeading || 'Escolhe o teu bilhete'}
+        />
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
-          {hasTickets ? (
-            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-              Bilhete *
-              <select className={inputCls} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
-                <option value="">— Escolha o bilhete —</option>
-                {tickets.map((t) => {
-                  const pt = t.kind === 'grupo' || t.partyType === 'family' || t.partyType === 'group' ? 'group' : 'single'
-                  return (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {ticketPriceLabel(t)}
-                      {pt !== 'single' ? ` · Grupo${t.groupSize ? ` até ${t.groupSize}` : ''}` : ''}
-                    </option>
-                  )
-                })}
-              </select>
-            </label>
+          {hasTickets && selectedTicket ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="flex min-w-0 flex-col">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bilhete</span>
+                <span className="truncate text-sm font-bold text-foreground">
+                  {selectedTicket.name}
+                  <span className="font-normal text-muted-foreground"> · {ticketPrice(selectedTicket)}</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTicketId('')}
+                className="shrink-0 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent"
+              >
+                Trocar bilhete
+              </button>
+            </div>
           ) : null}
 
           {/* Secção de membros (bilhete de grupo) */}
@@ -1025,7 +1083,7 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
 
 // Bloco de inscrição na LANDING: contador de vagas + botão que leva à página
 // dedicada de inscrição (em vez do formulário inline).
-function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
+function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, tickets }) {
   const c = block.content || {}
   const [deadlinePassed] = useState(() => Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
   const [notOpenYet] = useState(() => Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
@@ -1065,6 +1123,13 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref }) {
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
       ) : notOpenYet ? (
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
+      ) : tickets && tickets.length ? (
+        <TicketChooser
+          tickets={tickets}
+          accent={accent}
+          hrefFor={(t) => inviteRsvpHref(slug, t.id)}
+          heading={c.ticketHeading || 'Escolhe o teu bilhete'}
+        />
       ) : (
         <a
           href={rsvpHref}
@@ -1222,6 +1287,8 @@ export default function InvitePage({ slug, view = 'landing' }) {
                 accent={accent}
                 guestStatus={guestStatus}
                 rsvpHref={rsvpHref}
+                slug={slug}
+                tickets={page.tickets}
               />
             )
           }
