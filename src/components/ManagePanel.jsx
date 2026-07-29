@@ -71,7 +71,7 @@ const styles = {
   formActions: 'mt-1 flex justify-end gap-2',
   backBtn: 'inline-flex cursor-pointer rounded-md border-none bg-transparent px-1 py-0.5 text-lg text-muted-foreground transition-colors hover:bg-accent',
   menu: 'grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
-  menuCard: 'flex cursor-pointer flex-col gap-1 rounded-xl border border-border bg-muted/40 p-4 text-left transition-colors hover:border-ring hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:text-2xl [&>i]:text-primary',
+  menuCard: 'group flex cursor-pointer flex-col gap-1.5 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:flex [&>i]:h-11 [&>i]:w-11 [&>i]:items-center [&>i]:justify-center [&>i]:rounded-lg [&>i]:bg-primary/10 [&>i]:text-xl [&>i]:text-primary',
   menuTitle: 'text-[15px] font-bold text-foreground',
   menuDesc: 'text-xs text-muted-foreground',
   userForm: 'flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5',
