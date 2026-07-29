@@ -13,7 +13,7 @@ import EventHoverCard from './EventHoverCard'
 // Categorias pela ordem de apresentação na lista "Calendários".
 const CATEGORY_ORDER = ['culto', 'jovens', 'formacao', 'evento', 'aplicacao']
 
-// Cores vivas para os pontos sobre o fundo navy (independentes do tema).
+// Cores vivas para o indicador de categoria de cada evento (independentes do tema).
 const CAT_DOT = {
   culto: '#F5A800',
   jovens: '#6fa8ff',
@@ -23,8 +23,8 @@ const CAT_DOT = {
 }
 
 /**
- * CalendarSidebar — coluna lateral (navy) com o dia selecionado, a lista de
- * eventos desse dia e os filtros (igreja + categorias), ao estilo da referência.
+ * CalendarSidebar — coluna lateral (cartão) com o dia selecionado, a lista de
+ * eventos desse dia e os filtros (igreja + categorias).
  */
 export default function CalendarSidebar({
   open,
@@ -78,7 +78,7 @@ export default function CalendarSidebar({
       />
     <aside className={cn(
       collapsed ? 'hidden max-[980px]:flex' : 'flex',
-      'w-[280px] flex-shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-border bg-muted/60 p-4 pb-6 pt-[18px] text-foreground max-[980px]:fixed max-[980px]:inset-y-0 max-[980px]:left-0 max-[980px]:z-[60] max-[980px]:w-[min(86%,320px)] max-[980px]:bg-card max-[980px]:pt-14 max-[980px]:transition-transform max-[980px]:duration-200',
+      'w-[280px] flex-shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-border bg-card p-4 pb-6 pt-[18px] text-foreground max-[980px]:fixed max-[980px]:inset-y-0 max-[980px]:left-0 max-[980px]:z-[60] max-[980px]:w-[min(86%,320px)] max-[980px]:pt-14 max-[980px]:transition-transform max-[980px]:duration-200',
       open ? 'max-[980px]:translate-x-0 max-[980px]:shadow-2xl' : 'max-[980px]:-translate-x-full',
     )}>
       <button
@@ -130,15 +130,15 @@ export default function CalendarSidebar({
                 <li key={evt.id}>
                   <EventHoverCard event={evt} side="right" align="start">
                   <button type="button" className={cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent',
+                    'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent',
                     st && 'bg-destructive/15 hover:bg-destructive/25',
                     evt.featured && 'cclx-featured',
                   )} onClick={() => onSelectEvent(evt)}>
-                    <span className="min-w-[38px] text-[11px] font-bold tabular-nums text-muted-foreground">{evt.timeStart || '—'}</span>
                     <span
-                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      className="h-5 w-1 flex-shrink-0 rounded-full"
                       style={{ background: colorFor(evt).subHex || CAT_DOT[evt.category] || CAT_DOT.evento }}
                     />
+                    <span className="min-w-[38px] text-[11px] font-bold tabular-nums text-muted-foreground">{evt.timeStart || '—'}</span>
                     {evt.featured && <i className="ti ti-star-filled cclx-blink flex-shrink-0 text-[11px] text-amber-500" aria-hidden="true" />}
                     <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold">{evt.title}</span>
                     {st && (
