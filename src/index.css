@@ -26,52 +26,60 @@
 @layer base {
   :root {
     --sc-background: 0 0% 100%;
-    --sc-foreground: 0 0% 3.9%;
+    --sc-foreground: 222 20% 12%;
     --sc-card: 0 0% 100%;
-    --sc-card-foreground: 0 0% 3.9%;
+    --sc-card-foreground: 222 20% 12%;
     --sc-popover: 0 0% 100%;
-    --sc-popover-foreground: 0 0% 3.9%;
-    --sc-primary: 0 0% 9%;
+    --sc-popover-foreground: 222 20% 12%;
+    --sc-primary: 222 47% 20%;
     --sc-primary-foreground: 0 0% 98%;
-    --sc-secondary: 0 0% 96.1%;
-    --sc-secondary-foreground: 0 0% 9%;
-    --sc-muted: 0 0% 96.1%;
-    --sc-muted-foreground: 0 0% 45.1%;
-    --sc-accent: 0 0% 96.1%;
-    --sc-accent-foreground: 0 0% 9%;
-    --sc-destructive: 0 84.2% 60.2%;
+    --sc-secondary: 210 40% 96%;
+    --sc-secondary-foreground: 222 47% 20%;
+    --sc-muted: 210 40% 96%;
+    --sc-muted-foreground: 215 16% 47%;
+    --sc-accent: 210 40% 94%;
+    --sc-accent-foreground: 222 47% 20%;
+    --sc-destructive: 0 72% 51%;
     --sc-destructive-foreground: 0 0% 98%;
-    --sc-border: 0 0% 89.8%;
-    --sc-input: 0 0% 89.8%;
-    --sc-ring: 0 0% 3.9%;
-    --sc-radius: 0.5rem;
+    --sc-border: 214 20% 88%;
+    --sc-input: 214 20% 88%;
+    --sc-ring: 222 47% 20%;
+    --sc-radius: 0.6rem;
+    /* Marca CCLX */
+    --sc-gold: 40 100% 48%;
   }
 
   [data-theme='dark'] {
-    --sc-background: 0 0% 3.9%;
-    --sc-foreground: 0 0% 98%;
-    --sc-card: 0 0% 3.9%;
-    --sc-card-foreground: 0 0% 98%;
-    --sc-popover: 0 0% 3.9%;
-    --sc-popover-foreground: 0 0% 98%;
-    --sc-primary: 0 0% 98%;
-    --sc-primary-foreground: 0 0% 9%;
-    --sc-secondary: 0 0% 14.9%;
-    --sc-secondary-foreground: 0 0% 98%;
-    --sc-muted: 0 0% 14.9%;
-    --sc-muted-foreground: 0 0% 63.9%;
-    --sc-accent: 0 0% 14.9%;
-    --sc-accent-foreground: 0 0% 98%;
-    --sc-destructive: 0 62.8% 30.6%;
+    --sc-background: 222 30% 8%;
+    --sc-foreground: 210 40% 96%;
+    --sc-card: 222 28% 11%;
+    --sc-card-foreground: 210 40% 96%;
+    --sc-popover: 222 28% 11%;
+    --sc-popover-foreground: 210 40% 96%;
+    --sc-primary: 210 40% 96%;
+    --sc-primary-foreground: 222 47% 14%;
+    --sc-secondary: 217 25% 18%;
+    --sc-secondary-foreground: 210 40% 96%;
+    --sc-muted: 217 25% 18%;
+    --sc-muted-foreground: 215 20% 65%;
+    --sc-accent: 217 25% 20%;
+    --sc-accent-foreground: 210 40% 96%;
+    --sc-destructive: 0 63% 45%;
     --sc-destructive-foreground: 0 0% 98%;
-    --sc-border: 0 0% 14.9%;
-    --sc-input: 0 0% 14.9%;
-    --sc-ring: 0 0% 83.1%;
+    --sc-border: 217 25% 22%;
+    --sc-input: 217 25% 22%;
+    --sc-ring: 210 40% 80%;
+    --sc-gold: 40 100% 52%;
   }
 
   * {
     @apply border-border;
   }
+}
+
+@layer components {
+  .sc-gold { color: hsl(var(--sc-gold)); }
+  .sc-bg-gold { background-color: hsl(var(--sc-gold)); }
 }
 
 /* ===================================================================
