@@ -13,5 +13,12 @@ dist/
 .playwright-mcp/
 loop-sede.png
 
+# Playwright E2E
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+e2e/.auth/
+
 # Fontes de vídeo grandes (a vinheta web comprimida vive em public/)
 Images and videos/

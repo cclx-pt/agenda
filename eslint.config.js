@@ -48,5 +48,20 @@ export default [
       globals: { ...globals.node, ...globals.vitest },
     },
   },
+  {
+    // Testes E2E (Playwright) + config: correm em Node, com código de browser
+    // dentro de page.evaluate → dá-lhes globais de node e de browser. As regras
+    // do React não se aplicam (ex.: o parâmetro `use` das fixtures não é um hook).
+    files: ['e2e/**/*.{js,mjs}', 'playwright.config.js'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   prettier,
 ]
