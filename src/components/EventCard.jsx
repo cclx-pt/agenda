@@ -98,11 +98,11 @@ export default function EventCard({ event, onClick }) {
               </span>
             </div>
           )}
-          {/* Inscrições */}
-          {event.registrationUrl && (
+          {/* Inscrições — convite interno (landing) ou link externo */}
+          {(event.inviteSlug || event.registrationUrl) && (
             <div className="flex items-center gap-[7px]">
               <Ticket className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-              <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              <a href={event.inviteSlug ? `/invite/${event.inviteSlug}` : event.registrationUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                 className="font-semibold text-primary underline underline-offset-2 hover:opacity-80">
                 Inscrições
               </a>

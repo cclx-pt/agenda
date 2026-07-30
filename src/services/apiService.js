@@ -98,6 +98,7 @@ function mapSorEvent(e) {
     organizerPhone: e.organizerPhone ?? null,
     organizerEmail: e.organizerEmail ?? null,
     registrationUrl: e.registrationUrl ?? null,
+    inviteSlug: e.inviteSlug ?? null,
     attachmentUrl: e.attachmentUrl ?? null,
     attachmentName: e.attachmentName ?? null,
     mapUrl: e.mapUrl ?? null,

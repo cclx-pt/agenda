@@ -143,12 +143,12 @@ export default function EventDetail({ event, onClose, onBack, onExport, onDelete
                 </span>
               </div>
             )}
-            {/* Inscrições */}
-            {event.registrationUrl && (
+            {/* Inscrições — convite interno (landing) ou link externo */}
+            {(event.inviteSlug || event.registrationUrl) && (
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
                 <Ticket className="mt-px h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
                 <a
-                  href={event.registrationUrl}
+                  href={event.inviteSlug ? `/invite/${event.inviteSlug}` : event.registrationUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"

@@ -36,6 +36,19 @@ test.describe('Ligação evento ↔ convite (formulário de evento)', () => {
     expect(res.status()).toBe(401)
   })
 
+  test('o evento público expõe o slug do convite publicado (link no cartão)', async ({ admin, pub }) => {
+    const event = await admin.createEvent({ title: uniqueTitle('card-event') })
+    const invite = await admin.seedPublishedInvite({ title: uniqueTitle('card-invite'), eventId: event.id })
+
+    const res = await pub.ctx.get('/data/events/public')
+    expect(res.ok(), `HTTP ${res.status()}`).toBeTruthy()
+    const { events } = await res.json()
+    const found = (events || []).find((e) => e.id === event.id)
+    expect(found, 'o evento publicado devia constar no payload público').toBeTruthy()
+    // O cartão do evento usa este slug para ligar à landing page do convite.
+    expect(found.inviteSlug).toBe(invite.slug)
+  })
+
   test.describe('no formulário de evento (UI)', () => {
     test.use({ storageState: ADMIN_STATE })
 

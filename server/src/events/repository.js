@@ -69,6 +69,9 @@ function mapRow(row) {
     organizerPhone: row.organizer_phone ?? null,
     organizerEmail: row.organizer_email ?? null,
     registrationUrl: row.registration_url ?? null,
+    // Slug do convite interno PUBLICADO associado (1 evento ↔ 1 convite), para
+    // o cartão do evento mostrar o link da landing page. Null se não houver.
+    inviteSlug: row.invite_slug ?? null,
     attachmentUrl: row.attachment_url ?? null,
     attachmentName: row.attachment_name ?? null,
     mapUrl: row.map_url ?? null,
@@ -175,7 +178,12 @@ export async function list({ status, createdBy, includePrivate = true, allowedPr
     )
   }
   const sql = `
-    SELECT * FROM events
+    SELECT *, (
+      SELECT slug FROM invites
+      WHERE event_id = events.id AND status = 'publicado'
+      ORDER BY published_at DESC NULLS LAST LIMIT 1
+    ) AS invite_slug
+    FROM events
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY start_datetime ASC
   `
