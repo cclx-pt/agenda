@@ -6,6 +6,7 @@ import * as service from './service.js'
 import { EventError } from './service.js'
 import { buildCalendar } from './ics.js'
 import * as usersRepo from '../users/repository.js'
+import * as invitesRepo from '../invites/repository.js'
 
 export const eventsRouter = Router()
 
@@ -127,6 +128,29 @@ eventsRouter.get(
 
 // A partir daqui, tudo exige autenticação.
 eventsRouter.use(requireAuth)
+
+// Convite (interno) associado a um evento — resumo só de leitura para o
+// formulário de evento (nome + slug + estado). A gestão do convite faz-se na
+// secção Convites; aqui é apenas a ligação/saída informativa.
+eventsRouter.get(
+  '/:id/invite',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    const invite = await invitesRepo.findByEventId(req.params.id)
+    res.json({
+      invite: invite
+        ? {
+            id: invite.id,
+            slug: invite.slug,
+            title: invite.title,
+            status: invite.status,
+            registrationMode: invite.registrationMode,
+            rsvpEnabled: invite.rsvpEnabled,
+          }
+        : null,
+    })
+  })
+)
 
 // Token do feed pessoal de subscrição (cria na 1.ª vez). Só o próprio o obtém.
 eventsRouter.get('/calendar-token', async (req, res, next) => {

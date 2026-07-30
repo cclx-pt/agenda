@@ -25,19 +25,18 @@ const styles = {
   overlay: 'fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-12 max-[560px]:p-0',
   panel: 'flex w-[720px] max-w-[96vw] flex-col rounded-xl border border-border bg-background shadow-lg max-h-[calc(100vh-96px)] max-[560px]:h-full max-[560px]:max-h-full max-[560px]:w-full max-[560px]:max-w-full max-[560px]:rounded-none max-[560px]:border-none',
   header: 'flex flex-shrink-0 items-center justify-between border-b border-border px-5 py-4 max-[560px]:px-4 max-[560px]:py-3.5',
-  title: 'm-0 flex items-center gap-2.5 text-base font-bold text-foreground [&>i]:flex [&>i]:h-8 [&>i]:w-8 [&>i]:flex-shrink-0 [&>i]:items-center [&>i]:justify-center [&>i]:rounded-lg [&>i]:bg-primary/10 [&>i]:text-[17px] [&>i]:text-primary',
-  closeBtn: 'flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-md text-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+  title: 'm-0 flex items-center gap-2 text-base font-bold text-foreground [&>i]:text-[20px] [&>i]:text-primary',
+  closeBtn: 'cursor-pointer rounded p-1 text-lg text-muted-foreground transition-colors hover:bg-accent',
   body: 'flex flex-col gap-3 overflow-y-auto px-5 pb-5 pt-4 max-[560px]:px-4 max-[560px]:pb-[18px] max-[560px]:pt-3.5',
   toolbar: 'flex justify-between gap-2',
   toolbarHint: 'm-0 self-center text-[13px] text-muted-foreground [&_code]:font-semibold [&_code]:text-foreground',
   toolbarActions: 'flex flex-shrink-0 gap-2',
   muted: 'py-6 text-center text-sm text-muted-foreground',
-  empty: 'flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground',
   primaryBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent bg-primary px-3.5 py-[9px] text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50',
   ghostBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[9px] text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
   dangerBtn: 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-destructive/40 bg-transparent px-3.5 py-[9px] text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50',
   list: 'm-0 flex list-none flex-col gap-2 p-0',
-  item: 'flex items-center justify-between gap-3 rounded-[10px] border border-border bg-card p-3 max-[560px]:flex-col max-[560px]:items-stretch',
+  item: 'flex items-center justify-between gap-3 rounded-[10px] border border-border bg-muted/40 p-3 max-[560px]:flex-col max-[560px]:items-stretch',
   itemMain: 'flex min-w-0 items-start gap-2.5',
   itemText: 'flex min-w-0 flex-col gap-0.5',
   itemTitle: 'text-sm text-foreground',
@@ -70,9 +69,9 @@ const styles = {
   checks: 'flex flex-wrap gap-5',
   check: 'flex cursor-pointer items-center gap-[7px] text-[13px] font-medium text-foreground',
   formActions: 'mt-1 flex justify-end gap-2',
-  backBtn: 'flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-md text-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+  backBtn: 'inline-flex cursor-pointer rounded-md border-none bg-transparent px-1 py-0.5 text-lg text-muted-foreground transition-colors hover:bg-accent',
   menu: 'grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
-  menuCard: 'group flex cursor-pointer flex-col gap-1.5 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:flex [&>i]:h-11 [&>i]:w-11 [&>i]:items-center [&>i]:justify-center [&>i]:rounded-lg [&>i]:bg-primary/10 [&>i]:text-xl [&>i]:text-primary',
+  menuCard: 'flex cursor-pointer flex-col gap-1 rounded-xl border border-border bg-muted/40 p-4 text-left transition-colors hover:border-ring hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:text-2xl [&>i]:text-primary',
   menuTitle: 'text-[15px] font-bold text-foreground',
   menuDesc: 'text-xs text-muted-foreground',
   userForm: 'flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5',
@@ -88,13 +87,13 @@ const styles = {
   churchPicker: 'flex flex-col gap-2',
   churchGrid: 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-3.5 gap-y-1.5',
   statGrid: 'grid grid-cols-3 gap-2.5 max-[560px]:grid-cols-2',
-  statCard: 'flex flex-col gap-0.5 rounded-[10px] border border-border bg-card p-3.5 shadow-sm',
+  statCard: 'flex flex-col gap-0.5 rounded-[10px] border border-border bg-muted/40 p-3.5',
   statNum: 'text-2xl font-bold text-primary',
   statLabel: 'text-xs text-muted-foreground',
   reportSection: 'flex flex-col gap-2',
   reportHeading: 'mb-0 mt-1 text-[13px] font-bold uppercase tracking-wide text-muted-foreground',
   barList: 'm-0 flex list-none flex-col gap-1 p-0',
-  barRow: 'flex justify-between rounded-lg border border-border bg-card px-3 py-[7px] text-[13px] text-foreground',
+  barRow: 'flex justify-between rounded-lg border border-border bg-muted/40 px-3 py-[7px] text-[13px] text-foreground',
   barLabel: 'min-w-0 truncate pr-2',
   barValue: 'font-bold text-primary',
 }
@@ -510,6 +509,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [dragActive, setDragActive] = useState(false)
   // Separador ativo do formulário de evento (restruturação em separadores).
   const [activeTab, setActiveTab] = useState('detalhes')
+  // Convite (interno) associado ao evento em edição — só leitura, na aba Inscrição.
+  const [linkedInvite, setLinkedInvite] = useState(null)
+  const [linkedInviteLoading, setLinkedInviteLoading] = useState(false)
   // Pedido de alteração de data/hora/recorrência de um evento publicado
   // (null quando não aplicável). Fluxo de aprovação separado da edição normal.
   const [changeForm, setChangeForm] = useState(
@@ -607,6 +609,32 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     load()
   }, [load])
 
+  // Convite associado ao evento em edição (só leitura na aba Inscrição): reflete
+  // a ligação real 1 evento ↔ 1 convite. Sem gestão aqui — apenas nome + links.
+  useEffect(() => {
+    if (!editingId) return undefined
+    let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLinkedInviteLoading(true)
+    eventsService
+      .getEventInvite(editingId)
+      .then((invite) => {
+        if (!alive) return
+        setLinkedInvite(invite)
+        // Um convite associado torna a inscrição "interna" (se ainda não havia link externo).
+        if (invite) setForm((f) => (f.registrationType === 'none' ? { ...f, registrationType: 'internal' } : f))
+      })
+      .catch(() => {
+        if (alive) setLinkedInvite(null)
+      })
+      .finally(() => {
+        if (alive) setLinkedInviteLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [editingId])
+
   const setField = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setForm((f) => ({ ...f, [key]: value }))
@@ -617,6 +645,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     setEditingId(null)
     setEditingStatus(null)
     setChangeForm(null)
+    setLinkedInvite(null)
     setActiveTab('detalhes')
     setView('form')
   }
@@ -2012,9 +2041,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             {loading ? (
               <p className={styles.muted}>A carregar…</p>
             ) : events.length === 0 ? (
-              <p className={styles.empty}>Ainda não há eventos. Cria o primeiro.</p>
+              <p className={styles.muted}>Ainda não há eventos. Cria o primeiro.</p>
             ) : visibleEvents.length === 0 ? (
-              <p className={styles.empty}>Nenhum evento corresponde aos filtros.</p>
+              <p className={styles.muted}>Nenhum evento corresponde aos filtros.</p>
             ) : (
               <ul className={styles.list}>
                 {visibleEvents.map((evt) => {
@@ -2363,9 +2392,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </div>
 
             {users.length === 0 ? (
-              <p className={styles.empty}>Sem utilizadores.</p>
+              <p className={styles.muted}>Sem utilizadores.</p>
             ) : visibleUsers.length === 0 ? (
-              <p className={styles.empty}>Nenhum utilizador corresponde aos filtros.</p>
+              <p className={styles.muted}>Nenhum utilizador corresponde aos filtros.</p>
             ) : (
               <ul className={styles.list}>
                 {visibleUsers.map((u) => {
@@ -2726,7 +2755,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </form>
 
             {dbChurches.length === 0 ? (
-              <p className={styles.empty}>Ainda não há igrejas registadas.</p>
+              <p className={styles.muted}>Ainda não há igrejas registadas.</p>
             ) : (
               <ul className={styles.list}>
                 {dbChurches.map((c) => (
@@ -2840,7 +2869,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </form>
 
             {dbCategories.length === 0 ? (
-              <p className={styles.empty}>Ainda não há categorias registadas.</p>
+              <p className={styles.muted}>Ainda não há categorias registadas.</p>
             ) : (
               <ul className={styles.list}>
                 {dbCategories.map((c) => (
@@ -2939,7 +2968,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </form>
 
             {dbSubcategories.length === 0 ? (
-              <p className={styles.empty}>{t('noSubcategories')}</p>
+              <p className={styles.muted}>{t('noSubcategories')}</p>
             ) : (
               <ul className={styles.list}>
                 {dbSubcategories.map((s) => (
@@ -3005,7 +3034,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             </form>
 
             {dbPrivacyTags.length === 0 ? (
-              <p className={styles.empty}>Ainda não há etiquetas de privacidade registadas.</p>
+              <p className={styles.muted}>Ainda não há etiquetas de privacidade registadas.</p>
             ) : (
               <ul className={styles.list}>
                 {dbPrivacyTags.map((t) => (
@@ -3058,7 +3087,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             />
             <div className="flex flex-col gap-2">
               {visibleTranslationKeys.length === 0 ? (
-                <p className={styles.empty}>Nenhuma tradução corresponde à pesquisa.</p>
+                <p className={styles.muted}>Nenhuma tradução corresponde à pesquisa.</p>
               ) : (
                 visibleTranslationKeys.map((key) => (
                   <label key={key} className={styles.label}>
@@ -3851,9 +3880,45 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                 />
               </label>
             )}
-            {form.registrationType === 'internal' && (
-              <p className={styles.fieldHint}>{t('registrationInternalSoon')}</p>
-            )}
+            {form.registrationType === 'internal' &&
+              (linkedInviteLoading ? (
+                <p className={styles.fieldHint}>…</p>
+              ) : linkedInvite ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t('registrationInternalInvite')}
+                  </span>
+                  <strong className="text-sm text-foreground">{linkedInvite.title}</strong>
+                  <span className="text-xs text-muted-foreground">/invite/{linkedInvite.slug}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/invite/${linkedInvite.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+                    >
+                      <i className="ti ti-external-link" aria-hidden="true" />
+                      {t('registrationInternalOpen')}
+                    </a>
+                    <a
+                      href={`/invite/${linkedInvite.slug}/inscricao`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+                    >
+                      <i className="ti ti-ticket" aria-hidden="true" />
+                      {t('registrationInternalRegister')}
+                    </a>
+                  </div>
+                  {linkedInvite.status !== 'publicado' && (
+                    <p className="m-0 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                      {t('registrationInternalDraft')}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className={styles.fieldHint}>{t('registrationInternalNone')}</p>
+              ))}
               </TabsContent>
 
               <TabsContent value="datetime" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">

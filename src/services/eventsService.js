@@ -39,6 +39,12 @@ export async function getHistory(id) {
   return history
 }
 
+/** Convite (interno) associado a um evento — resumo só de leitura para o formulário. */
+export async function getEventInvite(id) {
+  const { invite } = await request(`/data/events/${id}/invite`)
+  return invite
+}
+
 export async function createEvent(payload) {
   const { event } = await request('/data/events', { method: 'POST', body: payload })
   return event
