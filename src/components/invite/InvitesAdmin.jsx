@@ -43,12 +43,16 @@ const PAY_LABEL = {
   failed: 'Falhado',
   expired: 'Expirado',
   cancelled: 'Cancelado',
+  refund_requested: 'Reembolso pedido',
+  refunded: 'Reembolsado',
 }
 const PAY_BADGE = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
   awaiting_validation: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
   failed: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+  refund_requested: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
+  refunded: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
 }
 
 // Tipo de PREÇO do bilhete: Pago (com valor), Grátis (0€) ou Doação (valor à
@@ -388,7 +392,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -446,6 +450,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
             mbEntity: (t.mbEntity || '').trim() || null,
             mbReference: (t.mbReference || '').trim() || null,
             mbNumbers: (t.mbNumbers || []).map((n) => String(n).trim()).filter(Boolean).slice(0, 4),
+            refundDeadline: normalizeKind(t.kind) === 'individual' ? t.refundDeadline || null : null,
             active: t.active !== false,
           }))
       )
@@ -532,6 +537,21 @@ function InviteEditor({ invite, onBack, onSaved }) {
     try {
       await invitesService.rejectPayment(p.id)
       toast.success('Pagamento rejeitado.')
+      await loadGuests()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Marca o reembolso de uma inscrição como concluído (fecha o pedido do convidado).
+  const markRefunded = async (g) => {
+    if (!window.confirm('Marcar este reembolso como concluído?')) return
+    setBusy(true)
+    try {
+      await invitesService.markInviteGuestRefunded(invite.id, g.id)
+      toast.success('Reembolso marcado como concluído.')
       await loadGuests()
     } catch (err) {
       toast.error(err.message)
@@ -712,6 +732,15 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <Copy className="h-4 w-4" aria-hidden="true" />
             Copiar link
           </button>
+          <a
+            href={`${publicUrl(invite.slug)}?preview=${invite.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className={ghostBtn}
+          >
+            <Eye className="h-4 w-4" aria-hidden="true" />
+            Pré-visualizar
+          </a>
           <a href={publicUrl(invite.slug)} target="_blank" rel="noreferrer" className={ghostBtn}>
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Abrir
@@ -973,6 +1002,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         <span />
                       )}
                     </div>
+                    {t.kind === 'individual' ? (
+                      <label className="flex flex-col gap-1 text-sm font-medium text-foreground sm:max-w-[16rem]">
+                        Data limite de reembolso
+                        <DateField
+                          value={t.refundDeadline || ''}
+                          onChange={(v) => setTicketField(i, 'refundDeadline', v)}
+                          className={inputCls}
+                          ariaLabel="Data limite de reembolso"
+                        />
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Até esta data (inclusive) o inscrito pode pedir reembolso na página de gestão. Em branco = sem reembolso.
+                        </span>
+                      </label>
+                    ) : null}
                     {normalizePartyType(t) !== 'single' ? (
                       <p className="m-0 text-xs text-muted-foreground">
                         No formulário público, este bilhete abre a lista de membros do grupo — pede nome, idade e (se for menor de 11) observações.
@@ -1340,6 +1383,25 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         ) : null}
                         {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
                         <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
+                        {g.paymentState === 'refund_requested' ? (
+                          <>
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-400">
+                              Reembolso pedido
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => markRefunded(g)}
+                              disabled={busy}
+                              className="rounded-lg border border-emerald-600/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+                            >
+                              Marcar reembolsado
+                            </button>
+                          </>
+                        ) : g.paymentState === 'refunded' ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400">
+                            Reembolsado
+                          </span>
+                        ) : null}
                         <span className={'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ' + SITUACAO_BADGE[inscricaoSituacao(g)]}>
                           {SITUACAO_LABEL[inscricaoSituacao(g)]}
                         </span>

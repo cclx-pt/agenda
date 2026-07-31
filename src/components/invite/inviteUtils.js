@@ -84,7 +84,7 @@ export const SITUACAO_BADGE = {
 export function inscricaoSituacao(guest) {
   const rsvp = guest?.rsvpState
   const pay = guest?.paymentState
-  if (rsvp === 'declined') return 'cancelada'
+  if (rsvp === 'declined' || rsvp === 'cancelled') return 'cancelada'
   if (rsvp === 'waitlisted') return 'espera'
   if (rsvp === 'confirmed') {
     if (pay === 'pending') return 'comprovativo'

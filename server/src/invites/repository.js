@@ -79,6 +79,7 @@ function mapGuest(row) {
     extra: row.extra ?? null,
     respondedAt: row.responded_at ?? null,
     checkedInAt: row.checked_in_at ?? null,
+    refundRequestedAt: row.refund_requested_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -315,8 +316,8 @@ export async function insertGuest(inviteId, data) {
   const id = randomUUID()
   await pool.query(
     `INSERT INTO invite_guests
-      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, responded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())`,
+      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, responded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())`,
     [
       id,
       inviteId,
@@ -330,6 +331,7 @@ export async function insertGuest(inviteId, data) {
       data.paymentState ?? 'not_applicable',
       data.extra ? JSON.stringify(data.extra) : null,
       data.ticketId ?? null,
+      data.managePasswordHash ?? null,
     ]
   )
   return findGuestById(id)
@@ -360,6 +362,17 @@ export async function findGuestByCode(inviteId, code) {
     [inviteId, code]
   )
   return mapGuest(rows[0])
+}
+
+// Como findGuestByCode mas devolve TAMBÉM o hash da senha de gestão (self-service),
+// para verificar o login na página /gerir. O hash nunca é exposto pelo mapGuest.
+export async function findGuestAuthByCode(inviteId, code) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_guests WHERE invite_id = $1 AND upper(code) = upper($2) LIMIT 1',
+    [inviteId, code]
+  )
+  if (!rows[0]) return null
+  return { guest: mapGuest(rows[0]), passwordHash: rows[0].manage_password_hash ?? null }
 }
 
 // Marca (ou desmarca) o check-in de uma inscrição.
@@ -429,6 +442,20 @@ export async function deleteGuest(id) {
   await pool.query('DELETE FROM invite_guests WHERE id = $1', [id])
 }
 
+// Atualiza SÓ o estado de pagamento (sem tocar em responded_at, ao contrário de
+// updateGuest). Com refundRequested regista a data/hora do pedido de reembolso.
+export async function setGuestPaymentState(id, paymentState, { refundRequested = false } = {}) {
+  await pool.query(
+    `UPDATE invite_guests SET
+       payment_state = $2,
+       refund_requested_at = ${refundRequested ? 'now()' : 'refund_requested_at'},
+       updated_at = now()
+     WHERE id = $1`,
+    [id, paymentState]
+  )
+  return findGuestById(id)
+}
+
 // Soma de lugares confirmados (guests_count dos convidados 'confirmed'), para a
 // verificação de capacidade.
 export async function countConfirmedSeats(inviteId) {
@@ -460,6 +487,19 @@ export async function countViews(inviteId) {
 
 // ── Bilhetes (tipos) ─────────────────────────────────────────────
 
+// Formata uma coluna DATE (pg devolve Date à meia-noite local) como 'YYYY-MM-DD',
+// sem desvio de fuso (usa os componentes locais, que correspondem à data guardada).
+function toDateStr(v) {
+  if (!v) return null
+  if (typeof v === 'string') return v.slice(0, 10)
+  const d = v instanceof Date ? v : new Date(v)
+  if (Number.isNaN(d.getTime())) return null
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function mapTicket(row) {
   if (!row) return null
   return {
@@ -473,6 +513,7 @@ function mapTicket(row) {
     groupSize: row.group_size ?? null,
     partyType: row.party_type ?? 'single',
     description: row.description ?? null,
+    refundDeadline: toDateStr(row.refund_deadline),
     mbEntity: row.mb_entity ?? null,
     mbReference: row.mb_reference ?? null,
     mbNumbers: Array.isArray(row.mb_numbers) ? row.mb_numbers : [],
@@ -561,20 +602,20 @@ export async function replaceTickets(inviteId, tickets) {
            name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
            group_size = $7, description = $8, active = $9, sort_order = $10,
            payment_method = $11, party_type = $13, payment_methods = $14,
-           mb_entity = $15, mb_reference = $16, mb_numbers = $17, updated_at = now()
+           mb_entity = $15, mb_reference = $16, mb_numbers = $17, refund_deadline = $18, updated_at = now()
          WHERE id = $1 AND invite_id = $12`,
         [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
           t.groupSize ?? null, t.description ?? null, t.active !== false, order, pmFirst, inviteId, t.partyType ?? 'single', pmsJson,
-          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson]
+          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null]
       )
     } else {
       await pool.query(
         `INSERT INTO invite_tickets
-          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods, mb_entity, mb_reference, mb_numbers)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods, mb_entity, mb_reference, mb_numbers, refund_deadline)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
         [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
           t.capacity ?? null, t.groupSize ?? null, t.description ?? null, pmFirst, t.active !== false, order, t.partyType ?? 'single', pmsJson,
-          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson]
+          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null]
       )
     }
     order += 1

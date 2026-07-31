@@ -100,6 +100,12 @@ export async function deleteInviteGuest(inviteId, guestId) {
   await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'DELETE' })
 }
 
+// Marca o reembolso de uma inscrição como concluído (organizador).
+export async function markInviteGuestRefunded(inviteId, guestId) {
+  const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}/refunded`, { method: 'POST' })
+  return guest
+}
+
 // ── Check-in (organizador) ──────────────────────────────
 export async function checkinLookup(inviteId, code) {
   const { result } = await request(`/data/invites/${inviteId}/checkin/lookup?code=${encodeURIComponent(code)}`)
@@ -136,6 +142,32 @@ export async function submitRsvp(slug, payload) {
     method: 'POST',
     body: payload,
   })
+}
+
+// ── Auto-gestão da inscrição (código de reserva + senha) ─────────
+
+export async function inviteManageLogin(slug, code, password) {
+  const { manage } = await request(`/data/public/invite/${encodeURIComponent(slug)}/manage`, {
+    method: 'POST',
+    body: { code, password },
+  })
+  return manage
+}
+
+export async function inviteManageCancel(slug, code, password) {
+  const { manage } = await request(`/data/public/invite/${encodeURIComponent(slug)}/manage/cancel`, {
+    method: 'POST',
+    body: { code, password },
+  })
+  return manage
+}
+
+export async function inviteManageRefund(slug, code, password) {
+  const { manage } = await request(`/data/public/invite/${encodeURIComponent(slug)}/manage/refund`, {
+    method: 'POST',
+    body: { code, password },
+  })
+  return manage
 }
 
 // ── Pagamentos ───────────────────────────────────────────────────

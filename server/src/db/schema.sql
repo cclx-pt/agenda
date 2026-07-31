@@ -528,3 +528,21 @@ ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES inv
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS code TEXT;
 -- Data/hora do check-in (validação à entrada); NULL = ainda não fez check-in.
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+
+-- Auto-gestão da inscrição pelo convidado (página /invite/<slug>/gerir): senha
+-- (hash scrypt, "salt:hash") para entrar com o código de reserva e cancelar /
+-- pedir reembolso; refund_requested_at = data/hora do pedido de reembolso.
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS manage_password_hash TEXT;
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS refund_requested_at TIMESTAMPTZ;
+-- Estado 'cancelled' (cancelada pelo próprio convidado) no rsvp_state.
+ALTER TABLE invite_guests DROP CONSTRAINT IF EXISTS invite_guests_rsvp_state_check;
+ALTER TABLE invite_guests ADD CONSTRAINT invite_guests_rsvp_state_check
+  CHECK (rsvp_state IN ('pending', 'confirmed', 'declined', 'waitlisted', 'cancelled'));
+-- Estados de reembolso no payment_state ('refund_requested' → 'refunded').
+ALTER TABLE invite_guests DROP CONSTRAINT IF EXISTS invite_guests_payment_state_check;
+ALTER TABLE invite_guests ADD CONSTRAINT invite_guests_payment_state_check
+  CHECK (payment_state IN ('not_applicable', 'pending', 'awaiting_validation', 'paid', 'expired', 'refund_requested', 'refunded'));
+
+-- Data limite de reembolso por bilhete (self-service): o convidado só pode pedir
+-- reembolso de um bilhete pago enquanto hoje <= refund_deadline. NULL = sem reembolso.
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS refund_deadline DATE;

@@ -1,11 +1,12 @@
 import { z } from 'zod'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { waitUntil } from '@vercel/functions'
 import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
+import * as usersRepo from '../users/repository.js'
 import * as paymentsRepo from './payments/repository.js'
 import { config } from '../config.js'
-import { sendRsvpConfirmationEmail } from '../auth/email.js'
+import { sendRsvpConfirmationEmail, sendRefundRequestEmail } from '../auth/email.js'
 import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
 
 // Erro de domínio com código HTTP associado.
@@ -204,6 +205,13 @@ const ticketSchema = z.object({
   mbReference: z.string().trim().max(30).optional().nullable(),
   // Números MB WAY definidos no bilhete (tipo 'mbway'); vazio usa os do método.
   mbNumbers: z.array(z.string().trim().max(20)).max(4).optional().nullable(),
+  // Data limite de reembolso (self-service): 'YYYY-MM-DD' ou null (sem reembolso).
+  refundDeadline: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de reembolso inválida.')
+    .nullable()
+    .optional(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -260,6 +268,34 @@ function genGuestCode() {
 // valor mas não bloqueia a inscrição num pagamento).
 function ticketNeedsPayment(t) {
   return !!t && t.kind === 'individual' && Number(t.price) > 0
+}
+
+// ── Auto-gestão da inscrição (self-service): senha curta + hash scrypt ─────
+// A senha (mostrada uma vez ao convidado + email) permite entrar em /gerir com o
+// código de reserva para cancelar ou pedir reembolso. Guarda-se só o hash.
+const MANAGE_PW_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function genManagePassword() {
+  const b = randomBytes(8)
+  let s = ''
+  for (let i = 0; i < 8; i += 1) s += MANAGE_PW_ALPHABET[b[i] % MANAGE_PW_ALPHABET.length]
+  return s
+}
+function hashManagePassword(pw) {
+  const salt = randomBytes(16)
+  const key = scryptSync(String(pw), salt, 32)
+  return `${salt.toString('hex')}:${key.toString('hex')}`
+}
+function verifyManagePassword(pw, stored) {
+  if (!stored || typeof stored !== 'string' || !stored.includes(':')) return false
+  const [saltHex, keyHex] = stored.split(':')
+  try {
+    const salt = Buffer.from(saltHex, 'hex')
+    const key = Buffer.from(keyHex, 'hex')
+    const got = scryptSync(String(pw), salt, key.length)
+    return key.length === got.length && timingSafeEqual(key, got)
+  } catch {
+    return false
+  }
 }
 
 // Banner efetivo: o do evento associado (se "usar imagem do evento") ou o próprio.
@@ -931,6 +967,15 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
       qrUrl,
       ticket: ticketInfo,
       data: dataSummary,
+      // Auto-gestão: código + senha + link para cancelar / pedir reembolso.
+      manage:
+        status?.managePassword && guest.code
+          ? {
+              code: guest.code,
+              password: status.managePassword,
+              url: status.manageUrl || `${base}/invite/${encodeURIComponent(invite.slug)}/gerir`,
+            }
+          : null,
     })
   })().catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
   try {
@@ -1017,7 +1062,8 @@ export async function submitRsvp(slug, input) {
   }
 
   // Cada inscrição é Única (não idempotente): cria sempre um novo registo, com o seu
-  // próprio token pessoal e código de bilhete.
+  // próprio token pessoal, código de bilhete e senha de auto-gestão.
+  const managePassword = genManagePassword()
   const guest = await repo.insertGuest(invite.id, {
     token: randomBytes(24).toString('hex'),
     code: genGuestCode(),
@@ -1029,11 +1075,17 @@ export async function submitRsvp(slug, input) {
     paymentState,
     ticketId: ticket?.id ?? null,
     extra: data.extra ?? null,
+    managePasswordHash: hashManagePassword(managePassword),
   })
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)
   // Comunidade do JotForm (link "contribuir via MB WAY") — mesma resolução do
   // email/renderPayload, para o link ficar correto já a seguir à inscrição.
   status.jotformCommunity = resolveJotformCommunity(invite, guest, invite.community)
+  // Credenciais de auto-gestão (mostradas UMA vez: cartão de confirmação + email).
+  // Nunca são devolvidas de novo em visitas seguintes (só se guarda o hash).
+  status.manageCode = guest.code
+  status.managePassword = managePassword
+  status.manageUrl = `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}/gerir`
   let methodType = null
   if (status?.paymentMethod) {
     const activeMethods = await getActivePaymentMethods().catch(() => [])
@@ -1046,6 +1098,140 @@ export async function submitRsvp(slug, input) {
     spotsLeft = Math.max(0, invite.capacity - taken)
   }
   return { token: guest.token, status, spotsLeft }
+}
+
+// ── Auto-gestão da inscrição (convidado, sem sessão: código + senha) ──────
+
+const manageSchema = z.object({
+  code: z.string().trim().min(1, 'Indique o código de reserva.').max(40),
+  password: z.string().trim().min(1, 'Indique a senha.').max(80),
+})
+
+// Carrega e AUTENTICA o convidado pelo código de reserva + senha de gestão.
+async function loadGuestForSelfManage(slug, input) {
+  const { code, password } = manageSchema.parse(input ?? {})
+  const invite = await repo.findBySlug(slug)
+  if (!invite || invite.status === 'rascunho') throw new InviteError(404, 'Convite não encontrado.')
+  const auth = await repo.findGuestAuthByCode(invite.id, code)
+  if (!auth || !auth.passwordHash || !verifyManagePassword(password, auth.passwordHash)) {
+    throw new InviteError(401, 'Código de reserva ou senha inválidos.')
+  }
+  const ticket = auth.guest.ticketId ? await repo.findTicketById(auth.guest.ticketId).catch(() => null) : null
+  return { invite, guest: auth.guest, ticket }
+}
+
+// Elegibilidade de reembolso: bilhete pago, já pago/em validação, prazo por vencer.
+function refundEligibility(guest, ticket) {
+  if (['refund_requested', 'refunded'].includes(guest.paymentState)) return { canRefund: false, reason: 'already' }
+  if (!ticket || !ticketNeedsPayment(ticket)) return { canRefund: false, reason: 'not_paid' }
+  if (!['paid', 'awaiting_validation'].includes(guest.paymentState)) return { canRefund: false, reason: 'not_paid_state' }
+  if (!ticket.refundDeadline) return { canRefund: false, reason: 'no_deadline' }
+  const today = new Date().toISOString().slice(0, 10)
+  if (today > ticket.refundDeadline) return { canRefund: false, reason: 'past_deadline' }
+  return { canRefund: true, reason: null }
+}
+
+// Resumo da inscrição para a página /gerir (+ o que o convidado pode fazer).
+function manageSummary(invite, guest, ticket) {
+  const active = ['pending', 'confirmed', 'waitlisted'].includes(guest.rsvpState)
+  const refund = refundEligibility(guest, ticket)
+  return {
+    code: guest.code,
+    name: guest.name,
+    email: guest.email,
+    eventTitle: invite.title,
+    when: invite.startDatetime,
+    location: invite.location ?? null,
+    rsvpState: guest.rsvpState,
+    paymentState: guest.paymentState,
+    checkedIn: !!guest.checkedInAt,
+    ticket: ticket
+      ? {
+          name: ticket.name,
+          price: ticket.price,
+          currency: ticket.currency,
+          kind: ticket.kind,
+          refundDeadline: ticket.refundDeadline ?? null,
+        }
+      : null,
+    canCancel: active && !guest.checkedInAt,
+    canRefund: refund.canRefund,
+    refundReason: refund.reason,
+    link: `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`,
+  }
+}
+
+// Consulta a inscrição (login com código + senha).
+export async function manageGet(slug, input) {
+  const { invite, guest, ticket } = await loadGuestForSelfManage(slug, input)
+  return manageSummary(invite, guest, ticket)
+}
+
+// Cancela a inscrição (liberta o lugar). Bloqueado após o check-in.
+export async function manageCancel(slug, input) {
+  const { invite, guest, ticket } = await loadGuestForSelfManage(slug, input)
+  if (guest.checkedInAt) throw new InviteError(409, 'Já foi feito o check-in desta inscrição.')
+  if (!['pending', 'confirmed', 'waitlisted'].includes(guest.rsvpState)) {
+    throw new InviteError(409, 'Esta inscrição já não está ativa.')
+  }
+  await repo.updateGuestDetails(guest.id, { rsvpState: 'cancelled' })
+  const updated = await repo.findGuestById(guest.id)
+  return manageSummary(invite, updated, ticket)
+}
+
+// Pede reembolso (só bilhete pago, dentro do prazo): cancela a presença + marca o
+// pagamento como 'refund_requested' e notifica o organizador (processa manualmente).
+export async function manageRefund(slug, input) {
+  const { invite, guest, ticket } = await loadGuestForSelfManage(slug, input)
+  const { canRefund, reason } = refundEligibility(guest, ticket)
+  if (!canRefund) {
+    const msg =
+      reason === 'already'
+        ? 'Já existe um pedido de reembolso para esta inscrição.'
+        : reason === 'past_deadline'
+          ? 'O prazo para pedir reembolso já terminou.'
+          : reason === 'no_deadline'
+            ? 'Este bilhete não permite reembolso.'
+            : 'Não é possível pedir reembolso desta inscrição.'
+    throw new InviteError(409, msg)
+  }
+  await repo.updateGuestDetails(guest.id, { rsvpState: 'cancelled' })
+  await repo.setGuestPaymentState(guest.id, 'refund_requested', { refundRequested: true })
+  const updated = await repo.findGuestById(guest.id)
+  notifyOrganizerRefund(invite, updated, ticket)
+  return manageSummary(invite, updated, ticket)
+}
+
+// Marca o reembolso como concluído (organizador). Fecha o ciclo do pedido.
+export async function markGuestRefunded(user, inviteId, guestId) {
+  const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  await repo.setGuestPaymentState(guest.id, 'refunded')
+  return repo.findGuestById(guest.id)
+}
+
+// Notifica (em background) o organizador — criador do convite — de um pedido de
+// reembolso. Best-effort: sem email do criador, apenas fica o estado no admin.
+function notifyOrganizerRefund(invite, guest, ticket) {
+  const p = (async () => {
+    if (!invite.createdBy) return
+    const organizer = await usersRepo.findById(invite.createdBy).catch(() => null)
+    if (!organizer?.email) return
+    await sendRefundRequestEmail(organizer.email, {
+      organizerName: organizer.name ?? null,
+      eventTitle: invite.title,
+      guestName: guest.name ?? null,
+      guestEmail: guest.email ?? null,
+      code: guest.code ?? null,
+      ticketName: ticket?.name ?? null,
+      amount: ticket?.price != null ? `${Number(ticket.price).toFixed(2)} ${ticket.currency || 'EUR'}` : null,
+      link: (config.appUrl || '').replace(/\/+$/, ''),
+    })
+  })().catch((err) => console.error('[invites] pedido de reembolso:', err?.message ?? err))
+  try {
+    waitUntil(p)
+  } catch {
+    /* fora do runtime Vercel: o processo persistente conclui o envio */
+  }
 }
 
 // ── Eventos associáveis + bilhetes (organizador) ─────────────────

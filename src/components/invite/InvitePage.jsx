@@ -242,11 +242,13 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const c = block.content || {}
   const inv = page.invite
   const fields = getFormFields(c)
+  // Em pré-visualização (organizador) o formulário mostra-se sempre, mesmo que o
+  // prazo tenha terminado ou as inscrições ainda não tenham aberto.
   const [deadlinePassed] = useState(
-    () => Boolean(inv.rsvpDeadline) && Date.now() > Date.parse(inv.rsvpDeadline)
+    () => !preview && Boolean(inv.rsvpDeadline) && Date.now() > Date.parse(inv.rsvpDeadline)
   )
   const [notOpenYet] = useState(
-    () => Boolean(inv.rsvpStartDatetime) && Date.now() < Date.parse(inv.rsvpStartDatetime)
+    () => !preview && Boolean(inv.rsvpStartDatetime) && Date.now() < Date.parse(inv.rsvpStartDatetime)
   )
   const tickets = (page.tickets || []).filter((t) => !t.soldOut)
   const hasTickets = tickets.length > 0
@@ -341,6 +343,33 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
               {ticketLink ? (
                 <a href={ticketLink} className="max-w-full break-all text-center text-xs font-semibold hover:underline" style={{ color: accent }}>
                   {ticketLink}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+          {guestStatus.managePassword ? (
+            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4">
+              <p className="m-0 text-sm font-bold text-foreground">Gerir a tua inscrição</p>
+              <p className="m-0 mt-1 text-xs text-muted-foreground">
+                Guarda a senha abaixo — precisas dela (com o código) para cancelar ou pedir reembolso.
+              </p>
+              <div className="mt-2 flex flex-col gap-1 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Código de reserva</span>
+                  <span className="font-mono font-bold text-foreground">{guestStatus.manageCode || code}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Senha</span>
+                  <span className="font-mono font-bold text-foreground">{guestStatus.managePassword}</span>
+                </div>
+              </div>
+              {guestStatus.manageUrl ? (
+                <a
+                  href={guestStatus.manageUrl}
+                  className="mt-3 inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline"
+                  style={{ color: accent }}
+                >
+                  Gerir inscrição
                 </a>
               ) : null}
             </div>
@@ -1126,10 +1155,11 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
 
 // Bloco de inscrição na LANDING: contador de vagas + botão que leva à página
 // dedicada de inscrição (em vez do formulário inline).
-function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, tickets }) {
+function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, tickets, preview = false }) {
   const c = block.content || {}
-  const [deadlinePassed] = useState(() => Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
-  const [notOpenYet] = useState(() => Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
+  // Em pré-visualização, ignora prazo/abertura para mostrar sempre o CTA/bilhetes.
+  const [deadlinePassed] = useState(() => !preview && Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
+  const [notOpenYet] = useState(() => !preview && Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
   const mode = invite.registrationMode || 'internal'
   if (mode === 'none') return null
   if (mode === 'external') {
@@ -1187,19 +1217,23 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, ticket
   )
 }
 
-export default function InvitePage({ slug, view = 'landing' }) {
+export default function InvitePage({ slug, view = 'landing', previewId = null }) {
   const [state, setState] = useState({ loading: true, error: null, page: null })
   const [guestStatus, setGuestStatus] = useState(null)
   const [guestToken, setGuestToken] = useState(
-    () => new URLSearchParams(window.location.search).get('g') || undefined
+    () => (previewId ? undefined : new URLSearchParams(window.location.search).get('g') || undefined)
   )
 
   useEffect(() => {
     let alive = true
     const params = new URLSearchParams(window.location.search)
-    const token = params.get('g') || undefined
-    invitesService
-      .getPublicInvite(slug, token)
+    const token = previewId ? undefined : params.get('g') || undefined
+    // Pré-visualização (organizador autenticado): usa o payload de preview, que
+    // funciona mesmo com o convite em rascunho ou com as inscrições fechadas.
+    const load = previewId
+      ? invitesService.getInvitePreview(previewId)
+      : invitesService.getPublicInvite(slug, token)
+    load
       .then((page) => {
         if (!alive) return
         applyMeta(page.meta)
@@ -1213,7 +1247,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
     return () => {
       alive = false
     }
-  }, [slug])
+  }, [slug, previewId])
 
   const { loading, error, page } = state
 
@@ -1300,7 +1334,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
               {page.invite.spotsOnRegistration ? <SpotsCounter invite={page.invite} accent={accent} /> : null}
             </>
           ) : null}
-          <RsvpCard block={rsvpBlock} page={page} accent={accent} guestStatus={guestStatus} onSubmitted={onRsvpSubmitted} />
+          <RsvpCard block={rsvpBlock} page={page} accent={accent} guestStatus={guestStatus} onSubmitted={onRsvpSubmitted} preview={page.preview} />
           <PaymentFlowCard
             slug={page.slug}
             guestToken={guestToken}
@@ -1340,6 +1374,7 @@ export default function InvitePage({ slug, view = 'landing' }) {
                 rsvpHref={rsvpHref}
                 slug={slug}
                 tickets={page.tickets}
+                preview={page.preview}
               />
             )
           }

@@ -73,7 +73,7 @@ function escapeHtml(s) {
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(
   to,
-  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket, data }
+  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket, data, manage }
 ) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
@@ -122,6 +122,9 @@ export async function sendRsvpConfirmationEmail(
       ? `\n\nDados da inscrição:\n${data.map((d) => `- ${d.label}: ${d.value}`).join('\n')}`
       : '') +
     `\n\nO teu bilhete (link único):\n${bilheteLink}` +
+    (manage
+      ? `\n\nGerir a tua inscrição (cancelar / pedir reembolso):\nCódigo de reserva: ${manage.code}\nSenha: ${manage.password}\n${manage.url}`
+      : '') +
     `\n\nVerifica este email — tem os dados do teu bilhete.\n\nAgenda CCLX`
 
   const methodsHtml = methods.length
@@ -160,6 +163,17 @@ export async function sendRsvpConfirmationEmail(
       </div>`
       : ''
 
+  const manageHtml = manage
+    ? `<div style="margin:16px 0;padding:14px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc">
+        <p style="margin:0 0 6px;font-weight:700;color:#111827">Gerir a tua inscrição</p>
+        <p style="margin:0 0 8px;color:#374151;font-size:14px">Podes cancelar a tua inscrição (ou pedir reembolso, quando aplicável) com estes dados:</p>
+        <p style="margin:0 0 3px;color:#111827;font-size:14px">Código de reserva: <strong style="font-family:monospace">${escapeHtml(manage.code)}</strong></p>
+        <p style="margin:0 0 10px;color:#111827;font-size:14px">Senha: <strong style="font-family:monospace">${escapeHtml(manage.password)}</strong></p>
+        <a href="${escapeHtml(manage.url)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Gerir inscrição</a>
+        <p style="margin:8px 0 0;color:#6b7280;font-size:12px">Guarda a senha — é pedida para gerires a tua inscrição.</p>
+      </div>`
+    : ''
+
   const html = `
     <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
       ${bannerSrc ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(title)}" style="width:100%;max-width:560px;border-radius:12px;margin:0 0 16px" />` : ''}
@@ -194,6 +208,7 @@ export async function sendRsvpConfirmationEmail(
         <p style="margin:8px 0 0;color:#6b7280;font-size:13px">Lê o QR ou abre o teu bilhete:</p>
         <p style="margin:4px 0 0"><a href="${escapeHtml(bilheteLink)}" style="color:#1f3864;font-weight:600">${escapeHtml(bilheteLink)}</a></p>
       </div>
+      ${manageHtml}
       <p style="margin:8px 0;color:#6b7280;font-size:13px">Guarda este email — tem os dados do teu bilhete. O link é pessoal e único desta inscrição.</p>
       <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Agenda CCLX</p>
     </div>`
@@ -201,6 +216,50 @@ export async function sendRsvpConfirmationEmail(
   const tx = getTransporter()
   if (!tx) {
     console.log(`\n[email:mock] Confirmação de inscrição para: ${to}\n[email:mock] Link: ${bilheteLink}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, subject, text, html })
+  return { mocked: false }
+}
+
+// Notifica o organizador de um pedido de reembolso (self-service do convidado).
+export async function sendRefundRequestEmail(
+  to,
+  { organizerName, eventTitle, guestName, guestEmail, code, ticketName, amount, link }
+) {
+  const title = eventTitle || 'Evento'
+  const subject = `Pedido de reembolso — ${title}`
+  const text =
+    `${organizerName ? `Olá ${organizerName},` : 'Olá,'}\n\n` +
+    `Foi pedido um reembolso numa inscrição de ${title}.` +
+    (guestName ? `\nNome: ${guestName}` : '') +
+    (guestEmail ? `\nEmail: ${guestEmail}` : '') +
+    (code ? `\nCódigo de reserva: ${code}` : '') +
+    (ticketName ? `\nBilhete: ${ticketName}` : '') +
+    (amount ? `\nValor: ${amount}` : '') +
+    `\n\nA inscrição foi cancelada e o pagamento marcado como "reembolso pedido". ` +
+    `Processa o reembolso e marca-o como concluído no painel de convites.` +
+    (link ? `\n\n${link}` : '') +
+    `\n\nAgenda CCLX`
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+      <h2 style="color:#b45309;margin:0 0 12px">Pedido de reembolso</h2>
+      <p style="margin:0 0 8px">${organizerName ? `Olá ${escapeHtml(organizerName)},` : 'Olá,'}</p>
+      <p style="margin:0 0 8px">Foi pedido um reembolso numa inscrição de <strong>${escapeHtml(title)}</strong>.</p>
+      <div style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px">
+        ${guestName ? `<p style="margin:0 0 3px;color:#374151;font-size:14px"><strong>Nome:</strong> ${escapeHtml(guestName)}</p>` : ''}
+        ${guestEmail ? `<p style="margin:0 0 3px;color:#374151;font-size:14px"><strong>Email:</strong> ${escapeHtml(guestEmail)}</p>` : ''}
+        ${code ? `<p style="margin:0 0 3px;color:#374151;font-size:14px"><strong>Código:</strong> <span style="font-family:monospace">${escapeHtml(code)}</span></p>` : ''}
+        ${ticketName ? `<p style="margin:0 0 3px;color:#374151;font-size:14px"><strong>Bilhete:</strong> ${escapeHtml(ticketName)}</p>` : ''}
+        ${amount ? `<p style="margin:0;color:#374151;font-size:14px"><strong>Valor:</strong> ${escapeHtml(amount)}</p>` : ''}
+      </div>
+      <p style="margin:0 0 12px;color:#374151">A inscrição foi cancelada e o pagamento marcado como <strong>reembolso pedido</strong>. Processa o reembolso e marca-o como concluído no painel de convites.</p>
+      ${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Abrir a agenda</a>` : ''}
+      <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Agenda CCLX</p>
+    </div>`
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Pedido de reembolso (${title}) para: ${to}\n`)
     return { mocked: true }
   }
   await tx.sendMail({ from: config.smtp.from, to, subject, text, html })

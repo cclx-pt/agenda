@@ -161,6 +161,15 @@ invitesRouter.post(
   })
 )
 
+// Marca o reembolso de uma inscrição como concluído.
+invitesRouter.post(
+  '/:id/guests/:guestId/refunded',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ guest: await service.markGuestRefunded(req.user, req.params.id, req.params.guestId) })
+  })
+)
+
 // Elimina uma inscrição.
 invitesRouter.delete(
   '/:id/guests/:guestId',
@@ -268,6 +277,31 @@ publicInvitesRouter.post(
   '/:slug/rsvp',
   asyncHandler(async (req, res) => {
     res.status(201).json(await service.submitRsvp(req.params.slug, req.body))
+  })
+)
+
+// ── Auto-gestão da inscrição (código de reserva + senha) ────────
+// POST /manage — login: devolve o resumo da inscrição.
+publicInvitesRouter.post(
+  '/:slug/manage',
+  asyncHandler(async (req, res) => {
+    res.json({ manage: await service.manageGet(req.params.slug, req.body) })
+  })
+)
+
+// POST /manage/cancel — cancela a inscrição (liberta o lugar).
+publicInvitesRouter.post(
+  '/:slug/manage/cancel',
+  asyncHandler(async (req, res) => {
+    res.json({ manage: await service.manageCancel(req.params.slug, req.body) })
+  })
+)
+
+// POST /manage/refund — pede reembolso (bilhete pago, dentro do prazo).
+publicInvitesRouter.post(
+  '/:slug/manage/refund',
+  asyncHandler(async (req, res) => {
+    res.json({ manage: await service.manageRefund(req.params.slug, req.body) })
   })
 )
 

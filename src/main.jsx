@@ -8,6 +8,7 @@ import LogsPage from './components/LogsPage'
 import ApprovalActionPage from './components/ApprovalActionPage'
 import LoopPage from './components/LoopPage'
 import InvitePage from './components/invite/InvitePage'
+import InviteManage from './components/invite/InviteManage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -30,12 +31,16 @@ const isLoopRoute = routePath.startsWith('/loop/')
 const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
 const isInviteRoute = routePath.startsWith('/invite/')
 // /invite/<slug> (landing) ou /invite/<slug>/inscricao (página só de inscrição).
+// ?preview=<id> → pré-visualização do organizador (funciona com rascunho/fechado).
 let inviteSlug = null
 let inviteView = 'landing'
+let invitePreviewId = null
 if (isInviteRoute) {
   const parts = routePath.slice('/invite/'.length).split('/')
   inviteSlug = decodeURIComponent(parts[0])
   if (parts[1] === 'inscricao') inviteView = 'rsvp'
+  else if (parts[1] === 'gerir') inviteView = 'manage'
+  invitePreviewId = new URLSearchParams(window.location.search).get('preview') || null
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -49,7 +54,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </I18nProvider>
       ) : isInviteRoute ? (
         <I18nProvider>
-          <InvitePage slug={inviteSlug} view={inviteView} />
+          {inviteView === 'manage' ? (
+            <InviteManage slug={inviteSlug} />
+          ) : (
+            <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
+          )}
         </I18nProvider>
       ) : isLogsRoute ? (
         <LogsPage />
