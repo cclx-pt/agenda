@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
-  Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen,
+  Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen, Globe,
 } from 'lucide-react'
 import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice, inviteRsvpHref } from './inviteUtils'
+import { RichText } from './RichText'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 const titleCls = 'mb-4 text-xl font-bold text-foreground'
@@ -65,7 +66,12 @@ function OverviewCard({ block }) {
         <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         {c.title || 'Sobre o evento'}
       </h2>
-      {c.body ? <p className="m-0 whitespace-pre-line leading-relaxed text-foreground">{c.body}</p> : null}
+      {c.body ? (
+        <RichText
+          value={c.body}
+          className="m-0 leading-relaxed text-foreground [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:m-0 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+        />
+      ) : null}
     </div>
   )
 }
@@ -184,7 +190,7 @@ function SpeakersCard({ block }) {
             <div className="min-w-0">
               <p className="m-0 font-bold text-foreground">{s.name}</p>
               {s.role ? <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.role}</p> : null}
-              <p className="m-0 mt-1 text-sm text-muted-foreground">{s.bio}</p>
+              <RichText value={s.bio} className="m-0 mt-1 text-sm text-muted-foreground [&_a]:underline [&_p]:m-0" />
             </div>
           </div>
         ))}
@@ -250,7 +256,7 @@ function WorkshopsCard({ block }) {
         {items.map((w, i) => (
           <div key={i} className="rounded-xl border border-border bg-background p-4">
             <p className="m-0 font-bold text-foreground">{w.title}</p>
-            <p className="m-0 mt-1 text-sm text-muted-foreground">{w.description}</p>
+            <RichText value={w.description} className="m-0 mt-1 text-sm text-muted-foreground [&_a]:underline [&_p]:m-0" />
             <p className="m-0 mt-2 text-xs font-semibold text-muted-foreground">
               {w.facilitator}
               {w.day ? ` · ${w.day}` : ''}
@@ -450,17 +456,63 @@ function ShareCard({ page, accent }) {
   )
 }
 
-function FooterCard({ block }) {
+// Ícones das redes sociais. As marcas (Facebook/Instagram/YouTube) já não vêm no
+// lucide-react, por isso são SVG embutido (herdam a cor via currentColor).
+const IconFacebook = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987H7.898V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+  </svg>
+)
+const IconInstagram = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="2" width="20" height="20" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+)
+const IconYoutube = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M23.5 6.2a3 3 0 0 0-2.11-2.12C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.39.53A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.11 2.12c1.89.53 9.39.53 9.39.53s7.5 0 9.39-.53a3 3 0 0 0 2.11-2.12A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z" />
+  </svg>
+)
+
+const SOCIAL_ICON = { facebook: IconFacebook, instagram: IconInstagram, youtube: IconYoutube, website: Globe }
+const SOCIAL_LABEL = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', website: 'Website' }
+
+function FooterCard({ block, page }) {
   const c = block.content || {}
+  const links = (Array.isArray(c.socialLinks) ? c.socialLinks : []).filter((s) => s && s.url && String(s.url).trim())
+  const hasContent = c.logoUrl || links.length > 0 || c.contactEmail || c.contactPhone
+  // Rodapé vazio → linha de marca discreta (usa as datas do convite).
+  if (!hasContent) {
+    return (
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        {fmtDateRange(page?.invite?.startDatetime, page?.invite?.endDatetime)} · Feito com a Agenda CCLX
+      </p>
+    )
+  }
   return (
     <div className="mt-2 flex flex-col items-center gap-3 py-6 text-center">
-      {Array.isArray(c.socialLinks) && c.socialLinks.length > 0 ? (
-        <div className="flex gap-3">
-          {c.socialLinks.map((s, i) => (
-            <a key={i} href={s.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
-              {s.platform}
-            </a>
-          ))}
+      {c.logoUrl ? <img src={c.logoUrl} alt="CCLX" className="h-12 w-auto object-contain" /> : null}
+      {links.length > 0 ? (
+        <div className="flex items-center gap-3">
+          {links.map((s, i) => {
+            const key = String(s.platform || '').toLowerCase()
+            const Icon = SOCIAL_ICON[key] || Globe
+            return (
+              <a
+                key={i}
+                href={s.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={SOCIAL_LABEL[key] || s.platform || 'Ligação'}
+                title={SOCIAL_LABEL[key] || s.platform}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </a>
+            )
+          })}
         </div>
       ) : null}
       <p className="m-0 text-xs text-muted-foreground">

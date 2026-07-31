@@ -69,6 +69,8 @@ export const SITUACAO_LABEL = {
   validacao: 'Aprovação de comprovativo pendente',
   espera: 'Lista de espera',
   cancelada: 'Cancelada',
+  reembolso: 'Reembolso pedido',
+  reembolsado: 'Reembolsado',
   expirada: 'Expirada',
   pendente: 'Pendente',
 }
@@ -78,12 +80,16 @@ export const SITUACAO_BADGE = {
   validacao: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
   espera: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
   cancelada: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
+  reembolso: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-400',
+  reembolsado: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-400',
   expirada: 'bg-muted text-muted-foreground',
   pendente: 'bg-muted text-muted-foreground',
 }
 export function inscricaoSituacao(guest) {
   const rsvp = guest?.rsvpState
   const pay = guest?.paymentState
+  if (pay === 'refunded') return 'reembolsado'
+  if (pay === 'refund_requested') return 'reembolso'
   if (rsvp === 'declined' || rsvp === 'cancelled') return 'cancelada'
   if (rsvp === 'waitlisted') return 'espera'
   if (rsvp === 'confirmed') {
@@ -93,6 +99,53 @@ export function inscricaoSituacao(guest) {
     return 'confirmada'
   }
   return 'pendente'
+}
+
+// Classifica uma idade em 'crianca' / 'jovem' / 'adulto' com base nas idades
+// configuradas no bilhete (childMaxAge / adultMinAge). Sem configuração, uma
+// pessoa com menos de 11 anos conta como criança. Idade desconhecida = adulto.
+export function classifyAge(age, ticket) {
+  const n = Number(age)
+  const known = age != null && age !== '' && !Number.isNaN(n)
+  if (!known) return 'adulto'
+  const childMax = ticket?.childMaxAge ?? null
+  const adultMin = ticket?.adultMinAge ?? null
+  if (childMax == null && adultMin == null) return n < 11 ? 'crianca' : 'adulto'
+  if (childMax != null && n <= childMax) return 'crianca'
+  if (adultMin != null && n >= adultMin) return 'adulto'
+  if (childMax != null && adultMin == null) return 'adulto'
+  if (adultMin != null && childMax == null) return 'crianca'
+  return 'jovem' // ambos definidos, idade no intervalo
+}
+
+// Reparte as pessoas de uma inscrição em adultos / jovens / crianças. Os membros
+// (bilhete de grupo/família, extra.membros) formam a comitiva; caso contrário o
+// inscrito principal conta como 1 adulto. As crianças indicadas (extra.criancas)
+// somam-se sempre. Usa as idades do bilhete escolhido (guest.ticket).
+export function classifyGuestPeople(guest, ticket = null) {
+  const t = ticket || guest?.ticket || null
+  const extra = guest?.extra || {}
+  const membros = Array.isArray(extra.membros) ? extra.membros : []
+  const criancas = Array.isArray(extra.criancas) ? extra.criancas : []
+  let adultos = 0
+  let jovens = 0
+  let criancasN = 0
+  const bump = (cls) => {
+    if (cls === 'crianca') criancasN += 1
+    else if (cls === 'jovem') jovens += 1
+    else adultos += 1
+  }
+  if (membros.length) {
+    for (const m of membros) bump(classifyAge(m?.idade, t))
+  } else {
+    adultos += 1 // inscrito principal (adulto)
+  }
+  for (const c of criancas) {
+    const cls = c && typeof c === 'object' && (c.idade ?? '') !== '' ? classifyAge(c.idade, t) : 'crianca'
+    bump(cls)
+  }
+  if (!criancas.length && Number(extra.numCriancas) > 0) criancasN += Math.floor(Number(extra.numCriancas))
+  return { adultos, jovens, criancas: criancasN, total: adultos + jovens + criancasN }
 }
 
 // Converte um link de YouTube/Vimeo num URL de embed, ou devolve null.

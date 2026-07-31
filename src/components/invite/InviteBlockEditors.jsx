@@ -1,5 +1,6 @@
 import { Plus, Trash2, ArrowUp, ArrowDown, Copy } from 'lucide-react'
 import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
+import { RichTextEditor } from './RichText'
 
 // Editores de conteúdo por tipo de bloco (formulários "sem código"). Cada editor
 // recebe { content, onChange } e chama onChange(novoConteudo) a cada alteração.
@@ -8,6 +9,21 @@ const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 
 const labelCls = 'flex flex-col gap-1 text-sm font-medium text-foreground'
 const smallBtn =
   'inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent'
+
+// Redes sociais do rodapé (com entradas predefinidas e ícones na página pública).
+const SOCIAL_PLATFORMS = [
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'website', label: 'Website' },
+  { value: 'other', label: 'Outro' },
+]
+const DEFAULT_SOCIALS = [
+  { platform: 'facebook', url: '' },
+  { platform: 'instagram', url: '' },
+  { platform: 'youtube', url: '' },
+  { platform: 'website', url: '' },
+]
 
 // Editor genérico de uma lista de itens (adicionar/remover linhas).
 function RowsEditor({ rows, onChange, emptyRow, render, addLabel }) {
@@ -56,16 +72,15 @@ function OverviewEditor({ content, onChange }) {
         Título
         <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Sobre o evento" />
       </label>
-      <label className={labelCls}>
-        Descrição
-        <textarea
-          className={inputCls}
-          rows={5}
+      <div className={labelCls}>
+        <span>Descrição</span>
+        <RichTextEditor
           value={content.body ?? ''}
-          onChange={set('body')}
+          onChange={(html) => onChange({ ...content, body: html })}
+          minRows={5}
           placeholder="Adiciona mais detalhes sobre o evento e o que os participantes podem esperar."
         />
-      </label>
+      </div>
     </div>
   )
 }
@@ -121,7 +136,7 @@ function SpeakersEditor({ content, onChange }) {
               <input className={inputCls} placeholder="Nome" value={row.name ?? ''} onChange={(e) => upd({ name: e.target.value })} />
               <input className={inputCls} placeholder="Função (opcional)" value={row.role ?? ''} onChange={(e) => upd({ role: e.target.value })} />
             </div>
-            <input className={inputCls} placeholder="Bio curta" value={row.bio ?? ''} onChange={(e) => upd({ bio: e.target.value })} />
+            <RichTextEditor value={row.bio ?? ''} onChange={(html) => upd({ bio: html })} minRows={2} placeholder="Bio curta" />
             <input className={inputCls} placeholder="URL da foto" value={row.photoUrl ?? ''} onChange={(e) => upd({ photoUrl: e.target.value })} />
           </div>
         )}
@@ -189,7 +204,7 @@ function WorkshopsEditor({ content, onChange }) {
         render={(row, upd) => (
           <div className="flex flex-col gap-1.5">
             <input className={inputCls} placeholder="Título" value={row.title ?? ''} onChange={(e) => upd({ title: e.target.value })} />
-            <input className={inputCls} placeholder="Descrição" value={row.description ?? ''} onChange={(e) => upd({ description: e.target.value })} />
+            <RichTextEditor value={row.description ?? ''} onChange={(html) => upd({ description: html })} minRows={2} placeholder="Descrição" />
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
               <input className={inputCls} placeholder="Facilitador" value={row.facilitator ?? ''} onChange={(e) => upd({ facilitator: e.target.value })} />
               <input className={inputCls} placeholder="Dia" value={row.day ?? ''} onChange={(e) => upd({ day: e.target.value })} />
@@ -447,8 +462,13 @@ function FaqsEditor({ content, onChange }) {
 
 function FooterEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  const socials = Array.isArray(content.socialLinks) && content.socialLinks.length ? content.socialLinks : DEFAULT_SOCIALS
   return (
     <div className="flex flex-col gap-2">
+      <label className={labelCls}>
+        Logótipo CCLX (URL)
+        <input className={inputCls} value={content.logoUrl ?? ''} onChange={set('logoUrl')} placeholder="https://…/logo.png" />
+      </label>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className={labelCls}>
           Email de contacto
@@ -459,18 +479,26 @@ function FooterEditor({ content, onChange }) {
           <input className={inputCls} value={content.contactPhone ?? ''} onChange={set('contactPhone')} />
         </label>
       </div>
+      <span className="text-sm font-medium text-foreground">Redes sociais</span>
       <RowsEditor
-        rows={content.socialLinks}
+        rows={socials}
         onChange={(socialLinks) => onChange({ ...content, socialLinks })}
-        emptyRow={{ platform: '', url: '' }}
+        emptyRow={{ platform: 'other', url: '' }}
         addLabel="Adicionar rede social"
         render={(row, upd) => (
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            <input className={inputCls} placeholder="Plataforma" value={row.platform ?? ''} onChange={(e) => upd({ platform: e.target.value })} />
-            <input className={inputCls} placeholder="URL" value={row.url ?? ''} onChange={(e) => upd({ url: e.target.value })} />
+            <select className={inputCls} value={row.platform ?? 'other'} onChange={(e) => upd({ platform: e.target.value })}>
+              {SOCIAL_PLATFORMS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <input className={inputCls} placeholder="https://…" value={row.url ?? ''} onChange={(e) => upd({ url: e.target.value })} />
           </div>
         )}
       />
+      <p className="m-0 text-xs text-muted-foreground">O logótipo e os ícones das redes com link aparecem no rodapé da página.</p>
     </div>
   )
 }

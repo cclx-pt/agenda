@@ -212,6 +212,10 @@ const ticketSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de reembolso inválida.')
     .nullable()
     .optional(),
+  // Idades (por bilhete) para classificar inscritos: criança até childMaxAge anos,
+  // adulto a partir de adultMinAge anos. NULL = usa o padrão (criança < 11 anos).
+  childMaxAge: z.number().int().min(0).max(120).nullable().optional(),
+  adultMinAge: z.number().int().min(0).max(120).nullable().optional(),
   active: z.boolean().optional().default(true),
 })
 const ticketsSchema = z.array(ticketSchema).max(50)
@@ -325,6 +329,7 @@ export async function create(user, input) {
     { type: 'rsvp', visible: true, content: { ctaLabel: 'Inscrever-me' } },
     { type: 'pagamento', visible: true, content: {} },
     { type: 'partilha', visible: true, content: {} },
+    { type: 'rodape', visible: true, content: {} },
   ])
   return getForEditor(user, invite.id)
 }
@@ -443,7 +448,14 @@ export async function listGuests(user, id) {
   if (!canAccessChurch(user, existing.community)) {
     throw new InviteError(403, 'Sem acesso a este convite.')
   }
-  return repo.listGuests(id)
+  const [guests, tickets] = await Promise.all([repo.listGuests(id), repo.listTickets(id)])
+  const byTicket = new Map(tickets.map((t) => [t.id, t]))
+  // Anexa uma cópia do bilhete escolhido (nome/tipo/idades) a cada inscrição, para
+  // a gestão repartir por bilhete e classificar crianças/adultos por idade.
+  return guests.map((g) => ({
+    ...g,
+    ticket: g.ticketId ? byTicket.get(g.ticketId) ?? null : null,
+  }))
 }
 
 // Estados possíveis de uma inscrição (CHECK invite_guests.rsvp_state).
@@ -454,6 +466,8 @@ const guestUpdateSchema = z.object({
   email: z.union([z.string().trim().email('Email inválido.').max(200), z.literal('')]).optional(),
   phone: z.string().trim().max(40).optional(),
   rsvpState: z.enum(GUEST_RSVP_STATES).optional(),
+  // Notas internas do organizador (comentários / follow-up). '' limpa as notas.
+  adminNotes: z.string().trim().max(2000).optional(),
 })
 
 // Carrega a inscrição garantindo permissão de gestão + acesso ao convite.
@@ -1202,9 +1216,11 @@ export async function manageRefund(slug, input) {
   return manageSummary(invite, updated, ticket)
 }
 
-// Marca o reembolso como concluído (organizador). Fecha o ciclo do pedido.
+// Marca o reembolso como concluído (organizador). Cancela a presença (liberta o
+// lugar) e fecha o pagamento como 'refunded'. Idempotente para pedidos self-service.
 export async function markGuestRefunded(user, inviteId, guestId) {
   const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  await repo.updateGuestDetails(guest.id, { rsvpState: 'cancelled' })
   await repo.setGuestPaymentState(guest.id, 'refunded')
   return repo.findGuestById(guest.id)
 }

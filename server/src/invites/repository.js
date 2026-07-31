@@ -80,6 +80,7 @@ function mapGuest(row) {
     respondedAt: row.responded_at ?? null,
     checkedInAt: row.checked_in_at ?? null,
     refundRequestedAt: row.refund_requested_at ?? null,
+    adminNotes: row.admin_notes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -430,9 +431,10 @@ export async function updateGuestDetails(id, data) {
        email = COALESCE($3, email),
        phone = COALESCE($4, phone),
        rsvp_state = COALESCE($5, rsvp_state),
+       admin_notes = COALESCE($6, admin_notes),
        updated_at = now()
      WHERE id = $1`,
-    [id, data.name ?? null, data.email ?? null, data.phone ?? null, data.rsvpState ?? null]
+    [id, data.name ?? null, data.email ?? null, data.phone ?? null, data.rsvpState ?? null, data.adminNotes ?? null]
   )
   return findGuestById(id)
 }
@@ -514,6 +516,8 @@ function mapTicket(row) {
     partyType: row.party_type ?? 'single',
     description: row.description ?? null,
     refundDeadline: toDateStr(row.refund_deadline),
+    childMaxAge: row.child_max_age ?? null,
+    adultMinAge: row.adult_min_age ?? null,
     mbEntity: row.mb_entity ?? null,
     mbReference: row.mb_reference ?? null,
     mbNumbers: Array.isArray(row.mb_numbers) ? row.mb_numbers : [],
@@ -602,20 +606,21 @@ export async function replaceTickets(inviteId, tickets) {
            name = $2, kind = $3, price = $4, currency = $5, capacity = $6,
            group_size = $7, description = $8, active = $9, sort_order = $10,
            payment_method = $11, party_type = $13, payment_methods = $14,
-           mb_entity = $15, mb_reference = $16, mb_numbers = $17, refund_deadline = $18, updated_at = now()
+           mb_entity = $15, mb_reference = $16, mb_numbers = $17, refund_deadline = $18,
+           child_max_age = $19, adult_min_age = $20, updated_at = now()
          WHERE id = $1 AND invite_id = $12`,
         [t.id, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR', t.capacity ?? null,
           t.groupSize ?? null, t.description ?? null, t.active !== false, order, pmFirst, inviteId, t.partyType ?? 'single', pmsJson,
-          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null]
+          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null, t.childMaxAge ?? null, t.adultMinAge ?? null]
       )
     } else {
       await pool.query(
         `INSERT INTO invite_tickets
-          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods, mb_entity, mb_reference, mb_numbers, refund_deadline)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+          (id, invite_id, name, kind, price, currency, capacity, group_size, description, payment_method, active, sort_order, party_type, payment_methods, mb_entity, mb_reference, mb_numbers, refund_deadline, child_max_age, adult_min_age)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
         [randomUUID(), inviteId, t.name, t.kind ?? 'individual', t.price ?? null, t.currency ?? 'EUR',
           t.capacity ?? null, t.groupSize ?? null, t.description ?? null, pmFirst, t.active !== false, order, t.partyType ?? 'single', pmsJson,
-          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null]
+          t.mbEntity ?? null, t.mbReference ?? null, mbNumsJson, t.refundDeadline ?? null, t.childMaxAge ?? null, t.adultMinAge ?? null]
       )
     }
     order += 1

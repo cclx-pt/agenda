@@ -18,7 +18,7 @@ import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
-import { inscricaoSituacao, SITUACAO_LABEL, SITUACAO_BADGE } from './inviteUtils'
+import { inscricaoSituacao, SITUACAO_LABEL, classifyGuestPeople } from './inviteUtils'
 import { Switch } from '@/components/ui/switch'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
@@ -258,7 +258,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
   const [addType, setAddType] = useState(ADDABLE_TYPES[0]?.type ?? 'info_extra')
   const [guests, setGuests] = useState(null)
   const [payments, setPayments] = useState(null)
-  const [expandedGuest, setExpandedGuest] = useState(null)
   const [tab, setTab] = useState('definicoes')
   const [showFormPreview, setShowFormPreview] = useState(false)
   // Métodos de pagamento ativos (geridos no Admin) para configurar nos bilhetes.
@@ -392,7 +391,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', childMaxAge: '', adultMinAge: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -451,6 +450,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
             mbReference: (t.mbReference || '').trim() || null,
             mbNumbers: (t.mbNumbers || []).map((n) => String(n).trim()).filter(Boolean).slice(0, 4),
             refundDeadline: normalizeKind(t.kind) === 'individual' ? t.refundDeadline || null : null,
+            childMaxAge: t.childMaxAge === '' || t.childMaxAge == null ? null : Number(t.childMaxAge),
+            adultMinAge: t.adultMinAge === '' || t.adultMinAge == null ? null : Number(t.adultMinAge),
             active: t.active !== false,
           }))
       )
@@ -545,21 +546,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
     }
   }
 
-  // Marca o reembolso de uma inscrição como concluído (fecha o pedido do convidado).
-  const markRefunded = async (g) => {
-    if (!window.confirm('Marcar este reembolso como concluído?')) return
-    setBusy(true)
-    try {
-      await invitesService.markInviteGuestRefunded(invite.id, g.id)
-      toast.success('Reembolso marcado como concluído.')
-      await loadGuests()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   // Colunas de respostas do formulário (vista detalhada + Excel). Derivadas da
   // configuração do bloco RSVP, mais quaisquer chaves órfãs presentes nas respostas.
   const rsvpBlock = blocks.find((b) => b.type === 'rsvp')
@@ -603,6 +589,35 @@ function InviteEditor({ invite, onBack, onSaved }) {
       return n
     })
   }
+  // Resumo (KPIs) das inscrições para o separador “Inscrições” (só indicadores).
+  const guestStats = (() => {
+    const list = guests || []
+    const bySit = (key) => list.filter((g) => inscricaoSituacao(g) === key).length
+    const ppl = list.reduce(
+      (acc, g) => {
+        if (g.rsvpState === 'confirmed') {
+          const p = classifyGuestPeople(g, g.ticket)
+          acc.adultos += p.adultos
+          acc.jovens += p.jovens
+          acc.criancas += p.criancas
+          acc.total += p.total
+        }
+        return acc
+      },
+      { adultos: 0, jovens: 0, criancas: 0, total: 0 }
+    )
+    return {
+      total: list.length,
+      confirmada: bySit('confirmada'),
+      comprovativo: bySit('comprovativo'),
+      validacao: bySit('validacao'),
+      espera: bySit('espera'),
+      cancelada: bySit('cancelada'),
+      reembolso: bySit('reembolso') + bySit('reembolsado'),
+      ppl,
+    }
+  })()
+
   // Página sintética para a pré-visualização do formulário (sem submeter).
   const previewPage = {
     slug: invite.slug,
@@ -1002,6 +1017,19 @@ function InviteEditor({ invite, onBack, onSaved }) {
                         <span />
                       )}
                     </div>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                        Criança até aos (anos)
+                        <input type="number" min="0" max="120" className={inputCls} placeholder="ex.: 10" value={t.childMaxAge ?? ''} onChange={(e) => setTicketField(i, 'childMaxAge', e.target.value)} />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                        Adulto a partir dos (anos)
+                        <input type="number" min="0" max="120" className={inputCls} placeholder="ex.: 18" value={t.adultMinAge ?? ''} onChange={(e) => setTicketField(i, 'adultMinAge', e.target.value)} />
+                      </label>
+                    </div>
+                    <p className="m-0 text-xs text-muted-foreground">
+                      Idades usadas para contar crianças e adultos nas inscrições deste bilhete. Em branco = criança com menos de 11 anos.
+                    </p>
                     {t.kind === 'individual' ? (
                       <label className="flex flex-col gap-1 text-sm font-medium text-foreground sm:max-w-[16rem]">
                         Data limite de reembolso
@@ -1322,7 +1350,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
       {/* Inscrições */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Inscrições</h3>
+          <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Inscrições — resumo</h3>
           <div className="flex flex-wrap gap-2">
             {guests && guests.length > 0 ? (
               <button type="button" onClick={exportGuests} className={ghostBtn}>
@@ -1332,7 +1360,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
             ) : null}
             <button type="button" onClick={loadGuests} className={ghostBtn}>
               <Users className="h-4 w-4" aria-hidden="true" />
-              {guests ? 'Atualizar' : 'Ver inscrições'}
+              {guests ? 'Atualizar' : 'Ver KPIs'}
             </button>
           </div>
         </div>
@@ -1340,89 +1368,55 @@ function InviteEditor({ invite, onBack, onSaved }) {
           guests.length === 0 ? (
             <p className="m-0 mt-3 text-sm text-muted-foreground">Ainda não há inscrições.</p>
           ) : (
-            <>
-              <p className="m-0 mt-3 text-xs text-muted-foreground">
-                {guests.length} inscrição(ões). Clique num nome para ver as respostas.
+            <div className="mt-3 flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+                {[
+                  { label: 'Inscrições', value: guestStats.total, cls: 'text-foreground' },
+                  { label: 'Confirmadas', value: guestStats.confirmada, cls: 'text-emerald-700 dark:text-emerald-400' },
+                  { label: 'Pendente comprovativo', value: guestStats.comprovativo, cls: 'text-amber-700 dark:text-amber-400' },
+                  { label: 'Aprovação pendente', value: guestStats.validacao, cls: 'text-sky-700 dark:text-sky-400' },
+                  { label: 'Lista de espera', value: guestStats.espera, cls: 'text-amber-700 dark:text-amber-400' },
+                  { label: 'Canceladas', value: guestStats.cancelada, cls: 'text-red-700 dark:text-red-400' },
+                  { label: 'Reembolsos', value: guestStats.reembolso, cls: 'text-orange-700 dark:text-orange-400' },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-lg border border-border bg-background p-3 text-center">
+                    <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
+                    <div className="text-xs text-muted-foreground">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="m-0 mb-2 text-xs font-semibold uppercase text-muted-foreground">Pessoas (confirmadas)</p>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div>
+                    <span className="text-xl font-bold text-foreground">{guestStats.ppl.adultos}</span>{' '}
+                    <span className="text-xs text-muted-foreground">adultos</span>
+                  </div>
+                  {guestStats.ppl.jovens ? (
+                    <div>
+                      <span className="text-xl font-bold text-foreground">{guestStats.ppl.jovens}</span>{' '}
+                      <span className="text-xs text-muted-foreground">jovens</span>
+                    </div>
+                  ) : null}
+                  <div>
+                    <span className="text-xl font-bold text-foreground">{guestStats.ppl.criancas}</span>{' '}
+                    <span className="text-xs text-muted-foreground">crianças</span>
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold text-primary">{guestStats.ppl.total}</span>{' '}
+                    <span className="text-xs text-muted-foreground">total</span>
+                  </div>
+                </div>
+              </div>
+              <p className="m-0 text-xs text-muted-foreground">
+                Para gerir cada inscrição em detalhe (editar, cancelar, reembolsar, notas), abra{' '}
+                <span className="font-semibold text-foreground">Convites → Inscrições</span>.
               </p>
-              <ul className="m-0 mt-1 flex list-none flex-col gap-0 p-0">
-                {guests.map((g) => {
-                  const open = expandedGuest === g.id
-                  const entries = [
-                    g.phone ? { label: 'Telemóvel', value: g.phone } : null,
-                    g.ticketId ? { label: 'Bilhete', value: ticketName(g.ticketId) } : null,
-                    g.extra?.tipoInscricao ? { label: 'Tipo de inscrição', value: g.extra.tipoInscricao } : null,
-                    g.extra?.membros ? { label: 'Membros', value: formatAnswer(null, g.extra.membros) } : null,
-                    g.extra?.donationAmount ? { label: 'Doação', value: fmtDonation(g.extra.donationAmount) } : null,
-                    g.paymentState && g.paymentState !== 'not_applicable'
-                      ? { label: 'Pagamento', value: PAY_LABEL[g.paymentState] || g.paymentState }
-                      : null,
-                    { label: 'Inscrito em', value: fmtDateTime(g.respondedAt || g.createdAt) },
-                    ...answerFields.map((f) => ({ label: f.label || f.key, value: formatAnswer(f, g.extra?.[f.key]) })),
-                    ...extraAnswerKeys.map((k) => ({ label: k, value: formatAnswer(null, g.extra?.[k]) })),
-                  ].filter((e) => e && e.value !== '' && e.value != null)
-                  return (
-                    <li key={g.id} className="border-b border-border/60">
-                      <div className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedGuest(open ? null : g.id)}
-                          className="inline-flex items-center gap-1 text-left font-medium text-foreground"
-                          aria-expanded={open}
-                        >
-                          {open ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                          )}
-                          {g.name || '(sem nome)'}
-                        </button>
-                        {g.code ? (
-                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground" title="Nº do bilhete">
-                            {g.code}
-                          </span>
-                        ) : null}
-                        {g.email ? <span className="text-muted-foreground">{g.email}</span> : null}
-                        <span className="text-muted-foreground">· {g.guestsCount} lugar(es)</span>
-                        {g.paymentState === 'refund_requested' ? (
-                          <>
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-400">
-                              Reembolso pedido
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => markRefunded(g)}
-                              disabled={busy}
-                              className="rounded-lg border border-emerald-600/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
-                            >
-                              Marcar reembolsado
-                            </button>
-                          </>
-                        ) : g.paymentState === 'refunded' ? (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400">
-                            Reembolsado
-                          </span>
-                        ) : null}
-                        <span className={'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ' + SITUACAO_BADGE[inscricaoSituacao(g)]}>
-                          {SITUACAO_LABEL[inscricaoSituacao(g)]}
-                        </span>
-                      </div>
-                      {open ? (
-                        <dl className="m-0 mb-3 grid grid-cols-1 gap-x-4 gap-y-2 pl-5 text-sm sm:grid-cols-2">
-                          {entries.map((e, idx) => (
-                            <div key={idx} className="flex flex-col">
-                              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{e.label}</dt>
-                              <dd className="m-0 whitespace-pre-line text-foreground">{e.value}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      ) : null}
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
+            </div>
           )
-        ) : null}
+        ) : (
+          <p className="m-0 mt-3 text-sm text-muted-foreground">Clique em “Ver KPIs” para carregar o resumo.</p>
+        )}
       </section>
 
       {/* Pagamentos (só quando há bilhetes pagos) */}

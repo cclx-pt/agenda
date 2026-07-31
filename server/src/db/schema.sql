@@ -521,6 +521,10 @@ ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_entity TEXT;
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_reference TEXT;
 -- Números MB WAY definidos no bilhete (método 'mbway'); vazio usa os do método.
 ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS mb_numbers JSONB;
+-- Idades (por bilhete) para classificar inscritos: criança até child_max_age anos,
+-- adulto a partir de adult_min_age anos. NULL = usa o padrão (criança < 11 anos).
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS child_max_age INTEGER;
+ALTER TABLE invite_tickets ADD COLUMN IF NOT EXISTS adult_min_age INTEGER;
 
 -- Bilhete escolhido por cada convidado (NULL = sem bilhete / evento gratuito).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES invite_tickets (id) ON DELETE SET NULL;
@@ -528,6 +532,8 @@ ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES inv
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS code TEXT;
 -- Data/hora do check-in (validação à entrada); NULL = ainda não fez check-in.
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+-- Notas internas do organizador sobre a inscrição (comentários / follow-up).
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 
 -- Auto-gestão da inscrição pelo convidado (página /invite/<slug>/gerir): senha
 -- (hash scrypt, "salt:hash") para entrar com o código de reserva e cancelar /
