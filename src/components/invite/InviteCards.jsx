@@ -192,10 +192,10 @@ function SpeakersCard({ block }) {
         {speakers.map((s, i) => (
           <div key={i} className="flex gap-3 rounded-xl border border-border bg-background p-3">
             {s.photoUrl ? (
-              <img src={s.photoUrl} alt={s.name} className="h-16 w-16 flex-shrink-0 rounded-full object-cover" />
+              <img src={s.photoUrl} alt={s.name} className="h-20 w-20 flex-shrink-0 rounded-full object-cover" />
             ) : (
-              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-muted">
-                <Users className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+              <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+                <Users className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
               </div>
             )}
             <div className="min-w-0">

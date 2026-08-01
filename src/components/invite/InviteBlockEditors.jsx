@@ -1,6 +1,9 @@
-import { Plus, Trash2, ArrowUp, ArrowDown, Copy } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Copy, Upload, Loader2, Image as ImageIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
 import { RichTextEditor } from './RichText'
+import { uploadEventImage } from '../../services/eventsService'
 
 // Editores de conteúdo por tipo de bloco (formulários "sem código"). Cada editor
 // recebe { content, onChange } e chama onChange(novoConteudo) a cada alteração.
@@ -9,6 +12,59 @@ const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 
 const labelCls = 'flex flex-col gap-1 text-sm font-medium text-foreground'
 const smallBtn =
   'inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent'
+
+// Campo de imagem com UPLOAD (Supabase Storage) + pré-visualização. Guarda o URL
+// devolvido no mesmo campo (retrocompatível com URLs já existentes). round=preview circular.
+function ImageUploadField({ value, onChange, label, hint, round = false }) {
+  const inputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const onFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setBusy(true)
+    try {
+      const url = await uploadEventImage(file)
+      onChange(url)
+    } catch (err) {
+      toast.error(err.message || 'Falha ao carregar a imagem.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      {label ? <span className="text-sm font-medium text-foreground">{label}</span> : null}
+      <div className="flex items-center gap-3">
+        {value ? (
+          <img
+            src={value}
+            alt=""
+            className={round ? 'h-16 w-16 flex-shrink-0 rounded-full object-cover' : 'h-14 w-auto max-w-[8rem] flex-shrink-0 rounded object-contain'}
+          />
+        ) : (
+          <div className={'flex flex-shrink-0 items-center justify-center bg-muted text-muted-foreground ' + (round ? 'h-16 w-16 rounded-full' : 'h-14 w-20 rounded')}>
+            <ImageIcon className="h-5 w-5" aria-hidden="true" />
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className={smallBtn}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Upload className="h-3.5 w-3.5" aria-hidden="true" />}
+            {value ? 'Mudar imagem' : 'Carregar imagem'}
+          </button>
+          {value ? (
+            <button type="button" onClick={() => onChange('')} disabled={busy} className={smallBtn}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Remover
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={onFile} />
+    </div>
+  )
+}
 
 // Redes sociais do rodapé (com entradas predefinidas e ícones na página pública).
 const SOCIAL_PLATFORMS = [
@@ -155,7 +211,7 @@ function SpeakersEditor({ content, onChange }) {
               <input className={inputCls} placeholder="Função (opcional)" value={row.role ?? ''} onChange={(e) => upd({ role: e.target.value })} />
             </div>
             <RichTextEditor value={row.bio ?? ''} onChange={(html) => upd({ bio: html })} minRows={2} placeholder="Bio curta" />
-            <input className={inputCls} placeholder="URL da foto" value={row.photoUrl ?? ''} onChange={(e) => upd({ photoUrl: e.target.value })} />
+            <ImageUploadField value={row.photoUrl} onChange={(url) => upd({ photoUrl: url })} label="Foto do orador" round />
           </div>
         )}
       />
@@ -483,10 +539,12 @@ function FooterEditor({ content, onChange }) {
   const socials = Array.isArray(content.socialLinks) && content.socialLinks.length ? content.socialLinks : DEFAULT_SOCIALS
   return (
     <div className="flex flex-col gap-2">
-      <label className={labelCls}>
-        Logótipo CCLX (URL)
-        <input className={inputCls} value={content.logoUrl ?? ''} onChange={set('logoUrl')} placeholder="https://…/logo.png" />
-      </label>
+      <ImageUploadField
+        value={content.logoUrl}
+        onChange={(url) => onChange({ ...content, logoUrl: url })}
+        label="Logótipo CCLX"
+        hint="Aparece no rodapé da página."
+      />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className={labelCls}>
           Email de contacto
