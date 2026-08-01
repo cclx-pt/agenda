@@ -36,7 +36,6 @@ function BannerCard({ block, page, accent }) {
             <span className="inline-flex items-center gap-2">
               <Calendar className="h-4 w-4" style={{ color: accent }} aria-hidden="true" />
               {dates}
-              {fmtTime(start) ? ` · ${fmtTime(start)}` : ''}
             </span>
           ) : null}
           {location ? (
