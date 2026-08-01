@@ -756,10 +756,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <Eye className="h-4 w-4" aria-hidden="true" />
             Pré-visualizar
           </a>
-          <a href={publicUrl(invite.slug)} target="_blank" rel="noreferrer" className={ghostBtn}>
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            Abrir
-          </a>
           {invite.status !== 'publicado' ? (
             <button type="button" onClick={() => changeStatus('publicado')} disabled={busy} className={primaryBtn}>
               <Send className="h-4 w-4" aria-hidden="true" />
