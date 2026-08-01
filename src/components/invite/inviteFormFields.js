@@ -97,6 +97,33 @@ export function getFormFields(content) {
   return Array.isArray(f) && f.length ? f : DEFAULT_RSVP_FIELDS
 }
 
+// Junta o schema ATUAL do formulário com os snapshots guardados em cada inscrição
+// → lista ordenada de campos, sem duplicados por `key`. O schema atual tem
+// prioridade (rótulo/ordem); campos removidos/renomeados depois de já haver
+// inscrições reaparecem com o rótulo original guardado no snapshot. Torna a gestão
+// de inscrições à-prova-de-edições do formulário.
+export function mergeFormSchemas(currentFields = [], snapshots = []) {
+  const out = []
+  const seen = new Set()
+  const add = (f) => {
+    if (!f || typeof f !== 'object' || !f.key || seen.has(f.key)) return
+    seen.add(f.key)
+    out.push(f)
+  }
+  for (const f of Array.isArray(currentFields) ? currentFields : []) add(f)
+  for (const snap of Array.isArray(snapshots) ? snapshots : []) {
+    if (Array.isArray(snap)) for (const f of snap) add(f)
+  }
+  return out
+}
+
+// Rótulo de um campo a partir de uma lista/snapshot de campos (ou a própria chave
+// quando nenhum schema o descreve).
+export function fieldLabel(fields, key) {
+  const f = Array.isArray(fields) ? fields.find((x) => x && x.key === key) : null
+  return (f && f.label) || key
+}
+
 // Gera uma chave estável e única a partir de um rótulo.
 export function deriveKey(label, taken = []) {
   const base =

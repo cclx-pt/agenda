@@ -17,7 +17,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
-import { getFormFields, SYSTEM_KEYS } from './inviteFormFields'
+import { getFormFields, SYSTEM_KEYS, mergeFormSchemas } from './inviteFormFields'
 import { inscricaoSituacao, SITUACAO_LABEL, classifyGuestPeople } from './inviteUtils'
 import { Switch } from '@/components/ui/switch'
 
@@ -549,9 +549,13 @@ function InviteEditor({ invite, onBack, onSaved }) {
   // Colunas de respostas do formulário (vista detalhada + Excel). Derivadas da
   // configuração do bloco RSVP, mais quaisquer chaves órfãs presentes nas respostas.
   const rsvpBlock = blocks.find((b) => b.type === 'rsvp')
-  const answerFields = getFormFields(rsvpBlock?.content || {}).filter(
-    (f) => f.type !== 'section' && !SYSTEM_KEYS.includes(f.key)
-  )
+  // À-prova-de-edições: junta o schema ATUAL com os snapshots guardados em cada
+  // inscrição, para continuar a mostrar (com o rótulo original) campos entretanto
+  // removidos/renomeados no formulário depois de já haver inscrições.
+  const answerFields = mergeFormSchemas(
+    getFormFields(rsvpBlock?.content || {}),
+    (guests || []).map((g) => g.schemaSnapshot)
+  ).filter((f) => f.type !== 'section' && !SYSTEM_KEYS.includes(f.key))
   const extraAnswerKeys = (() => {
     const known = new Set(answerFields.map((f) => f.key))
     known.add('donationAmount') // apresentado numa coluna própria "Doação"
@@ -755,6 +759,10 @@ function InviteEditor({ invite, onBack, onSaved }) {
           >
             <Eye className="h-4 w-4" aria-hidden="true" />
             Pré-visualizar
+          </a>
+          <a href={publicUrl(invite.slug)} target="_blank" rel="noreferrer" className={ghostBtn}>
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            Abrir
           </a>
           {invite.status !== 'publicado' ? (
             <button type="button" onClick={() => changeStatus('publicado')} disabled={busy} className={primaryBtn}>

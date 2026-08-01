@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { inscricaoSituacao, SITUACAO_LABEL, SITUACAO_BADGE, classifyGuestPeople } from './inviteUtils'
+import { fieldLabel } from './inviteFormFields'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -88,12 +89,13 @@ function formatAnswer(value) {
 // Chaves do `extra` já mostradas em colunas próprias (não repetir em "Respostas").
 const DEDICATED_EXTRA_KEYS = new Set(['tipoInscricao', 'membros', 'donationAmount', 'numCriancas'])
 
-// Junta as restantes respostas do formulário (chave: valor) numa só célula do Excel.
+// Junta as restantes respostas do formulário (rótulo: valor) numa só célula do Excel.
+// Usa o snapshot do schema da inscrição para mostrar o rótulo original de cada campo.
 function extraAnswersText(g) {
   const extra = g.extra || {}
   return Object.entries(extra)
     .filter(([k, v]) => !DEDICATED_EXTRA_KEYS.has(k) && formatAnswer(v) !== '')
-    .map(([k, v]) => `${k}: ${formatAnswer(v)}`)
+    .map(([k, v]) => `${fieldLabel(g.schemaSnapshot, k)}: ${formatAnswer(v)}`)
     .join('; ')
 }
 
@@ -606,7 +608,7 @@ export default function InviteSubmissionsAdmin() {
                               ) : (
                                 answers.map(([k, v]) => (
                                   <div key={k} className="flex gap-2">
-                                    <dt className="font-medium text-muted-foreground">{k}:</dt>
+                                    <dt className="font-medium text-muted-foreground">{fieldLabel(g.schemaSnapshot, k)}:</dt>
                                     <dd className="text-foreground">{formatAnswer(v)}</dd>
                                   </div>
                                 ))

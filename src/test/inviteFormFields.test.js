@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_RSVP_FIELDS,
   getFormFields,
+  mergeFormSchemas,
+  fieldLabel,
   deriveKey,
   isVisible,
   visibleKeys,
@@ -21,6 +23,37 @@ describe('inviteFormFields', () => {
     expect(getFormFields({ fields: [] })).toBe(DEFAULT_RSVP_FIELDS)
     const custom = [{ key: 'name', type: 'text', label: 'Nome' }]
     expect(getFormFields({ fields: custom })).toBe(custom)
+  })
+
+  it('mergeFormSchemas junta o schema atual com snapshots (sem duplicar keys)', () => {
+    const current = [
+      { key: 'name', type: 'text', label: 'Nome' },
+      { key: 'idade', type: 'number', label: 'Idade' },
+    ]
+    // Snapshot de uma inscrição antiga: 'idade' com rótulo diferente + campo removido 'antigo'.
+    const snap = [
+      { key: 'name', type: 'text', label: 'Nome completo' },
+      { key: 'idade', type: 'number', label: 'A tua idade' },
+      { key: 'antigo', type: 'text', label: 'Campo antigo' },
+    ]
+    const merged = mergeFormSchemas(current, [snap, null, undefined])
+    // Schema atual primeiro (o seu rótulo vence); campos órfãos do snapshot a seguir.
+    expect(merged.map((f) => f.key)).toEqual(['name', 'idade', 'antigo'])
+    expect(merged.find((f) => f.key === 'idade').label).toBe('Idade')
+    expect(merged.find((f) => f.key === 'antigo').label).toBe('Campo antigo')
+  })
+
+  it('mergeFormSchemas é robusto a entradas inválidas', () => {
+    expect(mergeFormSchemas()).toEqual([])
+    expect(mergeFormSchemas(null, null)).toEqual([])
+    expect(mergeFormSchemas([{ type: 'section' }], [])).toEqual([]) // sem key → ignorado
+  })
+
+  it('fieldLabel devolve o rótulo do snapshot ou a própria chave', () => {
+    const snap = [{ key: 'profissao', type: 'text', label: 'Profissão' }]
+    expect(fieldLabel(snap, 'profissao')).toBe('Profissão')
+    expect(fieldLabel(snap, 'inexistente')).toBe('inexistente')
+    expect(fieldLabel(null, 'x')).toBe('x')
   })
 
   it('deriveKey normaliza acentos e garante unicidade', () => {
