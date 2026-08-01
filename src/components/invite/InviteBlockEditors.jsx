@@ -105,10 +105,28 @@ function NarrativeEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   return (
     <div className="flex flex-col gap-2">
+      <div className={labelCls}>
+        <span>Narrativa</span>
+        <RichTextEditor
+          value={content.narrative ?? ''}
+          onChange={(html) => onChange({ ...content, narrative: html })}
+          minRows={4}
+          placeholder="Escreve o convite / narrativa do evento."
+        />
+      </div>
       <label className={labelCls}>
-        Narrativa
-        <textarea className={inputCls} rows={4} value={content.narrative ?? ''} onChange={set('narrative')} />
+        Nome do convidado (opcional)
+        <input className={inputCls} value={content.guestName ?? ''} onChange={set('guestName')} placeholder="Ex.: Pr. João Silva" />
       </label>
+      <div className={labelCls}>
+        <span>Bio do convidado</span>
+        <RichTextEditor
+          value={content.guestBio ?? ''}
+          onChange={(html) => onChange({ ...content, guestBio: html })}
+          minRows={3}
+          placeholder="Uma breve apresentação do convidado."
+        />
+      </div>
       <label className={labelCls}>
         Vídeo (YouTube/Vimeo, opcional)
         <input className={inputCls} value={content.videoUrl ?? ''} onChange={set('videoUrl')} placeholder="https://youtube.com/watch?v=…" />

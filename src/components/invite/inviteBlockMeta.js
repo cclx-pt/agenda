@@ -31,7 +31,7 @@ export function defaultContent(type) {
     case 'info_extra':
       return { title: '', body: '' }
     case 'convite_narrativo':
-      return { narrative: '', videoUrl: '' }
+      return { narrative: '', guestName: '', guestBio: '', videoUrl: '' }
     case 'good_to_know':
       return { title: 'Bom saber', highlights: [], ageInfo: '', doorTime: '', parkingInfo: '', items: [] }
     case 'oradores':

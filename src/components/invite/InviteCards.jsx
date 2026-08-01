@@ -154,7 +154,18 @@ function NarrativeCard({ block }) {
   const embed = toEmbed(c.videoUrl)
   return (
     <div className={cardCls}>
-      {c.narrative ? <p className="m-0 whitespace-pre-line text-lg leading-relaxed text-foreground">{c.narrative}</p> : null}
+      {c.narrative ? (
+        <RichText
+          value={c.narrative}
+          className="m-0 text-lg leading-relaxed text-foreground [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:m-0 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+        />
+      ) : null}
+      {c.guestName || c.guestBio ? (
+        <div className="mt-4 rounded-xl border border-border bg-background p-4">
+          {c.guestName ? <p className="m-0 font-bold text-foreground">{c.guestName}</p> : null}
+          <RichText value={c.guestBio} className="m-0 mt-1 text-sm text-muted-foreground [&_a]:underline [&_p]:m-0" />
+        </div>
+      ) : null}
       {embed ? (
         <div className="mt-4 overflow-hidden rounded-xl">
           <iframe
