@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { QrCode, Camera, CameraOff, Search, Check, CheckCircle2, Loader2, ExternalLink, Ticket, User } from 'lucide-react'
+import { QrCode, Camera, CameraOff, Search, Check, CheckCircle2, Loader2, ExternalLink, Ticket, User, Smartphone, Copy, RefreshCw, AlertTriangle } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import { validatePayment } from '../../services/invitesService'
 
@@ -24,6 +24,113 @@ function fmtDT(v) {
   return Number.isNaN(d.getTime())
     ? ''
     : d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Link de check-in móvel: link secreto por convite que o staff abre no telemóvel
+// (lê o QR dos bilhetes e valida a entrada, sem iniciar sessão). Copiar / QR / rodar.
+function CheckinLinkCard({ invite }) {
+  const [link, setLink] = useState(null)
+  const [busy, setBusy] = useState(true)
+  const [showQr, setShowQr] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    invitesService
+      .getCheckinLink(invite.id)
+      .then((l) => alive && setLink(l))
+      .catch((err) => alive && toast.error(err.message))
+      .finally(() => alive && setBusy(false))
+    return () => {
+      alive = false
+    }
+  }, [invite.id])
+
+  const copy = async () => {
+    if (!link?.url) return
+    try {
+      await navigator.clipboard.writeText(link.url)
+      toast.success('Link copiado.')
+    } catch {
+      toast.error('Não foi possível copiar. Copia o link manualmente.')
+    }
+  }
+
+  const regenerate = async () => {
+    if (!window.confirm('Gerar um NOVO link desativa o link anterior. Continuar?')) return
+    setBusy(true)
+    try {
+      setLink(await invitesService.regenerateCheckinLink(invite.id))
+      toast.success('Novo link de check-in gerado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const qrSrc = link?.url
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(link.url)}`
+    : null
+
+  return (
+    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+      <div>
+        <h3 className="m-0 mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          <Smartphone className="h-4 w-4" aria-hidden="true" /> Check-in no telemóvel
+        </h3>
+        <p className="m-0 text-xs text-muted-foreground">
+          Partilha este link com quem está à entrada. Abre no telemóvel para ler o QR dos bilhetes e validar a entrada — sem precisar de iniciar sessão.
+        </p>
+      </div>
+
+      {busy && !link ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> A preparar o link…
+        </div>
+      ) : link ? (
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              readOnly
+              value={link.url}
+              onFocus={(e) => e.target.select()}
+              className={`${inputCls} font-mono text-xs`}
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={copy} className={primaryBtn}>
+                <Copy className="h-4 w-4" aria-hidden="true" /> Copiar
+              </button>
+              <a href={link.url} target="_blank" rel="noreferrer" className={ghostBtn}>
+                <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir
+              </a>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setShowQr((v) => !v)} className={ghostBtn}>
+              <QrCode className="h-4 w-4" aria-hidden="true" /> {showQr ? 'Ocultar QR' : 'Mostrar QR'}
+            </button>
+            <button type="button" onClick={regenerate} disabled={busy} className={ghostBtn}>
+              <RefreshCw className="h-4 w-4" aria-hidden="true" /> Gerar novo link
+            </button>
+          </div>
+
+          {showQr && qrSrc ? (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-background p-3">
+              <img src={qrSrc} alt="QR do link de check-in" className="h-44 w-44" />
+              <p className="m-0 text-center text-xs text-muted-foreground">
+                Aponta a câmara do telemóvel a este QR para abrir o check-in.
+              </p>
+            </div>
+          ) : null}
+
+          <p className="m-0 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Quem tiver o link consegue fazer check-in. Gera um novo link para desativar o anterior.
+          </p>
+        </>
+      ) : null}
+    </section>
+  )
 }
 
 // Check-in (validação à entrada): lê o QR/código do bilhete, mostra os dados da
@@ -125,7 +232,9 @@ export default function CheckinAdmin({ invite }) {
   const paymentOpen = result?.payment && result.payment.status !== 'paid'
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+    <div className="flex flex-col gap-4">
+      <CheckinLinkCard invite={invite} />
+      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
       <div>
         <h3 className="m-0 mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
           <QrCode className="h-4 w-4" aria-hidden="true" /> Check-in
@@ -240,5 +349,6 @@ export default function CheckinAdmin({ invite }) {
         </div>
       ) : null}
     </section>
+    </div>
   )
 }

@@ -117,6 +117,40 @@ export async function acceptCheckin(inviteId, guestId, on = true) {
   return guest
 }
 
+// Link de check-in móvel (organizador): obter/criar e rodar (revoga o antigo).
+export async function getCheckinLink(inviteId) {
+  const { link } = await request(`/data/invites/${inviteId}/checkin/link`)
+  return link
+}
+
+export async function regenerateCheckinLink(inviteId) {
+  const { link } = await request(`/data/invites/${inviteId}/checkin/link/regenerate`, { method: 'POST' })
+  return link
+}
+
+// ── Check-in móvel público (autenticado pelo token do link ?k=) ──
+export async function publicCheckinContext(slug, token) {
+  const { context } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/checkin/context?k=${encodeURIComponent(token)}`
+  )
+  return context
+}
+
+export async function publicCheckinLookup(slug, token, code) {
+  const { result } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/checkin/lookup?k=${encodeURIComponent(token)}&code=${encodeURIComponent(code)}`
+  )
+  return result
+}
+
+export async function publicAcceptCheckin(slug, token, guestId, on = true) {
+  const { guest } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/checkin/${guestId}?k=${encodeURIComponent(token)}`,
+    { method: 'POST', body: { on } }
+  )
+  return guest
+}
+
 // ── Definições gerais dos convites (admin) ───────────────────────
 
 export async function getInviteSettings() {

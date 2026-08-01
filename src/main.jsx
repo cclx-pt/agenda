@@ -9,6 +9,7 @@ import ApprovalActionPage from './components/ApprovalActionPage'
 import LoopPage from './components/LoopPage'
 import InvitePage from './components/invite/InvitePage'
 import InviteManage from './components/invite/InviteManage'
+import InviteCheckin from './components/invite/InviteCheckin'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -35,12 +36,15 @@ const isInviteRoute = routePath.startsWith('/invite/')
 let inviteSlug = null
 let inviteView = 'landing'
 let invitePreviewId = null
+let inviteCheckinToken = null
 if (isInviteRoute) {
   const parts = routePath.slice('/invite/'.length).split('/')
   inviteSlug = decodeURIComponent(parts[0])
   if (parts[1] === 'inscricao') inviteView = 'rsvp'
   else if (parts[1] === 'gerir') inviteView = 'manage'
+  else if (parts[1] === 'checkin') inviteView = 'checkin'
   invitePreviewId = new URLSearchParams(window.location.search).get('preview') || null
+  inviteCheckinToken = new URLSearchParams(window.location.search).get('k') || null
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -56,6 +60,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <I18nProvider>
           {inviteView === 'manage' ? (
             <InviteManage slug={inviteSlug} />
+          ) : inviteView === 'checkin' ? (
+            <InviteCheckin slug={inviteSlug} token={inviteCheckinToken} />
           ) : (
             <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
           )}

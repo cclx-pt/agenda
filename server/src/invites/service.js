@@ -503,12 +503,8 @@ export async function removeGuest(user, inviteId, guestId) {
 }
 
 // ── Check-in (validação à entrada) ───────────────────────────────
-// Procura uma inscrição pelo código curto do bilhete OU pelo token do link (QR).
-export async function checkinLookup(user, inviteId, rawCode) {
-  ensureCanManage(user)
-  const invite = await repo.findById(inviteId)
-  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
-  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+// Resolve o convidado pelo código curto do bilhete OU pelo token do link (QR).
+async function resolveCheckinGuest(invite, rawCode) {
   const code = String(rawCode || '').trim()
   if (!code) throw new InviteError(400, 'Indique o código do bilhete.')
   // Aceita o código curto (XXXX-XXXX) OU um link/token do QR (extrai o token 'g').
@@ -516,16 +512,21 @@ export async function checkinLookup(user, inviteId, rawCode) {
   const m = code.match(/[?&]g=([^&\s]+)/)
   if (m) token = decodeURIComponent(m[1])
   else if (/^[a-f0-9]{32,}$/i.test(code)) token = code
-  let guest = await repo.findGuestByCode(inviteId, code)
+  let guest = await repo.findGuestByCode(invite.id, code)
   if (!guest && token) {
     const g = await repo.findGuestByToken(token)
-    if (g && g.inviteId === inviteId) guest = g
+    if (g && g.inviteId === invite.id) guest = g
   }
   if (!guest) throw new InviteError(404, 'Bilhete não encontrado neste convite.')
+  return guest
+}
+
+// Monta o resultado do check-in (convidado + bilhete + pagamento + respostas).
+async function buildCheckinResult(invite, guest) {
   const [ticket, payment, blocks] = await Promise.all([
     guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
     paymentsRepo.findLatestByGuest(guest.id).catch(() => null),
-    repo.listBlocks(inviteId).catch(() => []),
+    repo.listBlocks(invite.id).catch(() => []),
   ])
   const fields = blocks.find((b) => b.type === 'rsvp')?.content?.fields || []
   return {
@@ -558,9 +559,103 @@ export async function checkinLookup(user, inviteId, rawCode) {
   }
 }
 
+// Procura uma inscrição (organizador autenticado por sessão).
+export async function checkinLookup(user, inviteId, rawCode) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const guest = await resolveCheckinGuest(invite, rawCode)
+  return buildCheckinResult(invite, guest)
+}
+
 // Aceita (ou anula) o check-in de uma inscrição.
 export async function acceptCheckin(user, inviteId, guestId, { on = true } = {}) {
   const { guest } = await loadGuestForManage(user, inviteId, guestId)
+  return repo.setCheckedIn(guest.id, on)
+}
+
+// ── Check-in móvel: link secreto por convite (staff abre no telemóvel) ────────
+// O token do link autoriza APENAS o check-in deste convite (procurar bilhete +
+// aceitar entrada). Pode ser regenerado a qualquer momento para revogar o antigo.
+function checkinLinkPayload(invite, token) {
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  return {
+    token,
+    slug: invite.slug,
+    url: `${base}/invite/${encodeURIComponent(invite.slug)}/checkin?k=${token}`,
+  }
+}
+
+// Comparação em tempo constante do token do link com o guardado no convite.
+function checkinTokenMatches(invite, rawToken) {
+  const token = String(rawToken || '').trim()
+  if (!token || !invite.checkinToken) return false
+  const a = Buffer.from(invite.checkinToken)
+  const b = Buffer.from(token)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+// Resolve o convite pelo slug + valida o token do link de check-in.
+async function loadInviteByCheckinToken(slug, rawToken) {
+  const invite = await repo.findBySlug(slug)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!checkinTokenMatches(invite, rawToken)) {
+    throw new InviteError(401, 'Link de check-in inválido ou revogado.')
+  }
+  return invite
+}
+
+// Devolve (criando na primeira vez) o link de check-in móvel do convite.
+export async function getCheckinLink(user, inviteId) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  let token = invite.checkinToken
+  if (!token) {
+    token = randomBytes(24).toString('hex')
+    await repo.setCheckinToken(invite.id, token)
+  }
+  return checkinLinkPayload(invite, token)
+}
+
+// Gera um NOVO token (revoga o link anterior).
+export async function regenerateCheckinLink(user, inviteId) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const token = randomBytes(24).toString('hex')
+  await repo.setCheckinToken(invite.id, token)
+  return checkinLinkPayload(invite, token)
+}
+
+// Contexto (cabeçalho) da página de check-in móvel — valida o token.
+export async function checkinContext(slug, rawToken) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  return {
+    title: invite.title,
+    slug: invite.slug,
+    startDatetime: invite.startDatetime,
+    location: invite.location ?? null,
+    community: invite.community ?? null,
+    status: invite.status,
+  }
+}
+
+// Procura uma inscrição a partir do link móvel (autenticado pelo token).
+export async function checkinLookupPublic(slug, rawToken, rawCode) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  const guest = await resolveCheckinGuest(invite, rawCode)
+  return buildCheckinResult(invite, guest)
+}
+
+// Aceita (ou anula) o check-in a partir do link móvel (autenticado pelo token).
+export async function acceptCheckinPublic(slug, rawToken, guestId, { on = true } = {}) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  const guest = await repo.findGuestById(guestId)
+  if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
   return repo.setCheckedIn(guest.id, on)
 }
 
@@ -1089,6 +1184,9 @@ export async function submitRsvp(slug, input) {
     paymentState,
     ticketId: ticket?.id ?? null,
     extra: data.extra ?? null,
+    // Snapshot do schema do formulário no momento da inscrição (à-prova-de-edições):
+    // preserva campos/rótulos usados, mesmo que o formulário mude depois.
+    schemaSnapshot: Array.isArray(formFields) && formFields.length ? formFields : null,
     managePasswordHash: hashManagePassword(managePassword),
   })
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)

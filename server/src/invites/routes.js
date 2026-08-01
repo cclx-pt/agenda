@@ -239,6 +239,23 @@ invitesRouter.post(
   })
 )
 
+// Link de check-in móvel: gerar/obter (cria na 1ª vez) e rodar (revoga o antigo).
+invitesRouter.get(
+  '/:id/checkin/link',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ link: await service.getCheckinLink(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.post(
+  '/:id/checkin/link/regenerate',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ link: await service.regenerateCheckinLink(req.user, req.params.id) })
+  })
+)
+
 invitesRouter.delete(
   '/:id',
   manageRoles,
@@ -302,6 +319,35 @@ publicInvitesRouter.post(
   '/:slug/manage/refund',
   asyncHandler(async (req, res) => {
     res.json({ manage: await service.manageRefund(req.params.slug, req.body) })
+  })
+)
+
+// ── Check-in móvel (link secreto por convite, autenticado por ?k=<token>) ──
+// GET /checkin/context — cabeçalho da página (título/data) + valida o token.
+publicInvitesRouter.get(
+  '/:slug/checkin/context',
+  asyncHandler(async (req, res) => {
+    res.json({ context: await service.checkinContext(req.params.slug, req.query.k) })
+  })
+)
+
+// GET /checkin/lookup — procura uma inscrição pelo código/QR do bilhete.
+publicInvitesRouter.get(
+  '/:slug/checkin/lookup',
+  asyncHandler(async (req, res) => {
+    res.json({ result: await service.checkinLookupPublic(req.params.slug, req.query.k, req.query.code) })
+  })
+)
+
+// POST /checkin/:guestId — aceita (ou anula) o check-in da inscrição.
+publicInvitesRouter.post(
+  '/:slug/checkin/:guestId',
+  asyncHandler(async (req, res) => {
+    res.json({
+      guest: await service.acceptCheckinPublic(req.params.slug, req.query.k, req.params.guestId, {
+        on: req.body?.on !== false,
+      }),
+    })
   })
 )
 

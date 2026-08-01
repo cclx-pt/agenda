@@ -40,6 +40,7 @@ function mapInvite(row) {
     spotsOnRegistration: !!row.spots_on_registration,
     community: row.community ?? null,
     jotformCommunity: row.jotform_community ?? null,
+    checkinToken: row.checkin_token ?? null,
     status: row.status,
     publishedAt: row.published_at ?? null,
     createdBy: row.created_by ?? null,
@@ -77,6 +78,7 @@ function mapGuest(row) {
     paymentState: row.payment_state,
     ticketId: row.ticket_id ?? null,
     extra: row.extra ?? null,
+    schemaSnapshot: row.schema_snapshot ?? null,
     respondedAt: row.responded_at ?? null,
     checkedInAt: row.checked_in_at ?? null,
     refundRequestedAt: row.refund_requested_at ?? null,
@@ -150,6 +152,12 @@ export async function findById(id) {
 export async function findBySlug(slug) {
   const { rows } = await pool.query('SELECT * FROM invites WHERE slug = $1', [slug])
   return mapInvite(rows[0])
+}
+
+// Define/atualiza o token secreto do link de check-in móvel do convite.
+export async function setCheckinToken(id, token) {
+  await pool.query('UPDATE invites SET checkin_token = $2, updated_at = now() WHERE id = $1', [id, token])
+  return findById(id)
 }
 
 // Convite associado a um evento — garante 1 evento ↔ 1 convite. `exceptId` exclui
@@ -317,8 +325,8 @@ export async function insertGuest(inviteId, data) {
   const id = randomUUID()
   await pool.query(
     `INSERT INTO invite_guests
-      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, responded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())`,
+      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, schema_snapshot, responded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())`,
     [
       id,
       inviteId,
@@ -333,6 +341,7 @@ export async function insertGuest(inviteId, data) {
       data.extra ? JSON.stringify(data.extra) : null,
       data.ticketId ?? null,
       data.managePasswordHash ?? null,
+      data.schemaSnapshot ? JSON.stringify(data.schemaSnapshot) : null,
     ]
   )
   return findGuestById(id)

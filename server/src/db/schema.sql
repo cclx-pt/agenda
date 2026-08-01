@@ -478,6 +478,9 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS jotform_community TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_landing BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_registration BOOLEAN NOT NULL DEFAULT FALSE;
+-- Token secreto do link de check-in móvel (staff abre no telemóvel e valida à entrada;
+-- autoriza só o check-in deste convite; pode ser regenerado para revogar).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS checkin_token TEXT;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual/pago (com valor), grátis
 -- (0€), doação (valor à escolha) ou grupo. Cada tipo tem preço, capacidade
@@ -534,6 +537,10 @@ ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS code TEXT;
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
 -- Notas internas do organizador sobre a inscrição (comentários / follow-up).
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS admin_notes TEXT;
+-- Cópia (snapshot) do schema do formulário (rsvp.content.fields) no momento da
+-- inscrição: a gestão fica à-prova-de-edições — cada inscrição preserva os campos
+-- e rótulos com que foi capturada, mesmo que o formulário mude depois.
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS schema_snapshot JSONB;
 
 -- Auto-gestão da inscrição pelo convidado (página /invite/<slug>/gerir): senha
 -- (hash scrypt, "salt:hash") para entrar com o código de reserva e cancelar /
