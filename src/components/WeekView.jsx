@@ -45,11 +45,11 @@ export default function WeekView({ year, month, day, eventsByDate, onSelectEvent
                 <EventHoverCard key={evt.id} event={evt}>
                 <button
                   className={cn(
-                    'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left',
+                    'flex w-full flex-col items-start gap-0.5 rounded-md border-l-4 bg-muted/40 px-2 py-1.5 text-left text-foreground transition-colors hover:bg-muted/70',
                     st && '[outline:1px_dashed_currentColor] [outline-offset:-2px]',
                     evt.featured && 'cclx-featured',
                   )}
-                  style={{ background: st ? st.bg : vis.bg, color: vis.text }}
+                  style={{ background: st ? st.bg : undefined, borderLeftColor: vis.dot, color: st ? vis.text : undefined }}
                   onClick={() => onSelectEvent(evt)}
                 >
                   <span className="flex w-full items-center gap-1 text-[0.6rem] font-bold uppercase tracking-wide opacity-85">
