@@ -24,7 +24,7 @@ function ImageUploadField({ value, onChange, label, hint, round = false }) {
     if (!file) return
     setBusy(true)
     try {
-      const url = await uploadMultimediaVideo(file)
+      const url = await uploadEventImage(file)
       onChange(url)
     } catch (err) {
       toast.error(err.message || 'Falha ao carregar a imagem.')
@@ -85,7 +85,7 @@ function VideoUploadField({ value, onChange }) {
     }
     setBusy(true)
     try {
-      const url = await uploadEventImage(file)
+      const url = await uploadMultimediaVideo(file)
       onChange(url)
     } catch (err) {
       toast.error(err.message || 'Falha ao carregar o vídeo.')
