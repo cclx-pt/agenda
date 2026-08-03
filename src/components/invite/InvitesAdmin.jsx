@@ -391,7 +391,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', childMaxAge: '', adultMinAge: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', description: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', childMaxAge: '', adultMinAge: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -438,6 +438,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
           .map((t) => ({
             id: t.id || null,
             name: t.name.trim(),
+            description: (t.description || '').trim() || null,
             kind: normalizeKind(t.kind),
             partyType: normalizePartyType(t),
             price: t.kind === 'gratis' ? 0 : t.price === '' || t.price == null ? null : Number(t.price),
@@ -991,6 +992,14 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
                         ))}
                       </select>
                     </div>
+                    <textarea
+                      className={inputCls}
+                      rows="2"
+                      maxLength="500"
+                      placeholder="Descrição do bilhete (ex.: acesso gratuito para voluntários)"
+                      value={t.description ?? ''}
+                      onChange={(e) => setTicketField(i, 'description', e.target.value)}
+                    />
                     <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                       Tipo de inscrição
                       <select className={inputCls} value={normalizePartyType(t)} onChange={(e) => setTicketField(i, 'partyType', e.target.value)}>

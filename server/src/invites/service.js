@@ -119,6 +119,7 @@ const BLOCK_TYPES = [
   'overview',
   'info_extra',
   'convite_narrativo',
+  'multimedia',
   'good_to_know',
   'oradores',
   'agenda',

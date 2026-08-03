@@ -636,11 +636,53 @@ function GoodToKnowEditor({ content, onChange }) {
   )
 }
 
+const MEDIA_TYPES = [
+  { value: 'image', label: 'Imagem' },
+  { value: 'youtube', label: 'Vídeo YouTube' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'link', label: 'Link' },
+]
+
+function MultimediaEditor({ content, onChange }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={(e) => onChange({ ...content, title: e.target.value })} placeholder="Multimédia" />
+      </label>
+      <RowsEditor
+        rows={content.items}
+        onChange={(items) => onChange({ ...content, items })}
+        emptyRow={{ type: 'image', url: '', title: '', caption: '' }}
+        addLabel="Adicionar conteúdo"
+        render={(row, upd) => (
+          <div className="flex flex-col gap-2">
+            <select className={inputCls} value={row.type || 'image'} onChange={(e) => upd({ type: e.target.value, url: '' })}>
+              {MEDIA_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            </select>
+            {row.type === 'image' ? (
+              <ImageUploadField value={row.url} onChange={(url) => upd({ url })} label="Imagem" hint="PNG ou JPG" />
+            ) : (
+              <label className={labelCls}>
+                {row.type === 'youtube' ? 'Link do vídeo YouTube' : row.type === 'instagram' ? 'Link do Instagram' : 'URL'}
+                <input className={inputCls} type="url" value={row.url ?? ''} onChange={(e) => upd({ url: e.target.value })} placeholder="https://…" />
+              </label>
+            )}
+            <input className={inputCls} value={row.title ?? ''} onChange={(e) => upd({ title: e.target.value })} placeholder="Título (opcional)" />
+            <textarea className={inputCls} rows="2" value={row.caption ?? ''} onChange={(e) => upd({ caption: e.target.value })} placeholder="Descrição ou legenda (opcional)" />
+          </div>
+        )}
+      />
+    </div>
+  )
+}
+
 const EDITORS = {
   banner: BannerEditor,
   overview: OverviewEditor,
   info_extra: InfoExtraEditor,
   convite_narrativo: NarrativeEditor,
+  multimedia: MultimediaEditor,
   good_to_know: GoodToKnowEditor,
   oradores: SpeakersEditor,
   agenda: AgendaEditor,

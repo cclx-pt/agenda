@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen, Globe,
+  Images, Play, Link as LinkIcon,
 } from 'lucide-react'
 import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice, inviteRsvpHref } from './inviteUtils'
 import { RichText } from './RichText'
@@ -177,6 +178,57 @@ function NarrativeCard({ block }) {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function MultimediaCard({ block, accent }) {
+  const c = block.content || {}
+  const items = (Array.isArray(c.items) ? c.items : []).filter((item) => item?.url)
+  if (items.length === 0) return null
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        <Images className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.title || 'Multimédia'}
+      </h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {items.map((item, index) => {
+          const embed = item.type === 'youtube' ? toEmbed(item.url) : null
+          if (embed) {
+            return (
+              <div key={index} className="overflow-hidden rounded-xl border border-border bg-background sm:col-span-2">
+                <iframe src={embed} title={item.title || `Vídeo ${index + 1}`} className="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                {item.title || item.caption ? <div className="p-3"><MediaText item={item} /></div> : null}
+              </div>
+            )
+          }
+          if (item.type === 'image') {
+            return (
+              <figure key={index} className="m-0 overflow-hidden rounded-xl border border-border bg-background">
+                <img src={item.url} alt={item.title || item.caption || ''} className="aspect-[4/3] w-full object-cover" loading="lazy" />
+                {item.title || item.caption ? <figcaption className="p-3"><MediaText item={item} /></figcaption> : null}
+              </figure>
+            )
+          }
+          return (
+            <a key={index} href={item.url} target="_blank" rel="noreferrer" className="flex min-h-24 items-center gap-3 rounded-xl border border-border bg-background p-4 transition-colors hover:bg-accent">
+              {item.type === 'instagram' ? <Images className="h-6 w-6 flex-shrink-0" style={{ color: accent }} aria-hidden="true" /> : item.type === 'youtube' ? <Play className="h-6 w-6 flex-shrink-0" style={{ color: accent }} aria-hidden="true" /> : <LinkIcon className="h-6 w-6 flex-shrink-0" style={{ color: accent }} aria-hidden="true" />}
+              <span className="min-w-0 flex-1"><MediaText item={item} fallback={item.type === 'instagram' ? 'Ver no Instagram' : item.type === 'youtube' ? 'Ver no YouTube' : 'Abrir link'} /></span>
+              <ExternalLink className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MediaText({ item, fallback = '' }) {
+  return (
+    <>
+      <span className="block font-semibold text-foreground">{item.title || fallback}</span>
+      {item.caption ? <span className="mt-1 block whitespace-pre-line text-sm text-muted-foreground">{item.caption}</span> : null}
+    </>
   )
 }
 
@@ -537,6 +589,7 @@ function FooterCard({ block, page }) {
 export {
   BannerCard,
   OverviewCard,
+  MultimediaCard,
   InfoExtraCard,
   NarrativeCard,
   GoodToKnowCard,

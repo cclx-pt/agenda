@@ -7,6 +7,7 @@ export const BLOCK_META = {
   overview: { label: 'Descrição (Overview)', addable: true },
   info_extra: { label: 'Informação', addable: true },
   convite_narrativo: { label: 'Convite (narrativa + vídeo)', addable: true },
+  multimedia: { label: 'Multimédia', addable: true },
   good_to_know: { label: 'Bom saber (Good to know)', addable: true },
   oradores: { label: 'Oradores / Lineup', addable: true },
   agenda: { label: 'Programa / Agenda', addable: true },
@@ -32,6 +33,8 @@ export function defaultContent(type) {
       return { title: '', body: '' }
     case 'convite_narrativo':
       return { narrative: '', guestName: '', guestBio: '', videoUrl: '' }
+    case 'multimedia':
+      return { title: 'Multimédia', items: [] }
     case 'good_to_know':
       return { title: 'Bom saber', highlights: [], ageInfo: '', doorTime: '', parkingInfo: '', items: [] }
     case 'oradores':
