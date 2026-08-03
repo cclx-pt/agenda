@@ -771,8 +771,8 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
               Publicar
             </button>
           ) : (
-            <button type="button" onClick={() => changeStatus('fechado')} disabled={busy} className={ghostBtn}>
-              Fechar inscrições
+            <button type="button" onClick={() => changeStatus('rascunho')} disabled={busy} className={ghostBtn}>
+              Reverter para rascunho
             </button>
           )}
         </div>
