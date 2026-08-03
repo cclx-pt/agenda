@@ -127,6 +127,9 @@ export async function getLoop(church) {
     secondsPerSlideFeatured: Number(data.secondsPerSlideFeatured) > 0 ? Number(data.secondsPerSlideFeatured) : 30,
     church: data.church ?? church,
     events: Array.isArray(data.events) ? data.events.map(mapSorEvent) : [],
+    fixedSlides: Array.isArray(data.fixedSlides)
+      ? data.fixedSlides.filter((slide) => slide?.url && ['image', 'video'].includes(slide.type))
+      : [],
   }
 }
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { config } from '../config.js'
+import { normalizeLoop } from '../loop/config.js'
 import * as repo from './repository.js'
 
 // Chave da definição da integração com a inChurch.
@@ -289,13 +290,11 @@ export async function updateInviteSettings(input, actorId) {
 
 // ── Configuração do Loop + CCLX (múltiplos "loops" nomeados, para TV) ──
 // app_settings key 'loop' = { [slug]: { name, community, active, showGeneral,
-// weeks, format, secondsPerSlide, secondsPerSlideFeatured } }.
+// weeks, format, secondsPerSlide, secondsPerSlideFeatured, fixedSlides } }.
 // `community`: nome de igreja OU '' (= todas as igrejas). `slug` (chave) é
 // estável e usado no URL público /loop/<slug>. Config antiga (chaveada por
 // igreja, sem `name`) é migrada em leitura (name=community=igreja da chave).
 const LOOP_KEY = 'loop'
-const LOOP_FORMATS = ['16:9', '32:9']
-const LOOP_DEFAULTS = { active: false, showGeneral: true, weeks: 4, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 }
 
 // Texto → slug seguro em URL (sem acentos).
 function loopSlug(str) {
@@ -305,30 +304,6 @@ function loopSlug(str) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-}
-
-function normalizeLoop(cfg, fallbackName = '') {
-  const c = cfg && typeof cfg === 'object' ? cfg : {}
-  const weeks = Number(c.weeks)
-  const sps = Number(c.secondsPerSlide)
-  const spsFeat = Number(c.secondsPerSlideFeatured)
-  return {
-    name: String(c.name ?? fallbackName ?? '').trim(),
-    // Igreja/comunidade cujos eventos aparecem; '' = todas as igrejas.
-    community: String(c.community ?? '').trim(),
-    active: !!c.active,
-    showGeneral: c.showGeneral !== false, // por omissão true
-    weeks: Number.isInteger(weeks) && weeks >= 1 && weeks <= 52 ? weeks : LOOP_DEFAULTS.weeks,
-    // Formato do ecrã da TV: 16:9 (1920x1080) ou 32:9 (3840x1080, ultrawide).
-    format: LOOP_FORMATS.includes(c.format) ? c.format : LOOP_DEFAULTS.format,
-    // Duração de cada slide (segundos): normal e em destaque.
-    secondsPerSlide:
-      Number.isFinite(sps) && sps >= 3 && sps <= 120 ? Math.round(sps) : LOOP_DEFAULTS.secondsPerSlide,
-    secondsPerSlideFeatured:
-      Number.isFinite(spsFeat) && spsFeat >= 3 && spsFeat <= 300
-        ? Math.round(spsFeat)
-        : LOOP_DEFAULTS.secondsPerSlideFeatured,
-  }
 }
 
 /**

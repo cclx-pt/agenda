@@ -206,7 +206,7 @@ const SAVE_LABEL = {
   pagina: 'Guardar página',
 }
 
-function InviteEditor({ invite, onBack, onSaved }) {
+function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
   const [settings, setSettings] = useState(() => ({
     eventId: invite.eventId ?? '',
     title: invite.title ?? '',
@@ -718,7 +718,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     { id: 'definicoes', label: 'Definições' },
     ...(isInternal ? [{ id: 'bilhetes', label: 'Bilhetes' }, { id: 'inscricao', label: 'Inscrição' }] : []),
     { id: 'pagina', label: 'Página' },
-    ...(isInternal ? [{ id: 'inscricoes', label: 'Inscrições' }, { id: 'checkin', label: 'Check-in' }] : []),
+    ...(isInternal ? [{ id: 'checkin', label: 'Check-in' }] : []),
   ]
   const activeTab = tabs.some((t) => t.id === tab) ? tab : 'definicoes'
   const roadmap = [
@@ -733,7 +733,6 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ? [{ label: 'Inscrição', tabId: 'definicoes', done: Boolean(settings.registrationUrl.trim()) }]
       : []),
     { label: 'Página', tabId: 'pagina', done: pageBlocks.length > 0 },
-    ...(isInternal ? [{ label: 'Inscrições', tabId: 'inscricoes', done: invite.status === 'publicado' }] : []),
   ]
 
   return (
@@ -760,10 +759,12 @@ function InviteEditor({ invite, onBack, onSaved }) {
             <Eye className="h-4 w-4" aria-hidden="true" />
             Pré-visualizar
           </a>
-          <a href={publicUrl(invite.slug)} target="_blank" rel="noreferrer" className={ghostBtn}>
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            Abrir
-          </a>
+          {isInternal ? (
+            <button type="button" onClick={onManageRegistrations} className={ghostBtn}>
+              <Users className="h-4 w-4" aria-hidden="true" />
+              Gestão de Inscrições
+            </button>
+          ) : null}
           {invite.status !== 'publicado' ? (
             <button type="button" onClick={() => changeStatus('publicado')} disabled={busy} className={primaryBtn}>
               <Send className="h-4 w-4" aria-hidden="true" />
@@ -1571,6 +1572,11 @@ export default function InvitesAdmin() {
           load()
         }}
         onSaved={(updated) => setEditing((prev) => ({ ...updated, blocks: updated.blocks ?? prev.blocks }))}
+        onManageRegistrations={() => {
+          setEditingId(null)
+          setEditing(null)
+          setAdminTab('inscricoes')
+        }}
       />
     )
   }
@@ -1662,9 +1668,6 @@ export default function InvitesAdmin() {
                 <button type="button" onClick={() => copyLink(inv.slug)} className={ghostBtn} aria-label="Copiar link">
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 </button>
-                <a href={publicUrl(inv.slug)} target="_blank" rel="noreferrer" className={ghostBtn} aria-label="Abrir">
-                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                </a>
                 <button type="button" onClick={() => deleteInvite(inv)} disabled={busy} className="inline-flex items-center rounded-lg border border-destructive/40 bg-transparent px-3 py-2 text-destructive transition-colors hover:bg-destructive/10" aria-label="Eliminar">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>

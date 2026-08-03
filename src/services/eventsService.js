@@ -420,6 +420,20 @@ export async function uploadEventImage(file) {
   return data.url
 }
 
+/** Carrega uma imagem ou vídeo para um slide fixo do Loop. */
+export async function uploadLoopMedia(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/data/uploads', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Falha ao carregar o media.')
+  return data.url
+}
+
 /**
  * Carrega um anexo (PDF/PNG/JPG, ≤5MB) e devolve a URL pública. Usa o mesmo
  * endpoint de uploads (multipart/form-data).

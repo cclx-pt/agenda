@@ -3,21 +3,24 @@ import multer from 'multer'
 import { requireRole } from '../middleware/auth.js'
 import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
 
-const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-// Imagens PNG/JPG (banner) e PDF (anexos de evento).
+const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024 // 50 MB
+// Imagens PNG/JPG, PDF e vídeos do Loop.
 const ALLOWED = new Map([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
   ['application/pdf', '.pdf'],
+  ['video/mp4', '.mp4'],
+  ['video/webm', '.webm'],
 ])
 
 // O ficheiro fica em memória para ser reencaminhado ao Supabase Storage...
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_BYTES, files: 1 },
+  limits: { fileSize: MAX_VIDEO_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED.has(file.mimetype)) {
-      cb(new Error('Formato inválido. Apenas PDF, PNG ou JPG.'))
+      cb(new Error('Formato inválido. Apenas PDF, PNG, JPG, MP4 ou WebM.'))
       return
     }
     cb(null, true)
@@ -35,7 +38,7 @@ uploadsRouter.post('/', manageRoles, (req, res) => {
   upload.single('file')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       const message =
-        err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro demasiado grande (máx. 5MB).' : 'Falha no upload.'
+        err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro demasiado grande (máx. 50MB).' : 'Falha no upload.'
       return res.status(400).json({ error: message })
     }
     if (err) {
@@ -43,6 +46,9 @@ uploadsRouter.post('/', manageRoles, (req, res) => {
     }
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum ficheiro recebido.' })
+    }
+    if (!req.file.mimetype.startsWith('video/') && req.file.size > MAX_FILE_BYTES) {
+      return res.status(400).json({ error: 'Ficheiro demasiado grande (máx. 5MB).' })
     }
     if (!isStorageConfigured()) {
       return res.status(503).json({ error: 'Armazenamento de imagens não configurado.' })

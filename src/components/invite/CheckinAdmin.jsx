@@ -138,6 +138,7 @@ function CheckinLinkCard({ invite }) {
 export default function CheckinAdmin({ invite }) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState(null)
+  const [guests, setGuests] = useState(null)
   const [busy, setBusy] = useState(false)
   const [scanning, setScanning] = useState(false)
   const scannerRef = useRef(null)
@@ -162,6 +163,25 @@ export default function CheckinAdmin({ invite }) {
     },
     []
   )
+
+  const loadGuests = async () => {
+    try {
+      setGuests(await invitesService.listInviteGuests(invite.id))
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  useEffect(() => {
+    let alive = true
+    invitesService
+      .listInviteGuests(invite.id)
+      .then((list) => alive && setGuests(list))
+      .catch((err) => alive && toast.error(err.message))
+    return () => {
+      alive = false
+    }
+  }, [invite.id])
 
   const lookup = async (value) => {
     const code = String(value ?? input).trim()
@@ -206,6 +226,7 @@ export default function CheckinAdmin({ invite }) {
     try {
       const guest = await invitesService.acceptCheckin(invite.id, result.guest.id, true)
       setResult((r) => (r ? { ...r, guest: { ...r.guest, checkedInAt: guest.checkedInAt } } : r))
+      await loadGuests()
       toast.success('Check-in aceite.')
     } catch (err) {
       toast.error(err.message)
@@ -230,10 +251,51 @@ export default function CheckinAdmin({ invite }) {
 
   const g = result?.guest
   const paymentOpen = result?.payment && result.payment.status !== 'paid'
+  const checkinStats = (() => {
+    const eligible = (guests || []).filter((guest) => guest.rsvpState === 'confirmed')
+    const completed = eligible.filter((guest) => guest.checkedInAt).length
+    const byTicket = new Map()
+    for (const guest of eligible) {
+      const name = guest.ticket?.name || 'Sem bilhete'
+      const current = byTicket.get(name) || { total: 0, completed: 0 }
+      current.total += 1
+      if (guest.checkedInAt) current.completed += 1
+      byTicket.set(name, current)
+    }
+    return { pending: eligible.length - completed, completed, byTicket: [...byTicket.entries()] }
+  })()
 
   return (
     <div className="flex flex-col gap-4">
       <CheckinLinkCard invite={invite} />
+      <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Indicadores de check-in</h3>
+          <button type="button" onClick={loadGuests} className={ghostBtn}>Atualizar</button>
+        </div>
+        {guests ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{checkinStats.pending}</div>
+              <div className="text-xs text-muted-foreground">Pendentes</div>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{checkinStats.completed}</div>
+              <div className="text-xs text-muted-foreground">Efetuados</div>
+            </div>
+            {checkinStats.byTicket.map(([name, stats]) => (
+              <div key={name} className="rounded-lg border border-border bg-background p-3">
+                <div className="text-2xl font-bold text-foreground">{stats.completed}/{stats.total}</div>
+                <div className="truncate text-xs text-muted-foreground" title={name}>{name}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> A carregar indicadores…
+          </div>
+        )}
+      </section>
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
       <div>
         <h3 className="m-0 mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">

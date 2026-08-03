@@ -171,9 +171,11 @@ const emptyForm = {
 
 // Imagem de evento: limites espelhados no backend (PNG/JPG, ≤5MB).
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg']
+const ALLOWED_LOOP_MEDIA_TYPES = [...ALLOWED_IMAGE_TYPES, 'video/mp4', 'video/webm']
 // Anexo de evento: PDF além de imagens (limite de tamanho partilhado).
 const ALLOWED_ATTACHMENT_TYPES = ['application/pdf', 'image/png', 'image/jpeg']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024
 
 // Data máxima de fim de recorrência (6 meses após o início), em YYYY-MM-DD.
 function maxRecurrenceDate(startDate) {
@@ -529,6 +531,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Loops (carrosséis públicos para TV): lista de loops com nome próprio (CRUD).
   const [loops, setLoops] = useState([])
   const [loopChurches, setLoopChurches] = useState([])
+  const [uploadingLoopMedia, setUploadingLoopMedia] = useState(null)
   // Gestão de igrejas (admin).
   const [churchForm, setChurchForm] = useState(emptyChurch)
   const [editingChurchId, setEditingChurchId] = useState(null)
@@ -796,6 +799,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         format: '16:9',
         secondsPerSlide: 15,
         secondsPerSlideFeatured: 30,
+        fixedSlides: [],
       },
     ])
   }
@@ -806,6 +810,56 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
   const removeLoop = (index) => {
     setLoops((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const setLoopSlideField = (loopIndex, slideIndex, key, value) => {
+    setLoops((prev) => prev.map((loop, i) => i === loopIndex
+      ? { ...loop, fixedSlides: (loop.fixedSlides || []).map((slide, j) => j === slideIndex ? { ...slide, [key]: value } : slide) }
+      : loop))
+  }
+
+  const removeLoopSlide = (loopIndex, slideIndex) => {
+    setLoops((prev) => prev.map((loop, i) => i === loopIndex
+      ? { ...loop, fixedSlides: (loop.fixedSlides || []).filter((_, j) => j !== slideIndex) }
+      : loop))
+  }
+
+  const moveLoopSlide = (loopIndex, slideIndex, direction) => {
+    setLoops((prev) => prev.map((loop, i) => {
+      if (i !== loopIndex) return loop
+      const slides = [...(loop.fixedSlides || [])]
+      const target = slideIndex + direction
+      if (target < 0 || target >= slides.length) return loop
+      const current = slides[slideIndex]
+      slides[slideIndex] = slides[target]
+      slides[target] = current
+      return { ...loop, fixedSlides: slides }
+    }))
+  }
+
+  const handleLoopMediaFile = async (loopIndex, file) => {
+    if (!file) return
+    if (!ALLOWED_LOOP_MEDIA_TYPES.includes(file.type)) {
+      toast.error('Formato inválido. Apenas PNG, JPG, MP4 ou WebM.')
+      return
+    }
+    const isVideo = file.type.startsWith('video/')
+    if (file.size > (isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES)) {
+      toast.error(`Ficheiro demasiado grande (máx. ${isVideo ? 50 : 5}MB).`)
+      return
+    }
+    setUploadingLoopMedia(loopIndex)
+    try {
+      const url = await eventsService.uploadLoopMedia(file)
+      setLoops((prev) => prev.map((loop, i) => i === loopIndex
+        ? { ...loop, fixedSlides: [...(loop.fixedSlides || []), { url, type: isVideo ? 'video' : 'image', seconds: 15 }] }
+        : loop))
+      toast.success('Media adicionado ao fim do loop.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploadingLoopMedia(null)
+    }
   }
 
   const handleSaveLoop = async () => {
@@ -3334,6 +3388,63 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                             onChange={(e) => setLoopField(i, 'secondsPerSlideFeatured', Number(e.target.value) || 30)}
                           />
                         </label>
+                      </div>
+                      <div className="mt-3 w-full border-t border-border pt-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-foreground">Media fixos no fim do loop</span>
+                          <label className={styles.ghostBtn}>
+                            <i className={`ti ${uploadingLoopMedia === i ? 'ti-loader-2' : 'ti-photo-plus'}`} aria-hidden="true" />
+                            <span>{uploadingLoopMedia === i ? 'A carregar…' : 'Adicionar media'}</span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,video/mp4,video/webm"
+                              hidden
+                              disabled={busy || uploadingLoopMedia !== null}
+                              onChange={(e) => {
+                                handleLoopMediaFile(i, e.target.files?.[0])
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {(loop.fixedSlides || []).length === 0 ? (
+                          <p className="m-0 text-xs text-muted-foreground">Sem media fixos.</p>
+                        ) : (
+                          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                            {(loop.fixedSlides || []).map((slide, slideIndex) => (
+                              <li key={`${slide.url}-${slideIndex}`} className="flex items-center gap-2 rounded-lg border border-border bg-background p-2">
+                                {slide.type === 'video' ? (
+                                  <video src={slide.url} muted className="h-14 w-24 rounded object-cover" />
+                                ) : (
+                                  <img src={slide.url} alt="" className="h-14 w-24 rounded object-cover" />
+                                )}
+                                <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                                  Segundos
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="300"
+                                    className={styles.smallSelect}
+                                    value={slide.seconds}
+                                    disabled={busy}
+                                    onChange={(e) => setLoopSlideField(i, slideIndex, 'seconds', Number(e.target.value) || 15)}
+                                  />
+                                </label>
+                                <div className={`${styles.actions} ml-auto`}>
+                                  <button type="button" className={styles.iconBtn} disabled={busy || slideIndex === 0} onClick={() => moveLoopSlide(i, slideIndex, -1)} title="Mover para cima">
+                                    <i className="ti ti-arrow-up" aria-hidden="true" />
+                                  </button>
+                                  <button type="button" className={styles.iconBtn} disabled={busy || slideIndex === loop.fixedSlides.length - 1} onClick={() => moveLoopSlide(i, slideIndex, 1)} title="Mover para baixo">
+                                    <i className="ti ti-arrow-down" aria-hidden="true" />
+                                  </button>
+                                  <button type="button" className={styles.iconBtn} disabled={busy} onClick={() => removeLoopSlide(i, slideIndex)} title="Remover media">
+                                    <i className="ti ti-trash" aria-hidden="true" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     </li>
                   )

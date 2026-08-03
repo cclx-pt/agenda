@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, Church } from 'lucide-react'
 import { getLoop } from '../services/apiService'
@@ -13,14 +13,14 @@ const INTRO_MAX_MS = 30000 // segurança: passa ao loop se o vídeo não termina
  * destaque ficam mais tempo. Recarrega periodicamente para apanhar novidades.
  */
 export default function LoopPage({ church }) {
-  const [state, setState] = useState({ loading: true, active: false, events: [], error: null, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 })
+  const [state, setState] = useState({ loading: true, active: false, events: [], fixedSlides: [], error: null, format: '16:9', secondsPerSlide: 15, secondsPerSlideFeatured: 30 })
   const [index, setIndex] = useState(0)
   const [introDone, setIntroDone] = useState(false)
 
   const load = useCallback(async () => {
     try {
       const data = await getLoop(church)
-      setState({ loading: false, active: data.active, events: data.events, error: null, format: data.format, secondsPerSlide: data.secondsPerSlide, secondsPerSlideFeatured: data.secondsPerSlideFeatured })
+      setState({ loading: false, active: data.active, events: data.events, fixedSlides: data.fixedSlides, error: null, format: data.format, secondsPerSlide: data.secondsPerSlide, secondsPerSlideFeatured: data.secondsPerSlideFeatured })
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }))
     }
@@ -40,18 +40,23 @@ export default function LoopPage({ church }) {
     return () => clearTimeout(t)
   }, [introDone])
 
-  const events = state.events
-  const count = events.length
+  const slides = useMemo(() => [
+    ...state.events.map((event) => ({ ...event, slideType: 'event' })),
+    ...state.fixedSlides.map((slide, slideIndex) => ({ ...slide, id: `fixed-${slideIndex}`, slideType: 'fixed' })),
+  ], [state.events, state.fixedSlides])
+  const count = slides.length
 
   // Avança conforme a duração do slide atual (configurável por igreja; destaque
   // fica mais tempo).
   useEffect(() => {
     if (count === 0) return
-    const current = events[index % count]
-    const secs = current?.featured ? state.secondsPerSlideFeatured : state.secondsPerSlide
+    const current = slides[index % count]
+    const secs = current?.slideType === 'fixed'
+      ? current.seconds
+      : current?.featured ? state.secondsPerSlideFeatured : state.secondsPerSlide
     const t = setTimeout(() => setIndex((i) => (i + 1) % count), (secs || 15) * 1000)
     return () => clearTimeout(t)
-  }, [index, count, events, state.secondsPerSlide, state.secondsPerSlideFeatured])
+  }, [index, count, slides, state.secondsPerSlide, state.secondsPerSlideFeatured])
 
   const wrap = (children) => (
     <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-neutral-950 text-neutral-400">
@@ -88,36 +93,47 @@ export default function LoopPage({ church }) {
     return wrap(
       <>
         <CalendarDays className="h-14 w-14" aria-hidden="true" />
-        <span className="text-2xl">Sem eventos para mostrar em “{church}”.</span>
+        <span className="text-2xl">Sem conteúdos para mostrar em “{church}”.</span>
       </>
     )
 
-  const evt = events[index % count]
+  const slide = slides[index % count]
   // Formato do ecrã da TV (definido na configuração do Loop + CCLX da igreja):
   // escolhe o cartaz dedicado desse formato, com recurso ao outro se faltar.
   const isWide = state.format === '32:9'
   const loopPoster = isWide
-    ? evt.loopImage32x9 || evt.loopImage16x9
-    : evt.loopImage16x9 || evt.loopImage32x9
+    ? slide.loopImage32x9 || slide.loopImage16x9
+    : slide.loopImage16x9 || slide.loopImage32x9
   // Só a imagem: o cartaz dedicado ao Loop + CCLX, ou a imagem do próprio evento.
-  const image = loopPoster || evt.imageUrl
-  const durSec = (evt.featured ? state.secondsPerSlideFeatured : state.secondsPerSlide) || 15
+  const image = slide.slideType === 'fixed' ? slide.url : loopPoster || slide.imageUrl
+  const durSec = slide.slideType === 'fixed'
+    ? slide.seconds
+    : (slide.featured ? state.secondsPerSlideFeatured : state.secondsPerSlide) || 15
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-neutral-950 text-white">
       <AnimatePresence mode="wait">
         <motion.div
-          key={evt.id}
+          key={slide.id}
           className="flex h-full w-full items-center justify-center bg-black"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
         >
-          {image ? (
+          {slide.slideType === 'fixed' && slide.type === 'video' ? (
+            <video
+              src={slide.url}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="h-full w-full object-contain"
+            />
+          ) : image ? (
             <img
               src={image}
-              alt={evt.title}
+              alt={slide.slideType === 'event' ? slide.title : ''}
               className="h-full w-full object-contain"
             />
           ) : (
@@ -131,7 +147,7 @@ export default function LoopPage({ church }) {
       {/* Barra de progresso até ao próximo cartaz */}
       <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/10">
         <motion.div
-          key={`${evt.id}-bar`}
+          key={`${slide.id}-bar`}
           className="h-full bg-amber-400"
           initial={{ width: '0%' }}
           animate={{ width: '100%' }}
