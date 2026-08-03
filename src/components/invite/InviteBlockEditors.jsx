@@ -3,7 +3,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, Copy, Upload, Loader2, Image as Image
 import { toast } from 'sonner'
 import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
 import { RichTextEditor } from './RichText'
-import { uploadEventImage } from '../../services/eventsService'
+import { uploadEventImage, uploadMultimediaVideo } from '../../services/eventsService'
 
 // Editores de conteúdo por tipo de bloco (formulários "sem código"). Cada editor
 // recebe { content, onChange } e chama onChange(novoConteudo) a cada alteração.
@@ -24,7 +24,7 @@ function ImageUploadField({ value, onChange, label, hint, round = false }) {
     if (!file) return
     setBusy(true)
     try {
-      const url = await uploadEventImage(file)
+      const url = await uploadMultimediaVideo(file)
       onChange(url)
     } catch (err) {
       toast.error(err.message || 'Falha ao carregar a imagem.')

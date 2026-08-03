@@ -83,3 +83,20 @@ export async function uploadImage(buffer, { ext, contentType }) {
   const { data } = supabase.storage.from(bucket).getPublicUrl(objectName)
   return data.publicUrl
 }
+
+/** Cria um URL temporário para o browser carregar diretamente para o Storage. */
+export async function createSignedVideoUpload() {
+  const supabase = getClient()
+  if (!supabase) {
+    throw new Error('Supabase Storage não está configurado.')
+  }
+  const bucket = config.supabase.storageBucket
+  await ensureBucket(supabase, bucket)
+  const objectName = `${randomUUID()}.mp4`
+  const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectName)
+  if (error) {
+    throw new Error(error.message || 'Falha ao autorizar o upload no Supabase Storage.')
+  }
+  const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(objectName)
+  return { signedUrl: data.signedUrl, publicUrl: publicData.publicUrl }
+}

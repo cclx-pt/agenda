@@ -420,6 +420,27 @@ export async function uploadEventImage(file) {
   return data.url
 }
 
+/** Carrega um MP4 diretamente para o Supabase, sem atravessar o limite da Vercel. */
+export async function uploadMultimediaVideo(file) {
+  const { signedUrl, publicUrl } = await request('/data/uploads/sign-video', {
+    method: 'POST',
+    body: { contentType: file.type, size: file.size },
+  })
+  const form = new FormData()
+  form.append('cacheControl', '3600')
+  form.append('', file)
+  const res = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: { 'x-upsert': 'false' },
+    body: form,
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || data.error || 'Falha ao carregar o vídeo.')
+  }
+  return publicUrl
+}
+
 /** Carrega uma imagem ou vídeo para um slide fixo do Loop. */
 export async function uploadLoopMedia(file) {
   const form = new FormData()

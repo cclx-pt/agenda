@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { requireRole } from '../middleware/auth.js'
-import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
+import { uploadImage, createSignedVideoUpload, isStorageConfigured } from '../storage/supabase.js'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 const MAX_VIDEO_BYTES = 30 * 1024 * 1024 // 30 MB
@@ -31,6 +31,29 @@ export const uploadsRouter = Router()
 
 // Apenas quem gere eventos pode carregar imagens.
 const manageRoles = requireRole('admin', 'aprovador', 'editor')
+
+// Autoriza um upload direto browser → Supabase. O ficheiro não atravessa a
+// função Vercel, cujo limite de corpo é inferior aos 30 MB permitidos aqui.
+uploadsRouter.post('/sign-video', manageRoles, async (req, res) => {
+  const contentType = String(req.body?.contentType || '').toLowerCase()
+  const size = Number(req.body?.size)
+  if (contentType !== 'video/mp4') {
+    return res.status(400).json({ error: 'Formato inválido. Apenas MP4.' })
+  }
+  if (!Number.isFinite(size) || size <= 0 || size > MAX_VIDEO_BYTES) {
+    return res.status(400).json({ error: 'Ficheiro demasiado grande (máx. 30MB).' })
+  }
+  if (!isStorageConfigured()) {
+    return res.status(503).json({ error: 'Armazenamento de ficheiros não configurado.' })
+  }
+  try {
+    res.json(await createSignedVideoUpload())
+  } catch (uploadErr) {
+    const detail = uploadErr?.message ?? String(uploadErr)
+    console.error('[uploads] Falha ao autorizar vídeo:', detail)
+    res.status(502).json({ error: `Falha ao preparar o upload: ${detail}` })
+  }
+})
 
 // POST /data/uploads — recebe um ficheiro no campo "file", carrega-o para o
 // Supabase Storage e devolve o URL público (absoluto) da imagem.
