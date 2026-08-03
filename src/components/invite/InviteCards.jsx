@@ -319,14 +319,22 @@ function AgendaCard({ block, accent }) {
           ))}
         </div>
       ) : null}
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      <ul className="m-0 flex list-none flex-col p-0">
         {(day.items || []).map((it, i) => (
-          <li key={i} className="flex gap-3 border-b border-border/60 pb-2 last:border-0">
-            <span className="inline-flex min-w-[64px] items-center gap-1 font-mono text-sm font-semibold" style={{ color: accent }}>
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          <li key={i} className="relative flex min-h-14 gap-4 border-l border-border/80 pb-4 pl-5 last:border-transparent last:pb-0">
+            <span
+              className="absolute -left-1.5 top-2 h-3 w-3 rounded-full border-2 border-background"
+              style={{ backgroundColor: accent }}
+              aria-hidden="true"
+            />
+            <time
+              className="mt-0.5 inline-flex h-8 min-w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-bold tabular-nums"
+              style={{ color: accent, backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)` }}
+            >
+              <Clock className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
               {it.time && it.time.includes('T') ? fmtTime(it.time) : it.time}
-            </span>
-            <span className="text-foreground">
+            </time>
+            <span className="pt-1.5 text-foreground">
               {it.title}
               {it.owner ? <span className="text-muted-foreground"> · {it.owner}</span> : null}
             </span>
