@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Plus, Trash2, ArrowUp, ArrowDown, Copy, Upload, Loader2, Image as ImageIcon } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Copy, Upload, Loader2, Image as ImageIcon, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { FIELD_TYPES, DEFAULT_RSVP_FIELDS, hasOptions, deriveKey, SYSTEM_KEYS } from './inviteFormFields'
 import { RichTextEditor } from './RichText'
@@ -62,6 +62,55 @@ function ImageUploadField({ value, onChange, label, hint, round = false }) {
       </div>
       {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
       <input ref={inputRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={onFile} />
+    </div>
+  )
+}
+
+const MAX_MULTIMEDIA_VIDEO_BYTES = 30 * 1024 * 1024
+
+function VideoUploadField({ value, onChange }) {
+  const inputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const onFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.type !== 'video/mp4') {
+      toast.error('Formato inválido. Seleciona um vídeo MP4.')
+      return
+    }
+    if (file.size > MAX_MULTIMEDIA_VIDEO_BYTES) {
+      toast.error('O vídeo não pode exceder 30 MB.')
+      return
+    }
+    setBusy(true)
+    try {
+      const url = await uploadEventImage(file)
+      onChange(url)
+    } catch (err) {
+      toast.error(err.message || 'Falha ao carregar o vídeo.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-foreground">Vídeo MP4</span>
+      {value ? <video src={value} className="aspect-video max-h-40 w-full rounded bg-black object-contain" controls preload="metadata" /> : null}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className={smallBtn}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Video className="h-3.5 w-3.5" aria-hidden="true" />}
+          {value ? 'Mudar vídeo' : 'Carregar vídeo'}
+        </button>
+        {value ? (
+          <button type="button" onClick={() => onChange('')} disabled={busy} className={smallBtn}>
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Remover
+          </button>
+        ) : null}
+      </div>
+      <span className="text-xs font-normal text-muted-foreground">Apenas MP4, até 30 MB.</span>
+      <input ref={inputRef} type="file" accept="video/mp4,.mp4" className="hidden" onChange={onFile} />
     </div>
   )
 }
@@ -638,6 +687,7 @@ function GoodToKnowEditor({ content, onChange }) {
 
 const MEDIA_TYPES = [
   { value: 'image', label: 'Imagem' },
+  { value: 'video', label: 'Vídeo MP4' },
   { value: 'youtube', label: 'Vídeo YouTube' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'link', label: 'Link' },
@@ -662,6 +712,8 @@ function MultimediaEditor({ content, onChange }) {
             </select>
             {row.type === 'image' ? (
               <ImageUploadField value={row.url} onChange={(url) => upd({ url })} label="Imagem" hint="PNG ou JPG" />
+            ) : row.type === 'video' ? (
+              <VideoUploadField value={row.url} onChange={(url) => upd({ url })} />
             ) : (
               <label className={labelCls}>
                 {row.type === 'youtube' ? 'Link do vídeo YouTube' : row.type === 'instagram' ? 'Link do Instagram' : 'URL'}

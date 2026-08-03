@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen, Globe,
-  Images, Play, Link as LinkIcon,
+  Images, Play, Link as LinkIcon, X, ZoomIn,
 } from 'lucide-react'
 import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice, inviteRsvpHref } from './inviteUtils'
 import { RichText } from './RichText'
@@ -184,6 +184,15 @@ function NarrativeCard({ block }) {
 function MultimediaCard({ block, accent }) {
   const c = block.content || {}
   const items = (Array.isArray(c.items) ? c.items : []).filter((item) => item?.url)
+  const [expandedImage, setExpandedImage] = useState(null)
+  useEffect(() => {
+    if (!expandedImage) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setExpandedImage(null)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [expandedImage])
   if (items.length === 0) return null
   return (
     <div className={cardCls}>
@@ -205,7 +214,20 @@ function MultimediaCard({ block, accent }) {
           if (item.type === 'image') {
             return (
               <figure key={index} className="m-0 overflow-hidden rounded-xl border border-border bg-background">
-                <img src={item.url} alt={item.title || item.caption || ''} className="aspect-[4/3] w-full object-cover" loading="lazy" />
+                <button type="button" className="group relative block w-full cursor-zoom-in" onClick={() => setExpandedImage(item)} aria-label={`Ampliar ${item.title || 'imagem'}`}>
+                  <img src={item.url} alt={item.title || item.caption || ''} className="aspect-[4/3] w-full object-cover" loading="lazy" />
+                  <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <ZoomIn className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </button>
+                {item.title || item.caption ? <figcaption className="p-3"><MediaText item={item} /></figcaption> : null}
+              </figure>
+            )
+          }
+          if (item.type === 'video') {
+            return (
+              <figure key={index} className="m-0 overflow-hidden rounded-xl border border-border bg-background sm:col-span-2">
+                <video src={item.url} className="aspect-video w-full bg-black object-contain" controls preload="metadata" playsInline />
                 {item.title || item.caption ? <figcaption className="p-3"><MediaText item={item} /></figcaption> : null}
               </figure>
             )
@@ -219,6 +241,14 @@ function MultimediaCard({ block, accent }) {
           )
         })}
       </div>
+      {expandedImage ? (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 p-4" role="dialog" aria-modal="true" aria-label={expandedImage.title || 'Imagem ampliada'} onClick={() => setExpandedImage(null)}>
+          <button type="button" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25" onClick={() => setExpandedImage(null)} aria-label="Fechar imagem ampliada">
+            <X className="h-6 w-6" aria-hidden="true" />
+          </button>
+          <img src={expandedImage.url} alt={expandedImage.title || expandedImage.caption || ''} className="max-h-[90vh] max-w-[95vw] object-contain" onClick={(event) => event.stopPropagation()} />
+        </div>
+      ) : null}
     </div>
   )
 }

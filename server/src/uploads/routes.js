@@ -4,7 +4,7 @@ import { requireRole } from '../middleware/auth.js'
 import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024 // 50 MB
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024 // 30 MB
 // Imagens PNG/JPG, PDF e vídeos do Loop.
 const ALLOWED = new Map([
   ['image/png', '.png'],
@@ -38,7 +38,7 @@ uploadsRouter.post('/', manageRoles, (req, res) => {
   upload.single('file')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       const message =
-        err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro demasiado grande (máx. 50MB).' : 'Falha no upload.'
+        err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro demasiado grande (máx. 30MB).' : 'Falha no upload.'
       return res.status(400).json({ error: message })
     }
     if (err) {
