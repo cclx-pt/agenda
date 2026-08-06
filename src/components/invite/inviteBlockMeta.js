@@ -28,21 +28,21 @@ export const ADDABLE_TYPES = Object.entries(BLOCK_META)
 export function defaultContent(type) {
   switch (type) {
     case 'overview':
-      return { title: 'Sobre o evento', body: '' }
+      return { title: 'Sobre o evento', body: '', showIcon: true }
     case 'info_extra':
-      return { title: '', body: '' }
+      return { title: '', body: '', showIcon: true }
     case 'convite_narrativo':
-      return { narrative: '', guestName: '', guestBio: '', videoUrl: '' }
+      return { title: 'Convite', narrative: '', guestName: '', guestBio: '', videoUrl: '', showIcon: true }
     case 'multimedia':
-      return { title: 'Multimédia', items: [] }
+      return { title: 'Multimédia', items: [], showIcon: true }
     case 'good_to_know':
-      return { title: 'Bom saber', highlights: [], ageInfo: '', doorTime: '', parkingInfo: '', items: [] }
+      return { title: 'Bom saber', highlights: [], ageInfo: '', doorTime: '', parkingInfo: '', items: [], showIcon: true }
     case 'oradores':
-      return { title: 'Oradores / Lineup', speakers: [] }
+      return { title: 'Oradores / Lineup', speakers: [], showIcon: true }
     case 'agenda':
-      return { title: 'Programa', days: [] }
+      return { title: 'Programa', days: [], showIcon: true }
     case 'workshops':
-      return { title: 'Workshops', items: [] }
+      return { title: 'Workshops', information: '', items: [], showIcon: true }
     case 'localizacao':
       return { address: '', directionsUrl: '' }
     case 'faqs':

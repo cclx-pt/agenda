@@ -1166,7 +1166,10 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, ticket
   if (mode === 'external') {
     return (
       <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
+        <h2 className="m-0 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+          {c.showIcon !== false ? <Ticket className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+          Inscrição
+        </h2>
         {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
         <a
           href={invite.registrationUrl || '#'}
@@ -1183,7 +1186,10 @@ function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, ticket
   }
   return (
     <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <h2 className="m-0 text-xl font-bold text-foreground">Inscrição</h2>
+      <h2 className="m-0 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        {c.showIcon !== false ? <Ticket className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        Inscrição
+      </h2>
       {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
       {invite.spotsOnLanding ? <SpotsCounter invite={invite} accent={accent} /> : null}
       {guestStatus ? (

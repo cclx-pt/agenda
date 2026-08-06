@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   Calendar, MapPin, Clock, Share2, Copy, Mail, Ticket, Info, Users, CreditCard,
   Check, ExternalLink, HelpCircle, FileText, Sparkles, Car, DoorOpen, Globe,
-  Images, Play, Link as LinkIcon, X, ZoomIn,
+  Images, Play, Link as LinkIcon, Video, List, Presentation, X, ZoomIn,
 } from 'lucide-react'
 import { fmtTime, fmtDateRange, toEmbed, buildIcs, ticketPrice, inviteRsvpHref } from './inviteUtils'
 import { RichText } from './RichText'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
-const titleCls = 'mb-4 text-xl font-bold text-foreground'
 
 // ── Cartões ──────────────────────────────────────────────────────
 
@@ -63,7 +62,7 @@ function OverviewCard({ block }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-xl font-bold text-foreground">
-        <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         {c.title || 'Sobre o evento'}
       </h2>
       {c.body ? (
@@ -81,7 +80,7 @@ function InfoExtraCard({ block }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-2 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-        <Info className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <Info className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         {c.title || 'Informação'}
       </h2>
       {c.body ? <p className="m-0 whitespace-pre-line text-foreground">{c.body}</p> : null}
@@ -106,7 +105,7 @@ function GoodToKnowCard({ block, accent }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
-        <Sparkles className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <Sparkles className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         {c.title || 'Bom saber'}
       </h2>
       {highlights.length > 0 ? (
@@ -154,6 +153,12 @@ function NarrativeCard({ block }) {
   const embed = toEmbed(c.videoUrl)
   return (
     <div className={cardCls}>
+      {c.title ? (
+        <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+          {c.showIcon !== false ? <Video className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+          {c.title}
+        </h2>
+      ) : null}
       {c.narrative ? (
         <RichText
           value={c.narrative}
@@ -197,7 +202,7 @@ function MultimediaCard({ block, accent }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
-        <Images className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <Images className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         {c.title || 'Multimédia'}
       </h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -268,7 +273,10 @@ function SpeakersCard({ block }) {
   if (speakers.length === 0) return null
   return (
     <div className={cardCls}>
-      <h2 className={titleCls}>{c.title || 'Oradores e Convidados'}</h2>
+      <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        {c.showIcon !== false ? <Users className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        {c.title || 'Oradores e Convidados'}
+      </h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {speakers.map((s, i) => (
           <div key={i} className="flex gap-3 rounded-xl border border-border bg-background p-3">
@@ -300,7 +308,10 @@ function AgendaCard({ block, accent }) {
   const day = days[active] || days[0]
   return (
     <div className={cardCls}>
-      <h2 className={titleCls}>{c.title || 'Programa'}</h2>
+      <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        {c.showIcon !== false ? <List className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        {c.title || 'Programa'}
+      </h2>
       {days.length > 1 ? (
         <div className="mb-4 flex flex-wrap gap-2">
           {days.map((d, i) => (
@@ -351,7 +362,16 @@ function WorkshopsCard({ block }) {
   if (items.length === 0) return null
   return (
     <div className={cardCls}>
-      <h2 className={titleCls}>{c.title || 'Workshops'}</h2>
+      <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        {c.showIcon !== false ? <Presentation className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        {c.title || 'Workshops'}
+      </h2>
+      {c.information ? (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p className="m-0 whitespace-pre-line">{c.information}</p>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((w, i) => (
           <div key={i} className="rounded-xl border border-border bg-background p-4">
@@ -389,7 +409,7 @@ function PaymentCard({ block, page, accent }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-        <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         Bilhetes
       </h2>
       {tickets.length > 0 ? (
@@ -451,7 +471,8 @@ function PaymentCard({ block, page, accent }) {
   )
 }
 
-function LocationCard({ page }) {
+function LocationCard({ block, page }) {
+  const c = block.content || {}
   // Morada e link do mapa herdados da página de detalhe (Definições).
   const address = page.invite.location
   const mapUrl = page.invite.mapUrl
@@ -460,7 +481,7 @@ function LocationCard({ page }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-        <MapPin className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <MapPin className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         Localização
       </h2>
       {address ? <p className="m-0 text-foreground">{address}</p> : null}
@@ -481,7 +502,7 @@ function FaqsCard({ block }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-        <HelpCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <HelpCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         {c.title || 'Perguntas frequentes'}
       </h2>
       <div className="flex flex-col gap-3">
@@ -496,7 +517,8 @@ function FaqsCard({ block }) {
   )
 }
 
-function ShareCard({ page, accent }) {
+function ShareCard({ block, page, accent }) {
+  const c = block.content || {}
   const [copied, setCopied] = useState(false)
   const url = typeof window !== 'undefined' ? window.location.href.split('?')[0] : ''
   const text = `${page.invite.title} — ${url}`
@@ -513,7 +535,7 @@ function ShareCard({ page, accent }) {
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-        <Share2 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        {c.showIcon !== false ? <Share2 className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         Partilhar
       </h2>
       <div className="flex flex-wrap gap-2">

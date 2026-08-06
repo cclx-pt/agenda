@@ -156,6 +156,19 @@ function RowsEditor({ rows, onChange, emptyRow, render, addLabel }) {
   )
 }
 
+function OptionsEditor({ options, onChange }) {
+  return (
+    <textarea
+      className={inputCls}
+      rows={3}
+      placeholder="Uma opção por linha"
+      value={(options || []).join('\n')}
+      onChange={(event) => onChange(event.target.value.split('\n'))}
+      onBlur={(event) => onChange(event.target.value.split('\n').map((value) => value.trim()).filter(Boolean))}
+    />
+  )
+}
+
 function BannerEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   return (
@@ -210,6 +223,10 @@ function NarrativeEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   return (
     <div className="flex flex-col gap-2">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Convite" />
+      </label>
       <div className={labelCls}>
         <span>Narrativa</span>
         <RichTextEditor
@@ -319,6 +336,11 @@ function WorkshopsEditor({ content, onChange }) {
         Título
         <input className={inputCls} value={content.title ?? ''} onChange={set('title')} />
       </label>
+      <label className={labelCls}>
+        Informação
+        <textarea className={inputCls} rows={3} value={content.information ?? ''} onChange={set('information')} placeholder="Informação geral sobre os workshops" />
+        <span className="text-xs font-normal text-muted-foreground">Aparece sob o título com um ícone de informação fixo.</span>
+      </label>
       <RowsEditor
         rows={content.items}
         onChange={(items) => onChange({ ...content, items })}
@@ -346,6 +368,18 @@ export function RsvpEditor({ content, onChange, tickets }) {
   const fields = Array.isArray(content.fields) && content.fields.length ? content.fields : DEFAULT_RSVP_FIELDS
   const setFields = (next) => onChange({ ...content, fields: next })
   const updateField = (i, patch) => setFields(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
+  const updateOptions = (i, options) => {
+    const controllerKey = fields[i].key
+    const previousOptions = fields[i].options || []
+    setFields(fields.map((field, index) => {
+      if (index === i) return { ...field, options }
+      if (field.visibleWhen?.field !== controllerKey) return field
+      const currentValue = String(field.visibleWhen.equals ?? '')
+      if (options.includes(currentValue)) return field
+      const previousIndex = previousOptions.indexOf(currentValue)
+      return { ...field, visibleWhen: { ...field.visibleWhen, equals: options[previousIndex] ?? options[0] ?? '' } }
+    }))
+  }
   const removeField = (i) => setFields(fields.filter((_, idx) => idx !== i))
   const moveField = (i, dir) => {
     const j = i + dir
@@ -409,13 +443,7 @@ export function RsvpEditor({ content, onChange, tickets }) {
                   </div>
 
                   {hasOptions(f.type) ? (
-                    <textarea
-                      className={inputCls}
-                      rows={3}
-                      placeholder="Uma opção por linha"
-                      value={(f.options || []).join('\n')}
-                      onChange={(e) => updateField(i, { options: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })}
-                    />
+                    <OptionsEditor options={f.options} onChange={(options) => updateOptions(i, options)} />
                   ) : null}
 
                   {f.type !== 'section' ? (
@@ -469,6 +497,9 @@ export function RsvpEditor({ content, onChange, tickets }) {
                               value={String(f.visibleWhen.equals ?? '')}
                               onChange={(e) => updateField(i, { visibleWhen: { field: f.visibleWhen.field, equals: e.target.value } })}
                             >
+                              {!(ctrl.options || []).includes(String(f.visibleWhen.equals ?? '')) ? (
+                                <option value={String(f.visibleWhen.equals ?? '')}>Valor guardado inválido: {String(f.visibleWhen.equals ?? '') || '(vazio)'}</option>
+                              ) : null}
                               {(ctrl.options || []).map((o) => (
                                 <option key={o} value={o}>
                                   {o}
@@ -745,7 +776,28 @@ const EDITORS = {
   rodape: FooterEditor,
 }
 
+const ICON_TOGGLE_TYPES = new Set([
+  'overview', 'info_extra', 'convite_narrativo', 'multimedia', 'good_to_know',
+  'oradores', 'agenda', 'workshops', 'rsvp', 'pagamento', 'localizacao', 'faqs', 'partilha',
+])
+
 export function BlockEditor({ type, content, onChange }) {
   const Comp = EDITORS[type] || EmptyEditor
-  return <Comp content={content || {}} onChange={onChange} />
+  const value = content || {}
+  return (
+    <div className="flex flex-col gap-3">
+      {ICON_TOGGLE_TYPES.has(type) ? (
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">
+          Mostrar ícone no título
+          <input
+            type="checkbox"
+            checked={value.showIcon !== false}
+            onChange={(e) => onChange({ ...value, showIcon: e.target.checked })}
+            className="h-4 w-4 accent-primary"
+          />
+        </label>
+      ) : null}
+      <Comp content={value} onChange={onChange} />
+    </div>
+  )
 }
