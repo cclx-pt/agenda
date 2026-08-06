@@ -43,6 +43,8 @@ export function defaultContent(type) {
       return { title: 'Programa', days: [], showIcon: true }
     case 'workshops':
       return { title: 'Workshops', information: '', items: [], showIcon: true }
+    case 'pagamento':
+      return { information: '', showIcon: true }
     case 'localizacao':
       return { address: '', directionsUrl: '' }
     case 'faqs':

@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BlockEditor } from '../components/invite/InviteBlockEditors'
+import { PaymentCard } from '../components/invite/InviteCards'
 import { RsvpCard } from '../components/invite/InvitePage'
+import { shouldShowRsvpTeaser } from '../components/invite/inviteUtils'
 import { uploadEventImage, uploadMultimediaVideo } from '../services/eventsService'
 
 vi.mock('../services/eventsService', () => ({
@@ -44,6 +46,32 @@ describe('InviteBlockEditors uploads', () => {
       ...content,
       items: [{ ...content.items[0], url: 'https://storage.example/video.mp4' }],
     })
+  })
+
+  it('edits and displays ticket information', async () => {
+    const onChange = vi.fn()
+    const information = 'Inclui almoço e materiais.'
+    function Harness() {
+      const [content, setContent] = useState({})
+      const update = (nextContent) => {
+        setContent(nextContent)
+        onChange(nextContent)
+      }
+      return <BlockEditor type="pagamento" content={content} onChange={update} />
+    }
+    const { rerender } = render(<Harness />)
+
+    await userEvent.type(screen.getByPlaceholderText('Informação geral sobre os bilhetes'), information)
+    expect(onChange).toHaveBeenLastCalledWith({ information })
+
+    rerender(
+      <PaymentCard
+        block={{ content: { information } }}
+        page={{ invite: { registrationMode: 'none' }, tickets: [] }}
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByText(information)).toBeInTheDocument()
   })
 
   it('keeps Enter as a new dropdown option', async () => {
@@ -102,5 +130,14 @@ describe('InviteBlockEditors uploads', () => {
 
     expect(screen.getByText('Voluntários')).toBeInTheDocument()
     expect(screen.getByLabelText('Equipa pretendida')).toBeInTheDocument()
+  })
+
+  it('shows the registration block with tickets only when information is filled', () => {
+    const tickets = [{ id: 'ticket-1' }]
+
+    expect(shouldShowRsvpTeaser({ content: {} }, tickets)).toBe(false)
+    expect(shouldShowRsvpTeaser({ content: { infoText: '  ' } }, tickets)).toBe(false)
+    expect(shouldShowRsvpTeaser({ content: { infoText: 'Informação importante' } }, tickets)).toBe(true)
+    expect(shouldShowRsvpTeaser({ content: {} }, [])).toBe(true)
   })
 })

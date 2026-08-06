@@ -362,6 +362,22 @@ function WorkshopsEditor({ content, onChange }) {
   )
 }
 
+function PaymentEditor({ content, onChange }) {
+  return (
+    <label className={labelCls}>
+      Informação
+      <textarea
+        className={inputCls}
+        rows={3}
+        value={content.information ?? ''}
+        onChange={(event) => onChange({ ...content, information: event.target.value })}
+        placeholder="Informação geral sobre os bilhetes"
+      />
+      <span className="text-xs font-normal text-muted-foreground">Aparece sob o título com um ícone de informação fixo.</span>
+    </label>
+  )
+}
+
 export function RsvpEditor({ content, onChange, tickets }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   const ticketOptions = (tickets || []).filter((t) => t.id && (t.name || '').trim())
@@ -771,6 +787,7 @@ const EDITORS = {
   agenda: AgendaEditor,
   workshops: WorkshopsEditor,
   rsvp: RsvpEditor,
+  pagamento: PaymentEditor,
   localizacao: LocationEditor,
   faqs: FaqsEditor,
   rodape: FooterEditor,

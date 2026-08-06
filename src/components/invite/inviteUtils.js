@@ -46,6 +46,11 @@ export function inviteHomeHref(slug) {
   return g ? `${base}?g=${encodeURIComponent(g)}` : base
 }
 
+export function shouldShowRsvpTeaser(block, tickets) {
+  const hasInformation = Boolean(block.content?.infoText?.trim())
+  return !tickets?.length || hasInformation
+}
+
 // Rótulo de preço/tipo de um bilhete (lista "Custo" + seletor).
 export function ticketPrice(t) {
   if (!t) return ''

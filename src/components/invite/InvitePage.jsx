@@ -6,7 +6,7 @@ import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, MultimediaCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
-import { fmtDateRange, inviteRsvpHref, inviteHomeHref, ticketPrice } from './inviteUtils'
+import { fmtDateRange, inviteRsvpHref, inviteHomeHref, shouldShowRsvpTeaser, ticketPrice } from './inviteUtils'
 import {
   getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople, countChildren,
 } from './inviteFormFields'
@@ -1369,8 +1369,8 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
           if (block.type === 'rsvp') {
             // Quando há bilhetes, o bloco "Bilhetes" (Custo) já lista os bilhetes com o
             // botão "Inscrever-me" → não mostramos a secção redundante "Inscrição / Escolhe
-            // o teu bilhete" na landing. Sem bilhetes, mantém-se (é o único CTA de inscrição).
-            if ((page.tickets || []).length > 0) return null
+            // o teu bilhete" na landing. Informação própria força a apresentação do bloco.
+            if (!shouldShowRsvpTeaser(block, page.tickets)) return null
             return (
               <RsvpTeaser
                 key={block.id}

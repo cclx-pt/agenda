@@ -412,6 +412,12 @@ function PaymentCard({ block, page, accent }) {
         {c.showIcon !== false ? <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
         Bilhetes
       </h2>
+      {c.information ? (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p className="m-0 whitespace-pre-line">{c.information}</p>
+        </div>
+      ) : null}
       {tickets.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {tickets.map((t) => {
