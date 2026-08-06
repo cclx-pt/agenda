@@ -3,7 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BlockEditor } from '../components/invite/InviteBlockEditors'
-import { PaymentCard } from '../components/invite/InviteCards'
+import {
+  AgendaCard,
+  FaqsCard,
+  GoodToKnowCard,
+  LocationCard,
+  MultimediaCard,
+  OverviewCard,
+  PaymentCard,
+  SpeakersCard,
+  WorkshopsCard,
+} from '../components/invite/InviteCards'
 import { RsvpCard } from '../components/invite/InvitePage'
 import { shouldShowRsvpTeaser } from '../components/invite/inviteUtils'
 import { uploadEventImage, uploadMultimediaVideo } from '../services/eventsService'
@@ -139,5 +149,36 @@ describe('InviteBlockEditors uploads', () => {
     expect(shouldShowRsvpTeaser({ content: { infoText: '  ' } }, tickets)).toBe(false)
     expect(shouldShowRsvpTeaser({ content: { infoText: 'Informação importante' } }, tickets)).toBe(true)
     expect(shouldShowRsvpTeaser({ content: {} }, [])).toBe(true)
+  })
+
+  it('renders visible landing blocks even when they have no content', () => {
+    const emptyBlock = { content: {} }
+    const page = { invite: {} }
+
+    render(
+      <>
+        <OverviewCard block={emptyBlock} />
+        <GoodToKnowCard block={emptyBlock} accent="#1F3864" />
+        <MultimediaCard block={emptyBlock} accent="#1F3864" />
+        <SpeakersCard block={emptyBlock} />
+        <AgendaCard block={emptyBlock} accent="#1F3864" />
+        <WorkshopsCard block={emptyBlock} />
+        <LocationCard block={emptyBlock} page={page} />
+        <FaqsCard block={emptyBlock} />
+      </>,
+    )
+
+    for (const heading of [
+      'Sobre o evento',
+      'Bom saber',
+      'Multimédia',
+      'Oradores e Convidados',
+      'Programa',
+      'Workshops',
+      'Localização',
+      'Perguntas frequentes',
+    ]) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
   })
 })

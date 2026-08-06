@@ -58,7 +58,6 @@ function BannerCard({ block, page, accent }) {
 
 function OverviewCard({ block }) {
   const c = block.content || {}
-  if (!c.title && !c.body) return null
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -101,7 +100,6 @@ function GoodToKnowCard({ block, accent }) {
     c.doorTime ? { icon: DoorOpen, label: 'Abertura de portas', value: c.doorTime } : null,
     c.parkingInfo ? { icon: Car, label: 'Estacionamento', value: c.parkingInfo } : null,
   ].filter(Boolean)
-  if (highlights.length === 0 && tiles.length === 0 && items.length === 0) return null
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -198,7 +196,6 @@ function MultimediaCard({ block, accent }) {
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [expandedImage])
-  if (items.length === 0) return null
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -270,7 +267,6 @@ function MediaText({ item, fallback = '' }) {
 function SpeakersCard({ block }) {
   const c = block.content || {}
   const speakers = (c.speakers || []).filter((s) => s.name && s.bio)
-  if (speakers.length === 0) return null
   return (
     <div className={cardCls}>
       <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -304,8 +300,7 @@ function AgendaCard({ block, accent }) {
   // Suporta estrutura por dias (days[]) ou lista simples (items[]).
   const days = c.days || (c.items ? [{ label: null, items: c.items }] : [])
   const [active, setActive] = useState(0)
-  if (days.length === 0) return null
-  const day = days[active] || days[0]
+  const day = days[active] || days[0] || { items: [] }
   return (
     <div className={cardCls}>
       <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -359,7 +354,6 @@ function AgendaCard({ block, accent }) {
 function WorkshopsCard({ block }) {
   const c = block.content || {}
   const items = c.items || []
-  if (items.length === 0) return null
   return (
     <div className={cardCls}>
       <h2 className="mb-4 inline-flex items-center gap-2 text-xl font-bold text-foreground">
@@ -482,7 +476,6 @@ function LocationCard({ block, page }) {
   // Morada e link do mapa herdados da página de detalhe (Definições).
   const address = page.invite.location
   const mapUrl = page.invite.mapUrl
-  if (!address && !mapUrl) return null
   const directions = mapUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
   return (
     <div className={cardCls}>
@@ -504,7 +497,6 @@ function LocationCard({ block, page }) {
 function FaqsCard({ block }) {
   const c = block.content || {}
   const items = (c.items || []).filter((f) => f.question && f.answer)
-  if (items.length === 0) return null
   return (
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
