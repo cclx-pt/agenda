@@ -16,7 +16,6 @@ import {
   WorkshopsCard,
 } from '../components/invite/InviteCards'
 import { BannerRegistrationAction, RsvpCard } from '../components/invite/InvitePage'
-import { shouldShowRsvpTeaser } from '../components/invite/inviteUtils'
 import { uploadEventImage, uploadMultimediaVideo } from '../services/eventsService'
 
 vi.mock('../services/eventsService', () => ({
@@ -207,15 +206,6 @@ describe('InviteBlockEditors uploads', () => {
 
     expect(screen.getByText('Voluntários')).toBeInTheDocument()
     expect(screen.getByLabelText('Equipa pretendida')).toBeInTheDocument()
-  })
-
-  it('shows the registration block with tickets only when information is filled', () => {
-    const tickets = [{ id: 'ticket-1' }]
-
-    expect(shouldShowRsvpTeaser({ content: {} }, tickets)).toBe(false)
-    expect(shouldShowRsvpTeaser({ content: { infoText: '  ' } }, tickets)).toBe(false)
-    expect(shouldShowRsvpTeaser({ content: { infoText: 'Informação importante' } }, tickets)).toBe(true)
-    expect(shouldShowRsvpTeaser({ content: {} }, [])).toBe(true)
   })
 
   it('renders visible landing blocks even when they have no content', () => {

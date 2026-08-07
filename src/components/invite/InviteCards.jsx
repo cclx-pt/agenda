@@ -57,7 +57,7 @@ function BannerCard({ block, page, accent, children, showInformation = false }) 
             </span>
           ) : null}
         </div>
-        {children ? <div className="mt-5">{children}</div> : null}
+        {children ? <div className="mt-5 flex flex-col gap-3">{children}</div> : null}
       </div>
     </div>
   )

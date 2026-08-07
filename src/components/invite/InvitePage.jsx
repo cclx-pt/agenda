@@ -6,7 +6,7 @@ import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, MultimediaCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
   PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
-import { fmtDateRange, inviteRsvpHref, inviteHomeHref, shouldShowRsvpTeaser, ticketPrice } from './inviteUtils'
+import { fmtDateRange, inviteRsvpHref, inviteHomeHref, ticketPrice } from './inviteUtils'
 import {
   getFormFields, visibleKeys, initialValues, validateFields, buildSubmission, countPeople, countChildren,
 } from './inviteFormFields'
@@ -187,8 +187,14 @@ function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe 
   )
 }
 
-export function BannerRegistrationAction({ block, invite, tickets, slug, accent }) {
+export function BannerRegistrationAction({ block, invite, tickets, slug, accent, guestStatus, preview = false }) {
   const [choosingTicket, setChoosingTicket] = useState(false)
+  const [deadlinePassed] = useState(
+    () => !preview && Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline)
+  )
+  const [notOpenYet] = useState(
+    () => !preview && Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime)
+  )
   const content = block.content || {}
   const mode = invite.registrationMode || 'internal'
   if (mode === 'none') return null
@@ -205,12 +211,19 @@ export function BannerRegistrationAction({ block, invite, tickets, slug, accent 
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inscrição</span>
-        <span className="font-bold text-foreground">{ctaText(content)}</span>
+        <span className="font-bold text-foreground">{guestStatus ? 'Ver / gerir a minha inscrição' : ctaText(content)}</span>
       </span>
       <ArrowRight className="h-5 w-5 flex-shrink-0" style={{ color: accent }} aria-hidden="true" />
     </>
   )
 
+  if (mode === 'internal' && !guestStatus && (deadlinePassed || notOpenYet)) {
+    return (
+      <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+        {deadlinePassed ? 'O prazo de inscrição terminou.' : 'As inscrições ainda não abriram.'}
+      </p>
+    )
+  }
   if (hasTickets && choosingTicket) {
     return (
       <TicketChooser
@@ -221,7 +234,7 @@ export function BannerRegistrationAction({ block, invite, tickets, slug, accent 
       />
     )
   }
-  if (hasTickets) {
+  if (hasTickets && !guestStatus) {
     return (
       <button type="button" onClick={() => setChoosingTicket(true)} className={buttonClass} style={{ borderColor: accent }}>
         {buttonContent}
@@ -1208,76 +1221,6 @@ function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpda
   )
 }
 
-// Bloco de inscrição na LANDING: contador de vagas + botão que leva à página
-// dedicada de inscrição (em vez do formulário inline).
-function RsvpTeaser({ block, invite, accent, guestStatus, rsvpHref, slug, tickets, preview = false }) {
-  const c = block.content || {}
-  // Em pré-visualização, ignora prazo/abertura para mostrar sempre o CTA/bilhetes.
-  const [deadlinePassed] = useState(() => !preview && Boolean(invite.rsvpDeadline) && Date.now() > Date.parse(invite.rsvpDeadline))
-  const [notOpenYet] = useState(() => !preview && Boolean(invite.rsvpStartDatetime) && Date.now() < Date.parse(invite.rsvpStartDatetime))
-  const mode = invite.registrationMode || 'internal'
-  if (mode === 'none') return null
-  if (mode === 'external') {
-    return (
-      <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="m-0 inline-flex items-center gap-2 text-xl font-bold text-foreground">
-          {c.showIcon !== false ? <Ticket className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
-          Inscrição
-        </h2>
-        {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
-        <a
-          href={invite.registrationUrl || '#'}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex w-fit items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-          style={{ backgroundColor: accent }}
-        >
-          <Ticket className="h-4 w-4" aria-hidden="true" />
-          {ctaText(c)}
-        </a>
-      </div>
-    )
-  }
-  return (
-    <div id="inscricoes" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <h2 className="m-0 inline-flex items-center gap-2 text-xl font-bold text-foreground">
-        {c.showIcon !== false ? <Ticket className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
-        Inscrição
-      </h2>
-      {c.infoText ? <p className="m-0 text-sm text-muted-foreground">{c.infoText}</p> : null}
-      {invite.spotsOnLanding ? <SpotsCounter invite={invite} accent={accent} /> : null}
-      {guestStatus ? (
-        <>
-          <StatusCard status={guestStatus} />
-          <a href={rsvpHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: accent }}>
-            Ver / gerir a minha inscrição
-          </a>
-        </>
-      ) : deadlinePassed ? (
-        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
-      ) : notOpenYet ? (
-        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
-      ) : tickets && tickets.length ? (
-        <TicketChooser
-          tickets={tickets}
-          accent={accent}
-          hrefFor={(t) => inviteRsvpHref(slug, t.id)}
-          heading={c.ticketHeading || 'Escolhe o teu bilhete'}
-        />
-      ) : (
-        <a
-          href={rsvpHref}
-          className="inline-flex w-fit items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-          style={{ backgroundColor: accent }}
-        >
-          <Ticket className="h-4 w-4" aria-hidden="true" />
-          {ctaText(c)}
-        </a>
-      )}
-    </div>
-  )
-}
-
 export default function InvitePage({ slug, view = 'landing', previewId = null }) {
   const [state, setState] = useState({ loading: true, error: null, page: null })
   const [guestStatus, setGuestStatus] = useState(null)
@@ -1345,7 +1288,6 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
     }
   }
 
-  const rsvpHref = inviteRsvpHref(slug)
   const homeHref = inviteHomeHref(slug)
 
   // Página dedicada de inscrição (/invite/<slug>/inscricao): cabeçalho compacto,
@@ -1421,35 +1363,24 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
         {guestStatus ? <StatusCard status={guestStatus} /> : null}
         {page.blocks.map((block) => {
           if (block.type === 'rsvp') {
-            // Quando há bilhetes, o bloco "Bilhetes" (Custo) já lista os bilhetes com o
-            // botão "Inscrever-me" → não mostramos a secção redundante "Inscrição / Escolhe
-            // o teu bilhete" na landing. Informação própria força a apresentação do bloco.
-            if (!shouldShowRsvpTeaser(block, page.tickets)) return null
-            return (
-              <RsvpTeaser
-                key={block.id}
-                block={block}
-                invite={page.invite}
-                accent={accent}
-                guestStatus={guestStatus}
-                rsvpHref={rsvpHref}
-                slug={slug}
-                tickets={page.tickets}
-                preview={page.preview}
-              />
-            )
+            // O RSVP configura o formulário e só aparece na página dedicada de inscrição.
+            // Na landing, o CTA e a escolha de bilhete pertencem ao banner.
+            return null
           }
           const Comp = BLOCK_COMPONENTS[block.type]
           if (!Comp) return null
           if (block.type === 'banner' || block.type === 'cabecalho') {
             return (
               <Comp key={block.id} block={block} page={page} accent={accent} showInformation>
+                {page.invite.spotsOnLanding ? <SpotsCounter invite={page.invite} accent={accent} /> : null}
                 <BannerRegistrationAction
                   block={block}
                   invite={page.invite}
                   tickets={page.tickets}
                   slug={slug}
                   accent={accent}
+                  guestStatus={guestStatus}
+                  preview={page.preview}
                 />
               </Comp>
             )
