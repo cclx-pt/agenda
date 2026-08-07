@@ -69,6 +69,64 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;')
 }
 
+function campaignBlockHtml(block) {
+  if (block.type === 'text') {
+    return `<p style="margin:0 0 16px;color:#374151;line-height:1.65;white-space:pre-line">${escapeHtml(block.text)}</p>`
+  }
+  if (block.type === 'image') {
+    return `<img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt)}" style="display:block;width:100%;max-width:560px;height:auto;margin:0 0 18px;border-radius:8px" />`
+  }
+  if (block.type === 'video') {
+    return `<p style="margin:0 0 18px"><a href="${escapeHtml(block.url)}" style="color:#1f3864;font-weight:700">Ver vídeo: ${escapeHtml(block.title || block.url)}</a></p>`
+  }
+  if (block.type === 'button') {
+    return `<p style="margin:20px 0"><a href="${escapeHtml(block.url)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700">${escapeHtml(block.label)}</a></p>`
+  }
+  if (block.type === 'warning') {
+    return `<div style="margin:0 0 18px;padding:14px;background:#fef3c7;border-left:4px solid #d97706;color:#78350f"><strong>Aviso</strong><br />${escapeHtml(block.text)}</div>`
+  }
+  if (block.type === 'workshops') {
+    return `<div style="margin:0 0 18px"><h3 style="margin:0 0 10px;color:#1f2937">Workshops</h3>${block.items
+      .map((item) => `<div style="padding:10px 0;border-top:1px solid #e5e7eb"><strong>${escapeHtml(item.title)}</strong>${item.description ? `<p style="margin:4px 0 0;color:#4b5563">${escapeHtml(item.description)}</p>` : ''}</div>`)
+      .join('')}</div>`
+  }
+  return ''
+}
+
+export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, preheader, blocks, eventLink }) {
+  const greeting = recipientName ? `Olá ${recipientName},` : 'Olá,'
+  const content = Array.isArray(blocks) ? blocks : []
+  const textBlocks = content.map((block) => {
+    if (block.type === 'text' || block.type === 'warning') return block.text
+    if (block.type === 'image') return block.alt ? `${block.alt}: ${block.url}` : block.url
+    if (block.type === 'video') return `${block.title || 'Ver vídeo'}: ${block.url}`
+    if (block.type === 'button') return `${block.label}: ${block.url}`
+    if (block.type === 'workshops') return `Workshops:\n${block.items.map((item) => `- ${item.title}${item.description ? `: ${item.description}` : ''}`).join('\n')}`
+    return ''
+  }).filter(Boolean)
+  const text = `${greeting}\n\n${textBlocks.join('\n\n')}\n\nVer convite: ${eventLink}\n\nAgenda CCLX`
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+      ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</div>` : ''}
+      <p style="margin:0 0 16px">${escapeHtml(greeting)}</p>
+      ${content.map(campaignBlockHtml).join('')}
+      <p style="margin:24px 0 8px"><a href="${escapeHtml(eventLink)}" style="color:#1f3864;font-weight:700">Ver ${escapeHtml(eventTitle || 'convite')}</a></p>
+      <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Comunicação operacional relativa à sua inscrição · Agenda CCLX</p>
+    </div>`
+  return { subject, text, html }
+}
+
+export async function sendInviteCampaignEmail(to, data) {
+  const message = renderInviteCampaignEmail(data)
+  const tx = getTransporter()
+  if (!tx) {
+    console.log(`\n[email:mock] Comunicação de convite para: ${to}\n[email:mock] Assunto: ${message.subject}\n`)
+    return { mocked: true }
+  }
+  await tx.sendMail({ from: config.smtp.from, to, ...message })
+  return { mocked: false }
+}
+
 // Confirmação de inscrição enviada ao convidado, com o link pessoal (?g=) para
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(

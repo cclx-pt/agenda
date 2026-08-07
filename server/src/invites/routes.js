@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js'
 import * as service from './service.js'
 import { InviteError } from './service.js'
 import * as payments from './payments/service.js'
+import * as campaigns from './campaigns/service.js'
 import { uploadImage, isStorageConfigured } from '../storage/supabase.js'
 
 // Envolve handlers async: erros de domínio/validação viram respostas HTTP.
@@ -59,6 +60,11 @@ invitesRouter.param('id', (req, res, next, id) => {
 
 invitesRouter.param('guestId', (req, res, next, id) => {
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Inscrição não encontrada.' })
+  next()
+})
+
+invitesRouter.param('campaignId', (req, res, next, id) => {
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Comunicação não encontrada.' })
   next()
 })
 
@@ -142,6 +148,40 @@ invitesRouter.get(
     res.json({ guests: await service.listGuests(req.user, req.params.id) })
   })
 )
+
+// ── Comunicações operacionais por email ────────────────────────
+invitesRouter.get('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ campaigns: await campaigns.list(req.user, req.params.id) })
+}))
+
+invitesRouter.post('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
+  res.status(201).json({ campaign: await campaigns.create(req.user, req.params.id, req.body) })
+}))
+
+invitesRouter.post('/:id/campaigns/audience-preview', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ audience: await campaigns.previewAudience(req.user, req.params.id, req.body) })
+}))
+
+invitesRouter.get('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ campaign: await campaigns.find(req.user, req.params.id, req.params.campaignId) })
+}))
+
+invitesRouter.put('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ campaign: await campaigns.update(req.user, req.params.id, req.params.campaignId, req.body) })
+}))
+
+invitesRouter.delete('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async (req, res) => {
+  await campaigns.remove(req.user, req.params.id, req.params.campaignId)
+  res.json({ ok: true })
+}))
+
+invitesRouter.post('/:id/campaigns/:campaignId/test', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ result: await campaigns.sendTest(req.user, req.params.id, req.params.campaignId, req.body) })
+}))
+
+invitesRouter.post('/:id/campaigns/:campaignId/send', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ campaign: await campaigns.send(req.user, req.params.id, req.params.campaignId) })
+}))
 
 // Edita uma inscrição (nome/email/telemóvel/estado).
 invitesRouter.put(

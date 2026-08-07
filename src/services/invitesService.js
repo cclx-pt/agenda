@@ -85,6 +85,41 @@ export async function listInviteGuests(id) {
   return guests
 }
 
+// ── Comunicações operacionais por email ────────────────────────
+export async function listInviteCampaigns(inviteId) {
+  const { campaigns } = await request(`/data/invites/${inviteId}/campaigns`)
+  return campaigns
+}
+
+export async function createInviteCampaign(inviteId, payload) {
+  const { campaign } = await request(`/data/invites/${inviteId}/campaigns`, { method: 'POST', body: payload })
+  return campaign
+}
+
+export async function updateInviteCampaign(inviteId, campaignId, payload) {
+  const { campaign } = await request(`/data/invites/${inviteId}/campaigns/${campaignId}`, { method: 'PUT', body: payload })
+  return campaign
+}
+
+export async function deleteInviteCampaign(inviteId, campaignId) {
+  await request(`/data/invites/${inviteId}/campaigns/${campaignId}`, { method: 'DELETE' })
+}
+
+export async function previewInviteCampaignAudience(inviteId, audience) {
+  const { audience: result } = await request(`/data/invites/${inviteId}/campaigns/audience-preview`, { method: 'POST', body: audience })
+  return result
+}
+
+export async function testInviteCampaign(inviteId, campaignId, email, name = '') {
+  const { result } = await request(`/data/invites/${inviteId}/campaigns/${campaignId}/test`, { method: 'POST', body: { email, name } })
+  return result
+}
+
+export async function sendInviteCampaign(inviteId, campaignId) {
+  const { campaign } = await request(`/data/invites/${inviteId}/campaigns/${campaignId}/send`, { method: 'POST' })
+  return campaign
+}
+
 // Gestão de uma inscrição (organizador).
 export async function updateInviteGuest(inviteId, guestId, payload) {
   const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'PUT', body: payload })

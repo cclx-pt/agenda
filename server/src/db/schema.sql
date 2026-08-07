@@ -424,6 +424,51 @@ CREATE TABLE IF NOT EXISTS invite_guests (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_guests_invite ON invite_guests (invite_id);
 
+-- Campanhas operacionais de email associadas a um convite. O conteúdo e o filtro
+-- de audiência ficam em JSONB; depois do envio funcionam como snapshot imutável.
+CREATE TABLE IF NOT EXISTS invite_campaigns (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id       UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  type            TEXT NOT NULL DEFAULT 'update'
+                    CHECK (type IN ('update', 'warning', 'reminder', 'post_event')),
+  name            TEXT NOT NULL,
+  subject         TEXT NOT NULL,
+  preheader       TEXT,
+  blocks          JSONB NOT NULL DEFAULT '[]'::jsonb,
+  audience        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status          TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft', 'sending', 'sent', 'failed')),
+  recipient_count INTEGER NOT NULL DEFAULT 0,
+  sent_count      INTEGER NOT NULL DEFAULT 0,
+  failed_count    INTEGER NOT NULL DEFAULT 0,
+  skipped_count   INTEGER NOT NULL DEFAULT 0,
+  created_by      UUID REFERENCES users (id) ON DELETE SET NULL,
+  sent_at         TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_campaigns_invite
+  ON invite_campaigns (invite_id, created_at DESC);
+
+-- Audiência materializada no início do envio. Preserva quem recebeu, mesmo que a
+-- inscrição ou o email sejam alterados posteriormente.
+CREATE TABLE IF NOT EXISTS invite_campaign_recipients (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id    UUID NOT NULL REFERENCES invite_campaigns (id) ON DELETE CASCADE,
+  guest_id       UUID REFERENCES invite_guests (id) ON DELETE SET NULL,
+  name           TEXT,
+  email          TEXT NOT NULL,
+  guest_token    TEXT,
+  status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+  error          TEXT,
+  sent_at        TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (campaign_id, email)
+);
+CREATE INDEX IF NOT EXISTS idx_invite_campaign_recipients_campaign
+  ON invite_campaign_recipients (campaign_id, status);
+
 -- Visualizações da página (métricas simples; fire-and-forget no pedido público).
 CREATE TABLE IF NOT EXISTS invite_page_views (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
