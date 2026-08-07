@@ -11,7 +11,7 @@ const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 
 // ── Cartões ──────────────────────────────────────────────────────
 
-function BannerCard({ block, page, accent }) {
+function BannerCard({ block, page, accent, children, showInformation = false }) {
   const c = block.content || {}
   const inv = page.invite
   const image = c.imageUrl || inv.bannerUrl
@@ -50,7 +50,14 @@ function BannerCard({ block, page, accent }) {
               Ver no Google Maps
             </a>
           ) : null}
+          {showInformation && c.information?.trim() ? (
+            <span className="inline-flex items-start gap-2 text-foreground">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: accent }} aria-hidden="true" />
+              <span className="whitespace-pre-line">{c.information}</span>
+            </span>
+          ) : null}
         </div>
+        {children ? <div className="mt-5">{children}</div> : null}
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { BlockEditor } from '../components/invite/InviteBlockEditors'
 import {
   AgendaCard,
+  BannerCard,
   FaqsCard,
   GoodToKnowCard,
   LocationCard,
@@ -14,7 +15,7 @@ import {
   SpeakersCard,
   WorkshopsCard,
 } from '../components/invite/InviteCards'
-import { RsvpCard } from '../components/invite/InvitePage'
+import { BannerRegistrationAction, RsvpCard } from '../components/invite/InvitePage'
 import { shouldShowRsvpTeaser } from '../components/invite/inviteUtils'
 import { uploadEventImage, uploadMultimediaVideo } from '../services/eventsService'
 
@@ -82,6 +83,72 @@ describe('InviteBlockEditors uploads', () => {
       />,
     )
     expect(screen.getByText(information)).toBeInTheDocument()
+  })
+
+  it('edits and displays banner information only when filled', async () => {
+    const onChange = vi.fn()
+    const information = 'Entrada a partir das 18h30.'
+    function Harness() {
+      const [content, setContent] = useState({})
+      const update = (nextContent) => {
+        setContent(nextContent)
+        onChange(nextContent)
+      }
+      return <BlockEditor type="banner" content={content} onChange={update} />
+    }
+    const editor = render(<Harness />)
+
+    await userEvent.type(screen.getByPlaceholderText('Informação adicional apresentada no cabeçalho'), information)
+    expect(onChange).toHaveBeenLastCalledWith({ information })
+    editor.unmount()
+
+    const page = { invite: { title: 'Conferência' } }
+    const { rerender } = render(<BannerCard block={{ content: {} }} page={page} accent="#1F3864" showInformation />)
+    expect(screen.queryByText(information)).not.toBeInTheDocument()
+    rerender(<BannerCard block={{ content: { information } }} page={page} accent="#1F3864" showInformation />)
+    expect(screen.getByText(information)).toBeInTheDocument()
+  })
+
+  it('expands banner tickets and keeps direct internal and external flows', async () => {
+    const block = { content: { ctaLabel: 'Garantir lugar' } }
+    const ticket = { id: 'ticket-1', name: 'Bilhete geral', kind: 'gratis', active: true }
+    const { rerender } = render(
+      <BannerRegistrationAction
+        block={block}
+        invite={{ registrationMode: 'internal' }}
+        tickets={[ticket]}
+        slug="conferencia"
+        accent="#1F3864"
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /Garantir lugar/i }))
+    expect(screen.getByRole('link', { name: /Bilhete geral/i })).toHaveAttribute(
+      'href',
+      '/invite/conferencia/inscricao?ticket=ticket-1',
+    )
+
+    rerender(
+      <BannerRegistrationAction
+        block={block}
+        invite={{ registrationMode: 'internal' }}
+        tickets={[]}
+        slug="conferencia"
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByRole('link', { name: /Garantir lugar/i })).toHaveAttribute('href', '/invite/conferencia/inscricao')
+
+    rerender(
+      <BannerRegistrationAction
+        block={block}
+        invite={{ registrationMode: 'external', registrationUrl: 'https://forms.example/register' }}
+        tickets={[ticket]}
+        slug="conferencia"
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByRole('link', { name: /Garantir lugar/i })).toHaveAttribute('href', 'https://forms.example/register')
   })
 
   it('keeps Enter as a new dropdown option', async () => {

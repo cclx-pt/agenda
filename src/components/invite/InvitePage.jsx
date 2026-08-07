@@ -187,6 +187,60 @@ function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe 
   )
 }
 
+export function BannerRegistrationAction({ block, invite, tickets, slug, accent }) {
+  const [choosingTicket, setChoosingTicket] = useState(false)
+  const content = block.content || {}
+  const mode = invite.registrationMode || 'internal'
+  if (mode === 'none') return null
+
+  const activeTickets = (tickets || []).filter((ticket) => ticket.active !== false)
+  const hasTickets = mode === 'internal' && activeTickets.length > 0
+  const href = mode === 'external' ? invite.registrationUrl || '#' : inviteRsvpHref(slug)
+  const buttonClass =
+    'relative flex w-full items-center gap-3 overflow-hidden rounded-lg border-2 border-dashed bg-background px-5 py-3 text-left shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
+  const buttonContent = (
+    <>
+      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: accent }}>
+        <Ticket className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inscrição</span>
+        <span className="font-bold text-foreground">{ctaText(content)}</span>
+      </span>
+      <ArrowRight className="h-5 w-5 flex-shrink-0" style={{ color: accent }} aria-hidden="true" />
+    </>
+  )
+
+  if (hasTickets && choosingTicket) {
+    return (
+      <TicketChooser
+        tickets={activeTickets}
+        accent={accent}
+        hrefFor={(ticket) => inviteRsvpHref(slug, ticket.id)}
+        heading={content.ticketHeading || 'Escolhe o teu bilhete'}
+      />
+    )
+  }
+  if (hasTickets) {
+    return (
+      <button type="button" onClick={() => setChoosingTicket(true)} className={buttonClass} style={{ borderColor: accent }}>
+        {buttonContent}
+      </button>
+    )
+  }
+  return (
+    <a
+      href={href}
+      target={mode === 'external' ? '_blank' : undefined}
+      rel={mode === 'external' ? 'noreferrer' : undefined}
+      className={buttonClass}
+      style={{ borderColor: accent }}
+    >
+      {buttonContent}
+    </a>
+  )
+}
+
 // Secção de membros (bilhete de família ou grupo): nome, idade e — se a pessoa
 // tiver menos de 11 anos — uma observação / necessidade especial.
 function MembersSection({ title, members, setMembers, max, inputCls }) {
@@ -1387,6 +1441,19 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
           }
           const Comp = BLOCK_COMPONENTS[block.type]
           if (!Comp) return null
+          if (block.type === 'banner' || block.type === 'cabecalho') {
+            return (
+              <Comp key={block.id} block={block} page={page} accent={accent} showInformation>
+                <BannerRegistrationAction
+                  block={block}
+                  invite={page.invite}
+                  tickets={page.tickets}
+                  slug={slug}
+                  accent={accent}
+                />
+              </Comp>
+            )
+          }
           if (block.type === 'pagamento') {
             return (
               <div key={block.id} className="flex flex-col gap-4">

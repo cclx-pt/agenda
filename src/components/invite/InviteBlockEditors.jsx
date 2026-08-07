@@ -174,6 +174,16 @@ function BannerEditor({ content, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label className={labelCls}>
+        Informação
+        <textarea
+          className={inputCls}
+          rows={3}
+          value={content.information ?? ''}
+          onChange={set('information')}
+          placeholder="Informação adicional apresentada no cabeçalho"
+        />
+      </label>
+      <label className={labelCls}>
         Texto do botão
         <input className={inputCls} value={content.ctaLabel ?? ''} onChange={set('ctaLabel')} placeholder="Inscrever-me" />
       </label>
