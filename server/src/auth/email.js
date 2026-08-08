@@ -127,31 +127,38 @@ export async function sendInviteCampaignEmail(to, data) {
   return { mocked: false }
 }
 
+export function formatInviteDateRange(start, end) {
+  if (!start) return ''
+  const startDate = new Date(start)
+  if (Number.isNaN(startDate.getTime())) return ''
+  const options = { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Lisbon' }
+  const startText = startDate.toLocaleDateString('pt-PT', options)
+  if (!end) return startText
+  const endDate = new Date(end)
+  if (Number.isNaN(endDate.getTime())) return startText
+  const dayKey = (date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'Europe/Lisbon',
+    }).format(date)
+  if (dayKey(startDate) === dayKey(endDate)) return startText
+  return `${startText} – ${endDate.toLocaleDateString('pt-PT', options)}`
+}
+
 // Confirmação de inscrição enviada ao convidado, com o link pessoal (?g=) para
 // consultar/atualizar o estado. Sem SMTP configurado, imprime na consola (dev).
 export async function sendRsvpConfirmationEmail(
   to,
-  { name, eventTitle, when, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket, data, manage }
+  { name, eventTitle, when, whenEnd, location, statusMessage, link, uniqueLink, code, bannerUrl, qrUrl, ticket, data, manage }
 ) {
   const title = eventTitle || 'Evento'
   const subject = `Inscrição registada — ${title}`
   const appBase = (config.appUrl || '').replace(/\/+$/, '')
   const bilheteLink = uniqueLink || link
   const bannerSrc = bannerUrl ? (bannerUrl.startsWith('http') ? bannerUrl : `${appBase}${bannerUrl}`) : ''
-  let whenText = ''
-  if (when) {
-    const d = new Date(when)
-    if (!Number.isNaN(d.getTime())) {
-      whenText = d.toLocaleString('pt-PT', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Europe/Lisbon',
-      })
-    }
-  }
+  const whenText = formatInviteDateRange(when, whenEnd)
   // Linha de valor do bilhete: Pago → valor; Doação → sem valor; Grátis → grátis.
   const valueLine = ticket
     ? ticket.isPaid && ticket.valueText

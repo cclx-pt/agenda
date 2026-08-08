@@ -862,7 +862,7 @@ function buildJotformUrl({ local, mobile, eventId, ticketId }) {
 }
 
 // Fluxo MB WAY: confirmar telemóvel → abrir o JotForm (nova aba) → janela de
-// espera com confirmação (fica "em validação" para o organizador confirmar).
+// espera onde o comprovativo respeita as regras do tipo de bilhete.
 function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
   const [mobile, setMobile] = useState(() => guestStatus?.phone || '')
   const [stage, setStage] = useState('confirm') // 'confirm' | 'waiting'
@@ -876,6 +876,8 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
     eventId: invite.eventId || slug,
     ticketId: guestStatus?.ticketId,
   })
+  const isDonation = !!guestStatus?.isDonation
+  const receiptReq = !isDonation && receiptRequired(invite, guestStatus?.paymentMethod)
 
   // Abre o JotForm numa NOVA página (link real com target=_blank → nunca é
   // bloqueado como popup); valida o telemóvel antes de navegar.
@@ -888,8 +890,6 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
     setStage('waiting')
   }
 
-  // Confirmação do pagamento MB WAY = carregar o comprovativo (obrigatório) →
-  // fica "em validação" para o organizador confirmar.
   const onReceipt = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -949,8 +949,10 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
           <div className="flex items-start gap-3 rounded-lg bg-muted p-4">
             <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
             <p className="m-0 text-sm text-foreground">
-              Confirma o pagamento na app <strong>MB WAY</strong> no teu telemóvel. Depois de pagares com
-              sucesso, carrega aqui o comprovativo para confirmarmos a tua inscrição.
+              Confirma a operação na app <strong>MB WAY</strong> no teu telemóvel.
+              {isDonation
+                ? ' Se quiseres, podes anexar o comprovativo.'
+                : ' Depois de pagares com sucesso, carrega aqui o comprovativo para confirmarmos a tua inscrição.'}
             </p>
           </div>
           <label
@@ -962,7 +964,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             ) : (
               <Upload className="h-4 w-4" aria-hidden="true" />
             )}
-            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptRequired(invite, guestStatus?.paymentMethod) ? ' (obrigatório)' : ' (opcional)'}`}
+            {uploading ? 'A enviar…' : `Carregar comprovativo${receiptReq ? ' (obrigatório)' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
           </label>
           <a
