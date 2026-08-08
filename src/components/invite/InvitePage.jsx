@@ -66,21 +66,6 @@ const STATUS_STYLE = {
   pending: 'border-border bg-muted text-muted-foreground',
 }
 
-// Data/hora por extenso (Europe/Lisbon) — mesmo formato do email de confirmação.
-function fmtWhenLong(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('pt-PT', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Lisbon',
-  })
-}
-
 function StatusCard({ status }) {
   if (!status) return null
   const cls = STATUS_STYLE[status.rsvpState] || STATUS_STYLE.pending
@@ -341,7 +326,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(code)}`
       : ''
     const guestTicket = (page.tickets || []).find((t) => t.id === guestStatus.ticketId) || null
-    const whenText = fmtWhenLong(inv.startDatetime)
+    const whenText = fmtDateRange(inv.startDatetime, inv.endDatetime)
     const valueLine = guestTicket
       ? guestTicket.kind === 'voluntaria'
         ? 'Doação (valor à tua escolha)'

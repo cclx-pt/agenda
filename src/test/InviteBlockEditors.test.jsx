@@ -208,6 +208,29 @@ describe('InviteBlockEditors uploads', () => {
     expect(screen.getByLabelText('Equipa pretendida')).toBeInTheDocument()
   })
 
+  it('shows the full event date range after registration', () => {
+    const page = {
+      invite: {
+        title: 'Conferência',
+        startDatetime: '2026-10-02T09:00:00Z',
+        endDatetime: '2026-10-04T18:00:00Z',
+      },
+      tickets: [],
+    }
+
+    render(
+      <RsvpCard
+        block={{ content: {} }}
+        page={page}
+        accent="#1F3864"
+        guestStatus={{ name: 'Ana', code: 'ABC123' }}
+        onSubmitted={() => {}}
+      />,
+    )
+
+    expect(screen.getByText(/2 de outubro de 2026 – 4 de outubro de 2026/)).toBeInTheDocument()
+  })
+
   it('renders visible landing blocks even when they have no content', () => {
     const emptyBlock = { content: {} }
     const page = { invite: {} }
