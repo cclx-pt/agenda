@@ -201,6 +201,14 @@ invitesRouter.post(
   })
 )
 
+invitesRouter.post(
+  '/:id/guests/:guestId/resend-email',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ result: await service.resendGuestConfirmation(req.user, req.params.id, req.params.guestId) })
+  })
+)
+
 // Marca o reembolso de uma inscrição como concluído.
 invitesRouter.post(
   '/:id/guests/:guestId/refunded',

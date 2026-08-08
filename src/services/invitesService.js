@@ -131,6 +131,10 @@ export async function cancelInviteGuest(inviteId, guestId) {
   return guest
 }
 
+export async function resendInviteGuestTicket(inviteId, guestId) {
+  await request(`/data/invites/${inviteId}/guests/${guestId}/resend-email`, { method: 'POST' })
+}
+
 export async function deleteInviteGuest(inviteId, guestId) {
   await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'DELETE' })
 }

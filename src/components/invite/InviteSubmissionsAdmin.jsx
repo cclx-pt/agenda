@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
-import { inscricaoSituacao, SITUACAO_LABEL, SITUACAO_BADGE, classifyGuestPeople } from './inviteUtils'
+import {
+  inscricaoSituacao,
+  SITUACAO_LABEL,
+  SITUACAO_BADGE,
+  classifyGuestPeople,
+  isConfirmedRegistration,
+  registrationChurch,
+} from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
 
 const ghostBtn =
@@ -110,6 +117,9 @@ export default function InviteSubmissionsAdmin() {
   const [filterChurch, setFilterChurch] = useState('')
   const [filterTicket, setFilterTicket] = useState('')
   const [filterSituacao, setFilterSituacao] = useState('')
+  const [searchName, setSearchName] = useState('')
+  const [searchPhone, setSearchPhone] = useState('')
+  const [searchEmail, setSearchEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [expanded, setExpanded] = useState(null) // { id, mode: 'details' | 'edit' }
@@ -147,15 +157,17 @@ export default function InviteSubmissionsAdmin() {
 
   const filtered = (rows || []).filter((r) => {
     if (filterInvite && r.inviteId !== filterInvite) return false
-    if (filterChurch && (r.inviteCommunity || 'Sem igreja') !== filterChurch) return false
+    if (filterChurch && registrationChurch(r) !== filterChurch) return false
     if (filterTicket && (r.ticket?.name || 'Sem bilhete') !== filterTicket) return false
     if (filterSituacao && inscricaoSituacao(r) !== filterSituacao) return false
+    if (searchName && !String(r.name || '').toLocaleLowerCase('pt-PT').includes(searchName.trim().toLocaleLowerCase('pt-PT'))) return false
+    if (searchPhone && !String(r.phone || '').replace(/\D/g, '').includes(searchPhone.replace(/\D/g, ''))) return false
+    if (searchEmail && !String(r.email || '').toLocaleLowerCase('pt-PT').includes(searchEmail.trim().toLocaleLowerCase('pt-PT'))) return false
     return true
   })
 
-  // Opções de filtro derivadas das inscrições carregadas (igreja = comunidade do
-  // convite; bilhete = nome do bilhete escolhido).
-  const churchOptions = [...new Set((rows || []).map((r) => r.inviteCommunity || 'Sem igreja'))].sort((a, b) =>
+  // Opções de filtro derivadas das respostas de cada inscrição.
+  const churchOptions = [...new Set((rows || []).map(registrationChurch))].sort((a, b) =>
     a.localeCompare(b, 'pt')
   )
   const ticketOptions = [...new Set((rows || []).map((r) => r.ticket?.name || 'Sem bilhete'))].sort((a, b) =>
@@ -180,7 +192,7 @@ export default function InviteSubmissionsAdmin() {
   // (adultos/jovens/crianças) contam apenas inscrições confirmadas (rsvp 'confirmed').
   const people = filtered.reduce(
     (acc, r) => {
-      if (r.rsvpState !== 'confirmed') return acc
+      if (!isConfirmedRegistration(r)) return acc
       const p = classifyGuestPeople(r, r.ticket)
       acc.adultos += p.adultos
       acc.jovens += p.jovens
@@ -196,7 +208,7 @@ export default function InviteSubmissionsAdmin() {
       const key = keyFn(r)
       const cur = m.get(key) || { name: key, count: 0, pessoas: 0, adultos: 0, criancas: 0 }
       cur.count += 1
-      if (r.rsvpState === 'confirmed') {
+      if (isConfirmedRegistration(r)) {
         const p = classifyGuestPeople(r, r.ticket)
         cur.pessoas += p.total
         cur.adultos += p.adultos
@@ -207,7 +219,7 @@ export default function InviteSubmissionsAdmin() {
     return [...m.values()].sort((a, b) => b.count - a.count)
   }
   const byTicket = groupBy((r) => r.ticket?.name || 'Sem bilhete')
-  const byChurch = groupBy((r) => r.inviteCommunity || 'Sem igreja')
+  const byChurch = groupBy(registrationChurch)
 
   const openDetails = (g) =>
     setExpanded((e) => (e?.id === g.id && e.mode === 'details' ? null : { id: g.id, mode: 'details' }))
@@ -281,13 +293,25 @@ export default function InviteSubmissionsAdmin() {
     }
   }
 
+  const resendTicket = async (g) => {
+    setBusy(true)
+    try {
+      await invitesService.resendInviteGuestTicket(g.inviteId, g.id)
+      toast.success(`Bilhete reenviado para ${g.email}.`)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // Exporta para CSV (abre no Excel): BOM UTF-8 + separador ';'. Respeita os filtros.
   const exportRows = () => {
     if (!filtered.length) return
     const cols = [
       ['Nº do bilhete', (g) => g.code || ''],
       ['Convite', (g) => g.inviteTitle || ''],
-      ['Igreja', (g) => g.inviteCommunity || ''],
+      ['Igreja', (g) => registrationChurch(g)],
       ['Bilhete', (g) => g.ticket?.name || ''],
       ['Nome', (g) => g.name || ''],
       ['Email', (g) => g.email || ''],
@@ -376,6 +400,18 @@ export default function InviteSubmissionsAdmin() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className={labelCls}>
+            Nome
+            <input className={inputCls} value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Pesquisar nome" />
+          </label>
+          <label className={labelCls}>
+            Telefone
+            <input className={inputCls} value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} placeholder="Pesquisar telefone" />
+          </label>
+          <label className={labelCls}>
+            Email
+            <input className={inputCls} value={searchEmail} onChange={(e) => setSearchEmail(e.target.value)} placeholder="Pesquisar email" />
           </label>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -536,6 +572,16 @@ export default function InviteSubmissionsAdmin() {
                           <button type="button" onClick={() => openEdit(g)} className={iconBtn} title="Editar / notas" aria-label="Editar">
                             <Pencil className="h-4 w-4" aria-hidden="true" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => resendTicket(g)}
+                            disabled={busy || !g.email}
+                            className={iconBtn}
+                            title={g.email ? 'Reenviar bilhete por email' : 'Inscrição sem email'}
+                            aria-label="Reenviar bilhete por email"
+                          >
+                            <Mail className="h-4 w-4" aria-hidden="true" />
+                          </button>
                           {canRefund ? (
                             <button
                               type="button"
@@ -584,7 +630,7 @@ export default function InviteSubmissionsAdmin() {
                               </div>
                               <div className="flex gap-2">
                                 <dt className="font-medium text-muted-foreground">Igreja:</dt>
-                                <dd className="text-foreground">{g.inviteCommunity || 'Sem igreja'}</dd>
+                                <dd className="text-foreground">{registrationChurch(g)}</dd>
                               </div>
                               <div className="flex gap-2">
                                 <dt className="font-medium text-muted-foreground">Bilhete:</dt>

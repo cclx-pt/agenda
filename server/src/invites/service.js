@@ -1041,59 +1041,72 @@ function buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentIn
   return { name: ticket.name ?? null, isFree, isDonation, isPaid, valueText, methods, payUrl, showPay: !isFree, requireReceipt }
 }
 
-function notifyGuestConfirmation(invite, guest, status, methodType) {
-  if (!guest?.email) return
+async function sendGuestConfirmation(invite, guest, status = null, methodType = null) {
+  if (!guest?.email) throw new InviteError(400, 'Esta inscrição não tem email.')
   const base = (config.appUrl || '').replace(/\/+$/, '')
   // Link ÚNICO desta inscrição (abre o bilhete/estado) — no email e dentro do QR.
   const uniqueLink = `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?g=${guest.token}`
   const link = `${base}/invite/${encodeURIComponent(invite.slug)}?g=${guest.token}`
-  const p = (async () => {
-    const [ticket, activeMethods, paymentInfo, banner, blocks] = await Promise.all([
-      guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
-      getActivePaymentMethods().catch(() => []),
-      getInvitePaymentInfo().catch(() => null),
-      resolveInviteBanner(invite).catch(() => invite.bannerUrl ?? null),
-      repo.listBlocks(invite.id).catch(() => []),
-    ])
-    const ticketInfo = buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentInfo, {
-      uniqueLink,
-      methodType,
-    })
-    const dataSummary = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
-    // QR apenas com o NÚMERO do bilhete (código) — para leitura no check-in.
-    const qrUrl = guest.code
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(guest.code)}`
-      : ''
-    await sendRsvpConfirmationEmail(guest.email, {
-      name: guest.name,
-      eventTitle: invite.title,
-      when: invite.startDatetime,
-      whenEnd: invite.endDatetime,
-      location: invite.location ?? null,
-      statusMessage: status?.message ?? '',
-      link,
-      uniqueLink,
-      code: guest.code ?? null,
-      bannerUrl: banner ?? null,
-      qrUrl,
-      ticket: ticketInfo,
-      data: dataSummary,
-      // Auto-gestão: código + senha + link para cancelar / pedir reembolso.
-      manage:
-        status?.managePassword && guest.code
-          ? {
-              code: guest.code,
-              password: status.managePassword,
-              url: status.manageUrl || `${base}/invite/${encodeURIComponent(invite.slug)}/gerir`,
-            }
-          : null,
-    })
-  })().catch((err) => console.error('[invites] confirmação de inscrição:', err?.message ?? err))
+  const [ticket, activeMethods, paymentInfo, banner, blocks] = await Promise.all([
+    guest.ticketId ? repo.findTicketById(guest.ticketId).catch(() => null) : Promise.resolve(null),
+    getActivePaymentMethods().catch(() => []),
+    getInvitePaymentInfo().catch(() => null),
+    resolveInviteBanner(invite).catch(() => invite.bannerUrl ?? null),
+    repo.listBlocks(invite.id).catch(() => []),
+  ])
+  const paymentMethod = resolveGuestMethod(guest, ticket)
+  const resolvedMethodType =
+    methodType ?? activeMethods.find((method) => method.key === paymentMethod)?.type ?? null
+  const effectiveStatus = status ?? guestStatusPayload(guest, paymentMethod, ticket)
+  const ticketInfo = buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentInfo, {
+    uniqueLink,
+    methodType: resolvedMethodType,
+  })
+  const dataSummary = buildGuestDataSummary(guest, blocks.find((b) => b.type === 'rsvp')?.content?.fields || [])
+  const qrUrl = guest.code
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(guest.code)}`
+    : ''
+  await sendRsvpConfirmationEmail(guest.email, {
+    name: guest.name,
+    eventTitle: invite.title,
+    when: invite.startDatetime,
+    whenEnd: invite.endDatetime,
+    location: invite.location ?? null,
+    statusMessage: effectiveStatus?.message ?? '',
+    link,
+    uniqueLink,
+    code: guest.code ?? null,
+    bannerUrl: banner ?? null,
+    qrUrl,
+    ticket: ticketInfo,
+    data: dataSummary,
+    manage:
+      effectiveStatus?.managePassword && guest.code
+        ? {
+            code: guest.code,
+            password: effectiveStatus.managePassword,
+            url: effectiveStatus.manageUrl || `${base}/invite/${encodeURIComponent(invite.slug)}/gerir`,
+          }
+        : null,
+  })
+}
+
+function notifyGuestConfirmation(invite, guest, status, methodType) {
+  if (!guest?.email) return
+  const p = sendGuestConfirmation(invite, guest, status, methodType).catch((err) =>
+    console.error('[invites] confirmação de inscrição:', err?.message ?? err)
+  )
   try {
     waitUntil(p)
   } catch {
     /* fora do runtime Vercel: o processo persistente conclui o envio */
   }
+}
+
+export async function resendGuestConfirmation(user, inviteId, guestId) {
+  const { invite, guest } = await loadGuestForManage(user, inviteId, guestId)
+  await sendGuestConfirmation(invite, guest)
+  return { email: guest.email }
 }
 
 // ── RSVP (convidado, sem sessão) ─────────────────────────────────

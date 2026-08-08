@@ -101,6 +101,26 @@ export function inscricaoSituacao(guest) {
   return 'pendente'
 }
 
+export function isConfirmedRegistration(guest) {
+  return inscricaoSituacao(guest) === 'confirmada'
+}
+
+export function registrationChurch(guest) {
+  const extra = guest?.extra || {}
+  const fields = Array.isArray(guest?.schemaSnapshot) ? guest.schemaSnapshot : []
+  const communityField = fields.find((field) =>
+    String(field?.label || '')
+      .trim()
+      .toLocaleLowerCase('pt-PT')
+      .startsWith('cclx - comunidade')
+  )
+  const schemaValue = communityField?.key ? extra[communityField.key] : null
+  if (schemaValue != null && String(schemaValue).trim()) return String(schemaValue).trim()
+  if (extra.comunidade === 'CCLX' && extra.outra_igreja) return String(extra.outra_igreja).trim()
+  if (extra.comunidade === 'Outro' && extra.outra_igreja_qual) return String(extra.outra_igreja_qual).trim()
+  return extra.comunidade ? String(extra.comunidade).trim() : 'Sem igreja'
+}
+
 // Classifica uma idade em 'crianca' / 'jovem' / 'adulto' com base nas idades
 // configuradas no bilhete (childMaxAge / adultMinAge). Sem configuração, uma
 // pessoa com menos de 11 anos conta como criança. Idade desconhecida = adulto.
@@ -140,11 +160,10 @@ export function classifyGuestPeople(guest, ticket = null) {
   } else {
     adultos += 1 // inscrito principal (adulto)
   }
-  for (const c of criancas) {
-    const cls = c && typeof c === 'object' && (c.idade ?? '') !== '' ? classifyAge(c.idade, t) : 'crianca'
-    bump(cls)
+  criancasN += criancas.length
+  if (!criancas.length && !membros.length && Number(extra.numCriancas) > 0) {
+    criancasN += Math.floor(Number(extra.numCriancas))
   }
-  if (!criancas.length && Number(extra.numCriancas) > 0) criancasN += Math.floor(Number(extra.numCriancas))
   return { adultos, jovens, criancas: criancasN, total: adultos + jovens + criancasN }
 }
 
