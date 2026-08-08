@@ -1028,7 +1028,7 @@ function buildTicketPaymentEmail(invite, guest, ticket, activeMethods, paymentIn
     }
   }
   const resolvedDef = byKey.get(resolveGuestMethod(guest, ticket))
-  const requireReceipt = resolvedDef ? resolvedDef.requireReceipt !== false : true
+  const requireReceipt = !isDonation && (resolvedDef ? resolvedDef.requireReceipt !== false : true)
   const payUrl =
     methodType === 'mbway-contribuir'
       ? buildJotformUrl({
@@ -1068,6 +1068,7 @@ function notifyGuestConfirmation(invite, guest, status, methodType) {
       name: guest.name,
       eventTitle: invite.title,
       when: invite.startDatetime,
+      whenEnd: invite.endDatetime,
       location: invite.location ?? null,
       statusMessage: status?.message ?? '',
       link,
