@@ -294,6 +294,8 @@ export default function InviteSubmissionsAdmin() {
   }
 
   const resendTicket = async (g) => {
+    if (!g.email) return
+    if (!window.confirm(`Reenviar o bilhete por email para "${g.email}"?`)) return
     setBusy(true)
     try {
       await invitesService.resendInviteGuestTicket(g.inviteId, g.id)
