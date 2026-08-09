@@ -125,6 +125,7 @@ const BLOCK_TYPES = [
   'agenda',
   'workshops',
   'rsvp',
+  'tickets',
   'pagamento',
   'localizacao',
   'partilha',

@@ -13,6 +13,7 @@ export const BLOCK_META = {
   agenda: { label: 'Programa / Agenda', addable: true },
   workshops: { label: 'Workshops', addable: true },
   rsvp: { label: 'Inscrição (RSVP)', addable: false },
+  tickets: { label: 'Tickets / Bilhetes', addable: true },
   pagamento: { label: 'Bilhetes', addable: false },
   localizacao: { label: 'Localização', addable: true },
   faqs: { label: 'Perguntas frequentes', addable: true },
@@ -43,6 +44,8 @@ export function defaultContent(type) {
       return { title: 'Programa', days: [], showIcon: true }
     case 'workshops':
       return { title: 'Workshops', information: '', items: [], showIcon: true }
+    case 'tickets':
+      return { title: 'Bilhetes', information: '', showIcon: true }
     case 'pagamento':
       return { information: '', showIcon: true }
     case 'localizacao':

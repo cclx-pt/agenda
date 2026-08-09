@@ -478,6 +478,68 @@ function PaymentCard({ block, page, accent }) {
   )
 }
 
+function TicketsCard({ block, page, accent }) {
+  const content = block.content || {}
+  const invite = page.invite
+  const mode = invite.registrationMode || 'internal'
+  const tickets = (page.tickets || []).filter((ticket) => ticket.active !== false)
+
+  return (
+    <div className={cardCls}>
+      <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
+        {content.showIcon !== false ? <Ticket className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        {content.title || 'Bilhetes'}
+      </h2>
+      {content.information ? (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p className="m-0 whitespace-pre-line">{content.information}</p>
+        </div>
+      ) : null}
+      {tickets.length ? (
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {tickets.map((ticket) => {
+            const href = ticket.soldOut || mode === 'none'
+              ? null
+              : mode === 'external'
+                ? invite.registrationUrl || null
+                : inviteRsvpHref(page.slug, ticket.id)
+            return (
+              <li key={ticket.id} className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="font-semibold text-foreground">{ticket.name}</span>
+                  {ticket.description ? <span className="text-sm text-muted-foreground">{ticket.description}</span> : null}
+                  {(ticket.partyType === 'family' || ticket.partyType === 'group' || ticket.kind === 'grupo') && ticket.groupSize ? (
+                    <span className="text-xs text-muted-foreground">Grupo até {ticket.groupSize} pessoas</span>
+                  ) : null}
+                </span>
+                <span className="flex flex-shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
+                  <span className={ticket.soldOut ? 'text-sm font-bold text-destructive' : 'text-sm font-bold text-foreground'}>
+                    {ticket.soldOut ? 'Esgotado' : ticketPrice(ticket)}
+                  </span>
+                  {href ? (
+                    <a
+                      href={href}
+                      {...(mode === 'external' ? { target: '_blank', rel: 'noreferrer' } : {})}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: accent }}
+                    >
+                      Inscrever-me
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                  ) : null}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground">Ainda não existem bilhetes disponíveis.</p>
+      )}
+    </div>
+  )
+}
+
 function LocationCard({ block, page }) {
   const c = block.content || {}
   // Morada e link do mapa herdados da página de detalhe (Definições).
@@ -661,6 +723,7 @@ export {
   SpeakersCard,
   AgendaCard,
   WorkshopsCard,
+  TicketsCard,
   PaymentCard,
   LocationCard,
   FaqsCard,

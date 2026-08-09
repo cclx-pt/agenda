@@ -69,6 +69,11 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;')
 }
 
+export function ticketPaymentMethodsTitle(ticket) {
+  if (!ticket || ticket.isFree) return null
+  return ticket.isDonation ? 'Métodos de Doação' : 'Métodos de Pagamento'
+}
+
 function campaignBlockHtml(block) {
   if (block.type === 'text') {
     return `<p style="margin:0 0 16px;color:#374151;line-height:1.65;white-space:pre-line">${escapeHtml(block.text)}</p>`
@@ -170,6 +175,7 @@ export async function sendRsvpConfirmationEmail(
           : ''
     : ''
   const methods = ticket && !ticket.isFree ? ticket.methods || [] : []
+  const methodsTitle = ticketPaymentMethodsTitle(ticket)
 
   const text =
     `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
@@ -180,7 +186,7 @@ export async function sendRsvpConfirmationEmail(
     (valueLine ? `\n${valueLine}` : '') +
     (code ? `\nCódigo do bilhete: ${code}` : '') +
     (methods.length
-      ? `\n\nComo pagar:\n${methods.map((m) => `- ${m.label}${m.detail ? `: ${m.detail}` : ''}`).join('\n')}`
+      ? `\n\n${methodsTitle}:\n${methods.map((m) => `- ${m.label}${m.detail ? `: ${m.detail}` : ''}`).join('\n')}`
       : '') +
     (ticket?.requireReceipt ? `\n\nAnexa o comprovativo do pagamento aqui:\n${bilheteLink}` : '') +
     (Array.isArray(data) && data.length
@@ -194,7 +200,7 @@ export async function sendRsvpConfirmationEmail(
 
   const methodsHtml = methods.length
     ? `<div style="margin:12px 0;padding:12px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">
-        <p style="margin:0 0 6px;font-weight:700;color:#111827">Como pagar</p>
+        <p style="margin:0 0 6px;font-weight:700;color:#111827">${methodsTitle}</p>
         ${methods
           .map(
             (m) =>

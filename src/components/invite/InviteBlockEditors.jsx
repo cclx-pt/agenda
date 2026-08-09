@@ -372,19 +372,26 @@ function WorkshopsEditor({ content, onChange }) {
   )
 }
 
-function PaymentEditor({ content, onChange }) {
+function TicketsEditor({ content, onChange }) {
+  const set = (key) => (event) => onChange({ ...content, [key]: event.target.value })
   return (
-    <label className={labelCls}>
-      Informação
-      <textarea
-        className={inputCls}
-        rows={3}
-        value={content.information ?? ''}
-        onChange={(event) => onChange({ ...content, information: event.target.value })}
-        placeholder="Informação geral sobre os bilhetes"
-      />
-      <span className="text-xs font-normal text-muted-foreground">Aparece sob o título com um ícone de informação fixo.</span>
-    </label>
+    <div className="flex flex-col gap-2">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Bilhetes" />
+      </label>
+      <label className={labelCls}>
+        Informação no topo
+        <textarea
+          className={inputCls}
+          rows={3}
+          value={content.information ?? ''}
+          onChange={set('information')}
+          placeholder="Informação geral sobre os bilhetes"
+        />
+      </label>
+      <p className="m-0 text-xs text-muted-foreground">Os tipos de bilhete são preenchidos automaticamente a partir da configuração do convite.</p>
+    </div>
   )
 }
 
@@ -797,7 +804,8 @@ const EDITORS = {
   agenda: AgendaEditor,
   workshops: WorkshopsEditor,
   rsvp: RsvpEditor,
-  pagamento: PaymentEditor,
+  tickets: TicketsEditor,
+  pagamento: TicketsEditor,
   localizacao: LocationEditor,
   faqs: FaqsEditor,
   rodape: FooterEditor,
@@ -805,7 +813,7 @@ const EDITORS = {
 
 const ICON_TOGGLE_TYPES = new Set([
   'overview', 'info_extra', 'convite_narrativo', 'multimedia', 'good_to_know',
-  'oradores', 'agenda', 'workshops', 'rsvp', 'pagamento', 'localizacao', 'faqs', 'partilha',
+  'oradores', 'agenda', 'workshops', 'rsvp', 'tickets', 'pagamento', 'localizacao', 'faqs', 'partilha',
 ])
 
 export function BlockEditor({ type, content, onChange }) {
