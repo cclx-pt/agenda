@@ -8,6 +8,7 @@ import * as paymentsRepo from './payments/repository.js'
 import { config } from '../config.js'
 import { sendRsvpConfirmationEmail, sendRefundRequestEmail } from '../auth/email.js'
 import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
+import { buildFollowupStats } from './followup.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -659,6 +660,71 @@ export async function acceptCheckinPublic(slug, rawToken, guestId, { on = true }
   const guest = await repo.findGuestById(guestId)
   if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
   return repo.setCheckedIn(guest.id, on)
+}
+
+// ── Self Follow-up: painel público de KPIs por link secreto ────────────────
+function followupLinkPayload(invite, token) {
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  return {
+    token,
+    slug: invite.slug,
+    url: `${base}/invite/${encodeURIComponent(invite.slug)}/follow-up?k=${token}`,
+  }
+}
+
+function followupTokenMatches(invite, rawToken) {
+  const token = String(rawToken || '').trim()
+  if (!token || !invite.followupToken) return false
+  const stored = Buffer.from(invite.followupToken)
+  const supplied = Buffer.from(token)
+  return stored.length === supplied.length && timingSafeEqual(stored, supplied)
+}
+
+async function loadInviteByFollowupToken(slug, rawToken) {
+  const invite = await repo.findBySlug(slug)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!followupTokenMatches(invite, rawToken)) {
+    throw new InviteError(401, 'Link Self Follow-up inválido ou revogado.')
+  }
+  return invite
+}
+
+export async function getFollowupLink(user, inviteId) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  let token = invite.followupToken
+  if (!token) {
+    token = randomBytes(24).toString('hex')
+    await repo.setFollowupToken(invite.id, token)
+  }
+  return followupLinkPayload(invite, token)
+}
+
+export async function regenerateFollowupLink(user, inviteId) {
+  ensureCanManage(user)
+  const invite = await repo.findById(inviteId)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) throw new InviteError(403, 'Sem acesso a este convite.')
+  const token = randomBytes(24).toString('hex')
+  await repo.setFollowupToken(invite.id, token)
+  return followupLinkPayload(invite, token)
+}
+
+export async function followupStats(slug, rawToken) {
+  const invite = await loadInviteByFollowupToken(slug, rawToken)
+  const [guests, tickets] = await Promise.all([repo.listGuests(invite.id), repo.listTickets(invite.id)])
+  return {
+    event: {
+      title: invite.title,
+      startDatetime: invite.startDatetime,
+      endDatetime: invite.endDatetime,
+      location: invite.location ?? null,
+    },
+    updatedAt: new Date().toISOString(),
+    ...buildFollowupStats(guests, tickets),
+  }
 }
 
 // Pré-visualização (organizador): mesma forma do payload público, sem exigir publicação.

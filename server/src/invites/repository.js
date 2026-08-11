@@ -41,6 +41,7 @@ function mapInvite(row) {
     community: row.community ?? null,
     jotformCommunity: row.jotform_community ?? null,
     checkinToken: row.checkin_token ?? null,
+    followupToken: row.followup_token ?? null,
     status: row.status,
     publishedAt: row.published_at ?? null,
     createdBy: row.created_by ?? null,
@@ -157,6 +158,11 @@ export async function findBySlug(slug) {
 // Define/atualiza o token secreto do link de check-in móvel do convite.
 export async function setCheckinToken(id, token) {
   await pool.query('UPDATE invites SET checkin_token = $2, updated_at = now() WHERE id = $1', [id, token])
+  return findById(id)
+}
+
+export async function setFollowupToken(id, token) {
+  await pool.query('UPDATE invites SET followup_token = $2, updated_at = now() WHERE id = $1', [id, token])
   return findById(id)
 }
 

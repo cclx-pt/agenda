@@ -167,6 +167,24 @@ export async function regenerateCheckinLink(inviteId) {
   return link
 }
 
+// Link público Self Follow-up (organizador): obter/criar e rodar (revoga o antigo).
+export async function getFollowupLink(inviteId) {
+  const { link } = await request(`/data/invites/${inviteId}/follow-up/link`)
+  return link
+}
+
+export async function regenerateFollowupLink(inviteId) {
+  const { link } = await request(`/data/invites/${inviteId}/follow-up/link/regenerate`, { method: 'POST' })
+  return link
+}
+
+export async function publicFollowupStats(slug, token) {
+  const { stats } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/follow-up?k=${encodeURIComponent(token)}`
+  )
+  return stats
+}
+
 // ── Check-in móvel público (autenticado pelo token do link ?k=) ──
 export async function publicCheckinContext(slug, token) {
   const { context } = await request(

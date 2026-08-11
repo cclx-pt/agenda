@@ -379,6 +379,7 @@ CREATE TABLE IF NOT EXISTS invites (
   spots_on_registration BOOLEAN NOT NULL DEFAULT FALSE,
   community        TEXT,
   jotform_community TEXT,
+  followup_token   TEXT,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'publicado', 'fechado')),
   published_at     TIMESTAMPTZ,
@@ -526,6 +527,8 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_registration BOOLEAN NOT N
 -- Token secreto do link de check-in móvel (staff abre no telemóvel e valida à entrada;
 -- autoriza só o check-in deste convite; pode ser regenerado para revogar).
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS checkin_token TEXT;
+-- Token secreto do painel público Self Follow-up (KPIs agregados, sem dados pessoais).
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS followup_token TEXT;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual/pago (com valor), grátis
 -- (0€), doação (valor à escolha) ou grupo. Cada tipo tem preço, capacidade

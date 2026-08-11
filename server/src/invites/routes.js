@@ -304,6 +304,23 @@ invitesRouter.post(
   })
 )
 
+// Self Follow-up: link público, só de leitura, com KPIs agregados das inscrições.
+invitesRouter.get(
+  '/:id/follow-up/link',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ link: await service.getFollowupLink(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.post(
+  '/:id/follow-up/link/regenerate',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ link: await service.regenerateFollowupLink(req.user, req.params.id) })
+  })
+)
+
 invitesRouter.delete(
   '/:id',
   manageRoles,
@@ -396,6 +413,15 @@ publicInvitesRouter.post(
         on: req.body?.on !== false,
       }),
     })
+  })
+)
+
+// GET /follow-up?k=<token> — KPIs agregados, sem dados pessoais dos inscritos.
+publicInvitesRouter.get(
+  '/:slug/follow-up',
+  asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store')
+    res.json({ stats: await service.followupStats(req.params.slug, req.query.k) })
   })
 )
 

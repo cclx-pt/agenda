@@ -13,6 +13,7 @@ import PaymentMethodsAdmin from '../PaymentMethodsAdmin'
 import InviteSubmissionsAdmin from './InviteSubmissionsAdmin'
 import InviteSettingsAdmin from './InviteSettingsAdmin'
 import CheckinAdmin from './CheckinAdmin'
+import FollowupLinkCard from './FollowupLinkCard'
 import InviteCommunications from './InviteCommunications'
 import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
@@ -1269,6 +1270,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
             </div>
           </div>
         </section>
+        <FollowupLinkCard invite={invite} />
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
             <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>

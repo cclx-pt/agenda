@@ -10,6 +10,7 @@ import LoopPage from './components/LoopPage'
 import InvitePage from './components/invite/InvitePage'
 import InviteManage from './components/invite/InviteManage'
 import InviteCheckin from './components/invite/InviteCheckin'
+import InviteFollowup from './components/invite/InviteFollowup'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ if (isInviteRoute) {
   if (parts[1] === 'inscricao') inviteView = 'rsvp'
   else if (parts[1] === 'gerir') inviteView = 'manage'
   else if (parts[1] === 'checkin') inviteView = 'checkin'
+  else if (parts[1] === 'follow-up') inviteView = 'follow-up'
   invitePreviewId = new URLSearchParams(window.location.search).get('preview') || null
   inviteCheckinToken = new URLSearchParams(window.location.search).get('k') || null
 }
@@ -62,6 +64,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <InviteManage slug={inviteSlug} />
           ) : inviteView === 'checkin' ? (
             <InviteCheckin slug={inviteSlug} token={inviteCheckinToken} />
+          ) : inviteView === 'follow-up' ? (
+            <InviteFollowup slug={inviteSlug} token={inviteCheckinToken} />
           ) : (
             <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
           )}
