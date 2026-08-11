@@ -133,6 +133,41 @@ brandingRouter.put('/', adminOnly, async (req, res, next) => {
   }
 })
 
+// ── Portal público de inscrições ───────────────────
+// GET público devolve apenas links ativos; PUT permite ao admin gerir a lista completa.
+export const registrationPortalRouter = Router()
+
+registrationPortalRouter.get('/', async (_req, res, next) => {
+  try {
+    res.json({ links: await service.getRegistrationPortalLinks({ activeOnly: true }) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+registrationPortalRouter.get('/admin', adminOnly, async (_req, res, next) => {
+  try {
+    res.json({ links: await service.getRegistrationPortalLinks() })
+  } catch (err) {
+    next(err)
+  }
+})
+
+registrationPortalRouter.put('/', adminOnly, async (req, res, next) => {
+  try {
+    const links = await service.updateRegistrationPortalLinks(
+      req.body?.links ?? req.body,
+      req.user.sub
+    )
+    res.json({ links })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.issues[0]?.message ?? 'Dados inválidos.' })
+    }
+    next(err)
+  }
+})
+
 // ── Métodos de pagamento ──────────────────────────────
 // GET público (o editor de convites precisa da lista ativa); PUT só admin.
 export const paymentMethodsRouter = Router()

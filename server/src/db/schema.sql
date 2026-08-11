@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS events (
   organizer_phone   TEXT,
   organizer_email   TEXT,
   registration_url  TEXT,
+  include_in_registration_portal BOOLEAN NOT NULL DEFAULT FALSE,
   -- Anexo (PDF/imagem) e localização no mapa (opcionais).
   attachment_url    TEXT,
   attachment_name   TEXT,
@@ -101,6 +102,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_contact TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_phone TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_email TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS registration_url TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS include_in_registration_portal BOOLEAN NOT NULL DEFAULT FALSE;
 -- Anexo e localização no mapa (idempotente para BD existentes).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_url TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS attachment_name TEXT;

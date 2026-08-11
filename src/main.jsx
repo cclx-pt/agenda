@@ -7,6 +7,7 @@ import App from './App.jsx'
 import LogsPage from './components/LogsPage'
 import ApprovalActionPage from './components/ApprovalActionPage'
 import LoopPage from './components/LoopPage'
+import RegistrationPortal from './components/RegistrationPortal'
 import InvitePage from './components/invite/InvitePage'
 import InviteManage from './components/invite/InviteManage'
 import InviteCheckin from './components/invite/InviteCheckin'
@@ -30,6 +31,7 @@ const routePath = window.location.pathname.replace(/\/+$/, '')
 const isLogsRoute = routePath === '/logs'
 const isActionRoute = routePath === '/acao'
 const isLoopRoute = routePath.startsWith('/loop/')
+const isRegistrationPortalRoute = routePath === '/inscricoes'
 const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
 const isInviteRoute = routePath.startsWith('/invite/')
 // /invite/<slug> (landing) ou /invite/<slug>/inscricao (página só de inscrição).
@@ -54,6 +56,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <QueryClientProvider client={queryClient}>
       {isActionRoute ? (
         <ApprovalActionPage />
+      ) : isRegistrationPortalRoute ? (
+        <I18nProvider>
+          <RegistrationPortal />
+        </I18nProvider>
       ) : isLoopRoute ? (
         <I18nProvider>
           <LoopPage church={loopChurch} />

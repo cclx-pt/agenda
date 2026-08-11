@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { config } from '../config.js'
 import { normalizeLoop } from '../loop/config.js'
 import * as repo from './repository.js'
+import { normalizeRegistrationPortalLinks, parseStoredRegistrationPortalLinks } from './portalLinks.js'
 
 // Chave da definição da integração com a inChurch.
 const KEY = 'inchurch_integration'
@@ -129,6 +130,22 @@ export async function updateBranding(input, actorId) {
   const subcategoryColors = input?.subcategoryColors === true
   await repo.set(BRANDING_KEY, { logoUrl, subcategoryColors }, actorId)
   return { logoUrl, subcategoryColors }
+}
+
+// Links permanentes do portal público de inscrições (redes sociais, canais e
+// outros destinos que não correspondem a eventos).
+const REGISTRATION_PORTAL_LINKS_KEY = 'registration_portal_links'
+
+export async function getRegistrationPortalLinks({ activeOnly = false } = {}) {
+  const stored = await repo.get(REGISTRATION_PORTAL_LINKS_KEY)
+  const links = parseStoredRegistrationPortalLinks(stored)
+  return activeOnly ? links.filter((link) => link.active) : links
+}
+
+export async function updateRegistrationPortalLinks(input, actorId) {
+  const links = normalizeRegistrationPortalLinks(input)
+  await repo.set(REGISTRATION_PORTAL_LINKS_KEY, links, actorId)
+  return links
 }
 
 // ── Métodos de pagamento (geridos na Administração de convites) ──

@@ -84,6 +84,7 @@ export const eventInputSchema = z
       .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Link de inscrições inválido (use http/https).')
       .optional()
       .nullable(),
+    includeInRegistrationPortal: z.boolean().optional(),
     // Anexo (PDF/imagem) e localização no mapa (todos opcionais).
     attachmentUrl: z
       .string()
@@ -981,6 +982,7 @@ function eventToInsertData(event) {
     organizerPhone: event.organizerPhone ?? null,
     organizerEmail: event.organizerEmail ?? null,
     registrationUrl: event.registrationUrl ?? null,
+    includeInRegistrationPortal: event.includeInRegistrationPortal === true,
     attachmentUrl: event.attachmentUrl ?? null,
     attachmentName: event.attachmentName ?? null,
     mapUrl: event.mapUrl ?? null,

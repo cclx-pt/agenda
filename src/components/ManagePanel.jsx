@@ -152,6 +152,7 @@ const emptyForm = {
   organizerEmail: '',
   registrationUrl: '',
   registrationType: 'none',
+  includeInRegistrationPortal: false,
   attachmentUrl: '',
   attachmentName: '',
   mapUrl: '',
@@ -273,6 +274,7 @@ const SECTION = {
   reports: { icon: 'ti-chart-bar', title: 'Relatórios' },
   translations: { icon: 'ti-language', title: 'Traduções' },
   branding: { icon: 'ti-photo', title: 'Aparência' },
+  registrationPortal: { icon: 'ti-link', title: 'Portal de inscrições' },
   overlaps: { icon: 'ti-calendar-x', title: 'Sobreposições' },
   loop: { icon: 'ti-device-tv', title: 'Loop + CCLX' },
   invites: { icon: 'ti-mail', title: 'Convites' },
@@ -323,6 +325,7 @@ function eventToForm(evt) {
     organizerEmail: evt.organizerEmail ?? '',
     registrationUrl: evt.registrationUrl ?? '',
     registrationType: evt.registrationUrl ? 'link' : 'none',
+    includeInRegistrationPortal: !!evt.includeInRegistrationPortal,
     attachmentUrl: evt.attachmentUrl ?? '',
     attachmentName: evt.attachmentName ?? '',
     mapUrl: evt.mapUrl ?? '',
@@ -551,6 +554,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Aparência (admin): estado de upload/reposição do logótipo.
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [savingBranding, setSavingBranding] = useState(false)
+  const [portalLinks, setPortalLinks] = useState([])
+  const [savingPortalLinks, setSavingPortalLinks] = useState(false)
   // Sobreposição: aviso em tempo real no formulário + política (admin).
   const [overlapInfo, setOverlapInfo] = useState({ mode: 'off', conflicts: [] })
   const [overlapPolicy, setOverlapPolicy] = useState({ default: 'off', byCategory: {}, byChurch: {} })
@@ -768,6 +773,47 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
   // ── Aparência / logótipo (admin) ───────────────────
   const openBranding = () => setView('branding')
+
+  const openRegistrationPortal = async () => {
+    setBusy(true)
+    try {
+      setPortalLinks(await eventsService.getRegistrationPortalLinks({ includeInactive: true }))
+      setView('registrationPortal')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addPortalLink = () => {
+    setPortalLinks((links) => [
+      ...links,
+      { title: '', url: '', platform: 'other', description: '', active: true },
+    ])
+  }
+
+  const updatePortalLink = (index, field, value) => {
+    setPortalLinks((links) =>
+      links.map((link, linkIndex) => (linkIndex === index ? { ...link, [field]: value } : link))
+    )
+  }
+
+  const removePortalLink = (index) => {
+    setPortalLinks((links) => links.filter((_, linkIndex) => linkIndex !== index))
+  }
+
+  const handleSavePortalLinks = async () => {
+    setSavingPortalLinks(true)
+    try {
+      setPortalLinks(await eventsService.updateRegistrationPortalLinks(portalLinks))
+      toast.success('Links do portal guardados.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSavingPortalLinks(false)
+    }
+  }
 
   // ── Loops (carrosséis TV com nome próprio) — CRUD (admin) ─────────
   const openLoop = async () => {
@@ -1566,6 +1612,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
       organizerPhone: form.organizerPhone.trim() || null,
       organizerEmail: form.organizerEmail.trim() || null,
       registrationUrl: form.registrationType === 'link' ? form.registrationUrl.trim() || null : null,
+      includeInRegistrationPortal: form.includeInRegistrationPortal === true,
       attachmentUrl: form.attachmentUrl.trim() || null,
       attachmentName: form.attachmentName.trim() || null,
       mapUrl: form.mapUrl.trim() || null,
@@ -1961,6 +2008,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                   <i className="ti ti-photo" aria-hidden="true" />
                   <span className={styles.menuTitle}>{t('appearance')}</span>
                   <span className={styles.menuDesc}>{t('appearanceDesc')}</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button className={styles.menuCard} onClick={openRegistrationPortal} disabled={busy}>
+                  <i className="ti ti-link" aria-hidden="true" />
+                  <span className={styles.menuTitle}>Portal de inscrições</span>
+                  <span className={styles.menuDesc}>Gerir os links fixos apresentados no portal público.</span>
                 </button>
               )}
               {isAdmin && (
@@ -3230,6 +3284,63 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </button>
             </div>
           </div>
+        ) : view === 'registrationPortal' ? (
+          <div className={styles.body}>
+            <p className="m-0 text-sm text-muted-foreground">
+              Estes links aparecem no portal público juntamente com os eventos selecionados.
+            </p>
+            <div className="flex flex-col gap-3">
+              {portalLinks.map((link, index) => (
+                <div key={index} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className={styles.row}>
+                    <label className={styles.label}>
+                      Título
+                      <input className={styles.input} value={link.title} maxLength={100} onChange={(event) => updatePortalLink(index, 'title', event.target.value)} />
+                    </label>
+                    <label className={styles.label}>
+                      Plataforma
+                      <select className={styles.input} value={link.platform} onChange={(event) => updatePortalLink(index, 'platform', event.target.value)}>
+                        <option value="youtube">YouTube</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="website">Website</option>
+                        <option value="other">Outro</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className={styles.label}>
+                    URL
+                    <input className={styles.input} type="url" value={link.url} placeholder="https://..." onChange={(event) => updatePortalLink(index, 'url', event.target.value)} />
+                  </label>
+                  <label className={styles.label}>
+                    Descrição opcional
+                    <input className={styles.input} value={link.description} maxLength={240} onChange={(event) => updatePortalLink(index, 'description', event.target.value)} />
+                  </label>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className={styles.check}>
+                      <input type="checkbox" checked={link.active} onChange={(event) => updatePortalLink(index, 'active', event.target.checked)} />
+                      Ativo
+                    </label>
+                    <button type="button" className={styles.dangerBtn} onClick={() => removePortalLink(index)} aria-label={`Remover ${link.title || 'link'}`}>
+                      <i className="ti ti-trash" aria-hidden="true" />
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {portalLinks.length === 0 && <p className={styles.muted}>Ainda não existem links fixos.</p>}
+            </div>
+            <button type="button" className={`${styles.ghostBtn} self-start`} onClick={addPortalLink} disabled={savingPortalLinks}>
+              <i className="ti ti-plus" aria-hidden="true" />
+              Adicionar link
+            </button>
+            <div className={styles.formActions}>
+              <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingPortalLinks}>Voltar</button>
+              <button type="button" className={styles.primaryBtn} onClick={handleSavePortalLinks} disabled={savingPortalLinks}>
+                {savingPortalLinks ? 'A guardar…' : 'Guardar links'}
+              </button>
+            </div>
+          </div>
         ) : view === 'invites' ? (
           <div className={styles.body}>
             <InvitesAdmin />
@@ -4030,6 +4141,17 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               ) : (
                 <p className={styles.fieldHint}>{t('registrationInternalNone')}</p>
               ))}
+            <label className={`${styles.check} mt-2`}>
+              <input
+                type="checkbox"
+                checked={form.includeInRegistrationPortal}
+                onChange={setField('includeInRegistrationPortal')}
+              />
+              Incluir este evento no portal público de inscrições
+            </label>
+            <p className={styles.fieldHint}>
+              Requer um link externo ou um convite interno publicado.
+            </p>
               </TabsContent>
 
               <TabsContent value="datetime" className="mt-0 flex flex-col gap-3 focus-visible:ring-0">

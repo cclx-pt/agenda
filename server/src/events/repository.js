@@ -69,6 +69,7 @@ function mapRow(row) {
     organizerPhone: row.organizer_phone ?? null,
     organizerEmail: row.organizer_email ?? null,
     registrationUrl: row.registration_url ?? null,
+    includeInRegistrationPortal: !!row.include_in_registration_portal,
     // Slug do convite interno PUBLICADO associado (1 evento ↔ 1 convite), para
     // o cartão do evento mostrar o link da landing page. Null se não houver.
     inviteSlug: row.invite_slug ?? null,
@@ -246,8 +247,8 @@ export async function insert(data, actorId) {
        organizer_name, organizer_contact, registration_url,
        attachment_url, attachment_name, map_url, map_lat, map_lng,
        series_id, created_by, organizer_phone, organizer_email, subcategory, featured, loop, is_general,
-       loop_image_16x9, loop_image_32x9, loop_early)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
+       loop_image_16x9, loop_image_32x9, loop_early, include_in_registration_portal)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
     [
       id,
       data.title,
@@ -280,6 +281,7 @@ export async function insert(data, actorId) {
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
       data.loopEarly ?? false,
+      data.includeInRegistrationPortal ?? false,
     ]
   )
   return findById(id)
@@ -316,6 +318,7 @@ export async function update(id, data) {
        loop_image_16x9 = $27,
        loop_image_32x9 = $28,
        loop_early = $29,
+      include_in_registration_portal = $30,
        updated_at = now()
      WHERE id = $1`,
     [
@@ -348,6 +351,7 @@ export async function update(id, data) {
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
       data.loopEarly ?? false,
+      data.includeInRegistrationPortal ?? false,
     ]
   )
   return findById(id)
@@ -409,8 +413,9 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
        loop_image_16x9 = $25,
        loop_image_32x9 = $26,
        loop_early = $27,
+       include_in_registration_portal = $28,
        updated_at = now()
-     WHERE series_id = $1 AND id <> $28`,
+     WHERE series_id = $1 AND id <> $29`,
     [
       seriesId,
       data.title,
@@ -439,6 +444,7 @@ export async function updateSeriesShared(seriesId, data, exceptId) {
       data.loopImage16x9 ?? null,
       data.loopImage32x9 ?? null,
       data.loopEarly ?? false,
+      data.includeInRegistrationPortal ?? false,
       exceptId,
     ]
   )
