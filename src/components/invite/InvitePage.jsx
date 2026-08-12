@@ -4,7 +4,7 @@ import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2,
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, MultimediaCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
-  TicketsCard, PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
+  PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
 import { fmtDateRange, inviteRsvpHref, inviteHomeHref, ticketPrice } from './inviteUtils'
 import {
@@ -23,7 +23,6 @@ const BLOCK_COMPONENTS = {
   oradores: SpeakersCard,
   agenda: AgendaCard,
   workshops: WorkshopsCard,
-  tickets: TicketsCard,
   pagamento: PaymentCard,
   localizacao: LocationCard,
   faqs: FaqsCard,
@@ -971,7 +970,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
 
 // Fluxo de pagamento do convidado (aparece só para eventos pagos, a quem já se
 // inscreveu). Escolha do método → instruções (IBAN/referência) → comprovativo.
-export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, tickets, accent, onUpdate }) {
+export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
   // Mostra a secção de pagamento/comprovativo quando o bilhete do convidado NÃO
   // é grátis (pago OU doação). O anexo do comprovativo está sempre ligado ao bilhete.
   const applicable = !!guestToken && !!guestStatus && guestStatus.showReceipt
@@ -998,43 +997,27 @@ export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, tickets
   const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
   const rowCls = 'flex justify-between gap-3 border-b border-border/60 py-1.5 text-sm'
   const stateNow = payment?.status || guestStatus.paymentState
-  const isDonation = !!guestStatus.isDonation
-  const selectedTicket = (tickets || []).find((ticket) => ticket.id === guestStatus.ticketId)
-  const payMethod = payment?.method || guestStatus.paymentMethod || invite.paymentMethod || null
-  const methods = selectedTicket?.paymentMethods?.length
-    ? selectedTicket.paymentMethods
-    : payMethod
-      ? [payMethod]
-      : []
-  const methodsTitle = isDonation ? 'Métodos de Doação' : 'Métodos de Pagamento'
 
-  if ((stateNow === 'paid' && !isDonation) || stateNow === 'awaiting_validation') {
-    const statusText = stateNow === 'paid'
-      ? 'Pagamento confirmado. Obrigado!'
-      : 'Comprovativo recebido. Aguarda validação do organizador.'
+  if (stateNow === 'paid') {
+    return (
+      <div className={cardCls + ' flex items-center gap-2 text-emerald-700 dark:text-emerald-400'}>
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+        <p className="m-0 font-semibold">Pagamento confirmado. Obrigado!</p>
+      </div>
+    )
+  }
+  if (stateNow === 'awaiting_validation') {
     return (
       <div className={cardCls}>
-        <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
-          <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          {methodsTitle}
-        </h2>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {methods.map((method) => (
-            <span key={method} className="rounded-lg border border-border bg-muted px-3 py-1.5 text-sm font-semibold text-foreground">
-              {payLabel(invite, method)}
-            </span>
-          ))}
-        </div>
-        <p className={`m-0 inline-flex items-center gap-2 text-sm font-semibold ${stateNow === 'paid' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-          {stateNow === 'paid' ? <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> : null}
-          {statusText}
-        </p>
+        <h2 className="m-0 mb-1 text-lg font-bold text-foreground">Pagamento</h2>
+        <p className="m-0 text-sm text-muted-foreground">Comprovativo recebido. Aguarda validação do organizador.</p>
       </div>
     )
   }
 
   // MB WAY Contribuir (integração JotForm): fluxo dedicado (telemóvel → JotForm → comprovativo).
-  if (payment?.method && methodType(invite, payment.method) === 'mbway-contribuir') {
+  const payMethod = guestStatus.paymentMethod || invite.paymentMethod || null
+  if (methodType(invite, payMethod) === 'mbway-contribuir') {
     return (
       <MbwayFlow
         slug={slug}
@@ -1076,9 +1059,12 @@ export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, tickets
     }
   }
 
+  // Método do bilhete (o convidado já não escolhe — vem resolvido do bilhete).
+  const isDonation = !!guestStatus.isDonation
   // Doação = contribuição voluntária → comprovativo sempre OPCIONAL. Caso
   // contrário, respeita a configuração do método (paymentMethodReceipt).
   const receiptReq = !isDonation && receiptRequired(invite, payMethod)
+  const methods = payMethod ? [payMethod] : []
   const instr = payment?.instructions
 
   // Anexar comprovativo — sempre disponível, ligado ao bilhete (mostra se é
@@ -1103,7 +1089,7 @@ export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, tickets
     <div className={cardCls}>
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-lg font-bold text-foreground">
         <CreditCard className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        {methodsTitle}
+        {isDonation ? 'Contribuição' : 'Pagamento'}
       </h2>
       {isDonation ? (
         <p className="m-0 mb-3 text-sm text-muted-foreground">
@@ -1125,7 +1111,7 @@ export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, tickets
                   className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: accent }}
                 >
-                  {busy ? 'A carregar…' : payLabel(invite, m)}
+                  {busy ? 'A carregar…' : `Como pagar — ${payLabel(invite, m)}`}
                 </button>
               ))}
             </div>
@@ -1344,7 +1330,6 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
             guestToken={guestToken}
             invite={page.invite}
             guestStatus={guestStatus}
-            tickets={page.tickets}
             accent={accent}
             onUpdate={setGuestStatus}
           />
@@ -1396,7 +1381,6 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
                   guestToken={guestToken}
                   invite={page.invite}
                   guestStatus={guestStatus}
-                  tickets={page.tickets}
                   accent={accent}
                   onUpdate={setGuestStatus}
                 />

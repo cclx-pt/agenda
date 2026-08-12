@@ -35,20 +35,19 @@ function renderPaymentFlow(guestStatus) {
   )
 }
 
-it('shows all configured methods for donation tickets', () => {
+it('shows confirmation for completed donation tickets', () => {
   renderPaymentFlow({ isDonation: true, showReceipt: true, paymentState: 'paid' })
 
-  expect(screen.getByRole('heading', { name: 'Métodos de Doação' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Transferência bancária' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'MB WAY' })).toBeInTheDocument()
+  expect(screen.getByText('Pagamento confirmado. Obrigado!')).toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
-it('shows all configured methods for paid tickets', () => {
+it('shows the payment method resolved during registration', () => {
   renderPaymentFlow({ isDonation: false, showReceipt: true, paymentState: 'pending' })
 
-  expect(screen.getByRole('heading', { name: 'Métodos de Pagamento' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Transferência bancária' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'MB WAY' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Pagamento' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Como pagar — Transferência bancária' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /MB WAY/ })).not.toBeInTheDocument()
 })
 
 it('omits the payment-method section for free tickets', () => {
