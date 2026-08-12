@@ -5,6 +5,10 @@ const portalLinkSchema = z.object({
   url: z.string().trim().url().refine((value) => /^https?:\/\//i.test(value), 'Link inválido (use http/https).'),
   platform: z.enum(['youtube', 'instagram', 'facebook', 'website', 'other']).default('other'),
   description: z.string().trim().max(240).optional().default(''),
+  imageUrl: z.string().trim().max(1000).refine(
+    (value) => !value || value.startsWith('/') || /^https?:\/\//i.test(value),
+    'Imagem inválida.'
+  ).optional().default(''),
   active: z.boolean().default(true),
 })
 

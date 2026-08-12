@@ -31,6 +31,7 @@ test('normalizeRegistrationPortalLinks trims and defaults fixed portal links', (
         url: 'https://youtube.com/@cclx',
         platform: 'youtube',
         description: '',
+        imageUrl: '',
         active: true,
       },
     ]
@@ -42,4 +43,16 @@ test('normalizeRegistrationPortalLinks rejects non-http destinations', () => {
     () => normalizeRegistrationPortalLinks([{ title: 'Email', url: 'mailto:info@example.com' }]),
     /Link inválido/
   )
+})
+
+test('normalizeRegistrationPortalLinks preserves image URLs and array order', () => {
+  const links = normalizeRegistrationPortalLinks([
+    { title: 'Segundo', url: 'https://example.com/2', imageUrl: '/uploads/second.png' },
+    { title: 'Primeiro', url: 'https://example.com/1', imageUrl: 'https://example.com/first.png' },
+  ])
+
+  assert.deepEqual(links.map(({ title, imageUrl }) => ({ title, imageUrl })), [
+    { title: 'Segundo', imageUrl: '/uploads/second.png' },
+    { title: 'Primeiro', imageUrl: 'https://example.com/first.png' },
+  ])
 })

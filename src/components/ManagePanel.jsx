@@ -556,6 +556,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [savingBranding, setSavingBranding] = useState(false)
   const [portalLinks, setPortalLinks] = useState([])
   const [savingPortalLinks, setSavingPortalLinks] = useState(false)
+  const [uploadingPortalLink, setUploadingPortalLink] = useState(null)
   // Sobreposição: aviso em tempo real no formulário + política (admin).
   const [overlapInfo, setOverlapInfo] = useState({ mode: 'off', conflicts: [] })
   const [overlapPolicy, setOverlapPolicy] = useState({ default: 'off', byCategory: {}, byChurch: {} })
@@ -789,7 +790,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const addPortalLink = () => {
     setPortalLinks((links) => [
       ...links,
-      { title: '', url: '', platform: 'other', description: '', active: true },
+      { title: '', url: '', platform: 'other', description: '', imageUrl: '', active: true },
     ])
   }
 
@@ -801,6 +802,30 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
   const removePortalLink = (index) => {
     setPortalLinks((links) => links.filter((_, linkIndex) => linkIndex !== index))
+  }
+
+  const movePortalLink = (index, direction) => {
+    setPortalLinks((links) => {
+      const target = index + direction
+      if (target < 0 || target >= links.length) return links
+      const next = [...links]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  const uploadPortalLinkImage = async (index, file) => {
+    if (!file) return
+    setUploadingPortalLink(index)
+    try {
+      const imageUrl = await eventsService.uploadEventImage(file)
+      updatePortalLink(index, 'imageUrl', imageUrl)
+      toast.success('Imagem carregada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploadingPortalLink(null)
+    }
   }
 
   const handleSavePortalLinks = async () => {
@@ -3316,15 +3341,51 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                     Descrição opcional
                     <input className={styles.input} value={link.description} maxLength={240} onChange={(event) => updatePortalLink(index, 'description', event.target.value)} />
                   </label>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-background">
+                      {link.imageUrl ? (
+                        <img src={link.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <i className="ti ti-photo text-xl text-muted-foreground" aria-hidden="true" />
+                      )}
+                    </span>
+                    <label className={`${styles.ghostBtn} cursor-pointer`}>
+                      <i className="ti ti-upload" aria-hidden="true" />
+                      {uploadingPortalLink === index ? 'A carregar…' : 'Carregar ícone/logótipo'}
+                      <input
+                        className="sr-only"
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        disabled={uploadingPortalLink !== null}
+                        onChange={(event) => {
+                          uploadPortalLinkImage(index, event.target.files?.[0])
+                          event.target.value = ''
+                        }}
+                      />
+                    </label>
+                    {link.imageUrl && (
+                      <button type="button" className={styles.ghostBtn} onClick={() => updatePortalLink(index, 'imageUrl', '')}>
+                        Remover imagem
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <label className={styles.check}>
                       <input type="checkbox" checked={link.active} onChange={(event) => updatePortalLink(index, 'active', event.target.checked)} />
                       Ativo
                     </label>
-                    <button type="button" className={styles.dangerBtn} onClick={() => removePortalLink(index)} aria-label={`Remover ${link.title || 'link'}`}>
-                      <i className="ti ti-trash" aria-hidden="true" />
-                      Remover
-                    </button>
+                    <div className="flex gap-1">
+                      <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, -1)} disabled={index === 0} title="Subir" aria-label={`Subir ${link.title || 'link'}`}>
+                        <i className="ti ti-arrow-up" aria-hidden="true" />
+                      </button>
+                      <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, 1)} disabled={index === portalLinks.length - 1} title="Descer" aria-label={`Descer ${link.title || 'link'}`}>
+                        <i className="ti ti-arrow-down" aria-hidden="true" />
+                      </button>
+                      <button type="button" className={styles.dangerBtn} onClick={() => removePortalLink(index)} aria-label={`Remover ${link.title || 'link'}`}>
+                        <i className="ti ti-trash" aria-hidden="true" />
+                        Remover
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
