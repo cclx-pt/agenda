@@ -32,6 +32,7 @@ test('normalizeRegistrationPortalLinks trims and defaults fixed portal links', (
     ]),
     [
       {
+        type: 'link',
         title: 'YouTube CCLX',
         url: 'https://youtube.com/@cclx',
         platform: 'youtube',
@@ -52,13 +53,13 @@ test('normalizeRegistrationPortalLinks rejects non-http destinations', () => {
 
 test('normalizeRegistrationPortalLinks preserves image URLs and array order', () => {
   const links = normalizeRegistrationPortalLinks([
-    { title: 'Segundo', url: 'https://example.com/2', imageUrl: '/uploads/second.png' },
+    { type: 'registration', title: 'Segundo', url: 'https://example.com/2', imageUrl: '/uploads/second.png' },
     { title: 'Primeiro', url: 'https://example.com/1', imageUrl: 'https://example.com/first.png' },
   ])
 
-  assert.deepEqual(links.map(({ title, imageUrl }) => ({ title, imageUrl })), [
-    { title: 'Segundo', imageUrl: '/uploads/second.png' },
-    { title: 'Primeiro', imageUrl: 'https://example.com/first.png' },
+  assert.deepEqual(links.map(({ type, title, imageUrl }) => ({ type, title, imageUrl })), [
+    { type: 'registration', title: 'Segundo', imageUrl: '/uploads/second.png' },
+    { type: 'link', title: 'Primeiro', imageUrl: 'https://example.com/first.png' },
   ])
 })
 

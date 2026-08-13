@@ -25,6 +25,21 @@ const DEFAULT_PORTAL_HEADER = {
   description: 'Encontra aqui as inscrições abertas e os canais oficiais da comunidade.',
 }
 
+let portalEditorKey = 0
+
+function portalEntryForEditor(entry = {}) {
+  return {
+    ...entry,
+    type: entry.type === 'registration' ? 'registration' : 'link',
+    _editorKey: entry._editorKey || `portal-entry-${++portalEditorKey}`,
+  }
+}
+
+function portalEntryForSave(entry) {
+  const { _editorKey, ...savedEntry } = entry
+  return savedEntry
+}
+
 // Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
 // antigo CSS module, mantendo intactas as referências styles.* no JSX.
 const styles = {
@@ -562,6 +577,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const [savingBranding, setSavingBranding] = useState(false)
   const [portalHeader, setPortalHeader] = useState(DEFAULT_PORTAL_HEADER)
   const [portalLinks, setPortalLinks] = useState([])
+  const [expandedPortalLinks, setExpandedPortalLinks] = useState([])
   const [savingPortalLinks, setSavingPortalLinks] = useState(false)
   const [uploadingPortalLogo, setUploadingPortalLogo] = useState(false)
   const [uploadingPortalLink, setUploadingPortalLink] = useState(null)
@@ -788,7 +804,8 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     try {
       const portal = await eventsService.getRegistrationPortalLinks({ includeInactive: true })
       setPortalHeader(portal.header || DEFAULT_PORTAL_HEADER)
-      setPortalLinks(portal.links || [])
+      setPortalLinks((portal.links || []).map(portalEntryForEditor))
+      setExpandedPortalLinks([])
       setView('registrationPortal')
     } catch (err) {
       toast.error(err.message)
@@ -798,10 +815,11 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   }
 
   const addPortalLink = () => {
-    setPortalLinks((links) => [
-      ...links,
-      { title: '', url: '', platform: 'other', description: '', imageUrl: '', active: true },
-    ])
+    const entry = portalEntryForEditor({
+      type: 'link', title: '', url: '', platform: 'other', description: '', imageUrl: '', active: true,
+    })
+    setPortalLinks((links) => [...links, entry])
+    setExpandedPortalLinks((keys) => [...keys, entry._editorKey])
   }
 
   const updatePortalLink = (index, field, value) => {
@@ -811,7 +829,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   }
 
   const removePortalLink = (index) => {
+    const editorKey = portalLinks[index]?._editorKey
     setPortalLinks((links) => links.filter((_, linkIndex) => linkIndex !== index))
+    setExpandedPortalLinks((keys) => keys.filter((key) => key !== editorKey))
+  }
+
+  const togglePortalLink = (editorKey) => {
+    setExpandedPortalLinks((keys) =>
+      keys.includes(editorKey) ? keys.filter((key) => key !== editorKey) : [...keys, editorKey]
+    )
   }
 
   const movePortalLink = (index, direction) => {
@@ -865,10 +891,13 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     try {
       const portal = await eventsService.updateRegistrationPortalLinks({
         header: portalHeader,
-        links: portalLinks,
+        links: portalLinks.map(portalEntryForSave),
       })
       setPortalHeader(portal.header)
-      setPortalLinks(portal.links)
+      setPortalLinks(portal.links.map((link, index) => portalEntryForEditor({
+        ...link,
+        _editorKey: portalLinks[index]?._editorKey,
+      })))
       toast.success('Portal de inscrições guardado.')
     } catch (err) {
       toast.error(err.message)
@@ -3349,7 +3378,7 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
         ) : view === 'registrationPortal' ? (
           <div className={styles.body}>
             <p className="m-0 text-sm text-muted-foreground">
-              Estes links aparecem no portal público juntamente com os eventos selecionados.
+              Classifique e ordene as entradas do portal. As entradas automáticas mantêm a ordem do calendário.
             </p>
             <section className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4" aria-labelledby="portal-header-settings-title">
               <h3 id="portal-header-settings-title" className="m-0 text-sm font-bold text-foreground">Cabeçalho do portal</h3>
@@ -3389,13 +3418,53 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               </label>
             </section>
             <div className="flex flex-col gap-3">
-              {portalLinks.map((link, index) => (
-                <div key={index} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              {portalLinks.map((link, index) => {
+                const expanded = expandedPortalLinks.includes(link._editorKey)
+                const entryLabel = link.type === 'registration' ? 'Inscrição' : 'Ligação'
+                return (
+                <div key={link._editorKey} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => togglePortalLink(link._editorKey)}
+                      aria-expanded={expanded}
+                      aria-label={`${expanded ? 'Recolher' : 'Expandir'} ${link.title || entryLabel}`}
+                    >
+                      <i className={`ti ti-chevron-${expanded ? 'up' : 'down'}`} aria-hidden="true" />
+                    </button>
+                    <span className="rounded-full bg-background px-2 py-1 text-[11px] font-bold uppercase text-muted-foreground">
+                      {entryLabel}
+                    </span>
+                    <strong className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {link.title || `Nova ${entryLabel.toLowerCase()}`}
+                    </strong>
+                    <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, -1)} disabled={index === 0} title="Subir" aria-label={`Subir ${link.title || entryLabel}`}>
+                      <i className="ti ti-arrow-up" aria-hidden="true" />
+                    </button>
+                    <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, 1)} disabled={index === portalLinks.length - 1} title="Descer" aria-label={`Descer ${link.title || entryLabel}`}>
+                      <i className="ti ti-arrow-down" aria-hidden="true" />
+                    </button>
+                    <button type="button" className={`${styles.iconBtn} ${styles.danger}`} onClick={() => removePortalLink(index)} title="Remover" aria-label={`Remover ${link.title || entryLabel}`}>
+                      <i className="ti ti-trash" aria-hidden="true" />
+                    </button>
+                  </div>
+                  {expanded && (
+                  <>
                   <div className={styles.row}>
                     <label className={styles.label}>
                       Título
                       <input className={styles.input} value={link.title} maxLength={100} onChange={(event) => updatePortalLink(index, 'title', event.target.value)} />
                     </label>
+                    <label className={styles.label}>
+                      Classificação
+                      <select className={styles.input} value={link.type} onChange={(event) => updatePortalLink(index, 'type', event.target.value)}>
+                        <option value="registration">Inscrição</option>
+                        <option value="link">Ligação</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className={styles.row}>
                     <label className={styles.label}>
                       Plataforma
                       <select className={styles.input} value={link.platform} onChange={(event) => updatePortalLink(index, 'platform', event.target.value)}>
@@ -3405,6 +3474,15 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                         <option value="website">Website</option>
                         <option value="other">Outro</option>
                       </select>
+                    </label>
+                    <label className={styles.label}>
+                      Estado
+                      <span className="flex min-h-[38px] items-center">
+                        <span className={styles.check}>
+                          <input type="checkbox" checked={link.active} onChange={(event) => updatePortalLink(index, 'active', event.target.checked)} />
+                          Ativo
+                        </span>
+                      </span>
                     </label>
                   </div>
                   <label className={styles.label}>
@@ -3443,31 +3521,16 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <label className={styles.check}>
-                      <input type="checkbox" checked={link.active} onChange={(event) => updatePortalLink(index, 'active', event.target.checked)} />
-                      Ativo
-                    </label>
-                    <div className="flex gap-1">
-                      <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, -1)} disabled={index === 0} title="Subir" aria-label={`Subir ${link.title || 'link'}`}>
-                        <i className="ti ti-arrow-up" aria-hidden="true" />
-                      </button>
-                      <button type="button" className={styles.iconBtn} onClick={() => movePortalLink(index, 1)} disabled={index === portalLinks.length - 1} title="Descer" aria-label={`Descer ${link.title || 'link'}`}>
-                        <i className="ti ti-arrow-down" aria-hidden="true" />
-                      </button>
-                      <button type="button" className={styles.dangerBtn} onClick={() => removePortalLink(index)} aria-label={`Remover ${link.title || 'link'}`}>
-                        <i className="ti ti-trash" aria-hidden="true" />
-                        Remover
-                      </button>
-                    </div>
-                  </div>
+                  </>
+                  )}
                 </div>
-              ))}
-              {portalLinks.length === 0 && <p className={styles.muted}>Ainda não existem links fixos.</p>}
+                )
+              })}
+              {portalLinks.length === 0 && <p className={styles.muted}>Ainda não existem entradas configuradas.</p>}
             </div>
             <button type="button" className={`${styles.ghostBtn} self-start`} onClick={addPortalLink} disabled={savingPortalLinks}>
               <i className="ti ti-plus" aria-hidden="true" />
-              Adicionar link
+              Adicionar entrada
             </button>
             <div className={styles.formActions}>
               <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingPortalLinks || uploadingPortalLogo}>Voltar</button>

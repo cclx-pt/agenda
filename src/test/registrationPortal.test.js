@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventDestination, selectRegistrationEvents } from '../utils/registrationPortal'
+import { classifyPortalEntries, eventDestination, selectRegistrationEvents } from '../utils/registrationPortal'
 
 describe('registration portal events', () => {
   it('prefers the published landing page over an external registration URL', () => {
@@ -17,5 +17,19 @@ describe('registration portal events', () => {
     ]
 
     expect(selectRegistrationEvents(events, now).map((event) => event.id)).toEqual([2, 3])
+  })
+
+  it('classifies configured entries without changing their manual order', () => {
+    const entries = [
+      { title: 'YouTube', type: 'link' },
+      { title: 'Retiro', type: 'registration' },
+      { title: 'Conferência', type: 'registration' },
+      { title: 'Instagram' },
+    ]
+
+    expect(classifyPortalEntries(entries)).toEqual({
+      registrations: [entries[1], entries[2]],
+      links: [entries[0], entries[3]],
+    })
   })
 })
