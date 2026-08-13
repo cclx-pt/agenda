@@ -139,7 +139,7 @@ export const registrationPortalRouter = Router()
 
 registrationPortalRouter.get('/', async (_req, res, next) => {
   try {
-    res.json({ links: await service.getRegistrationPortalLinks({ activeOnly: true }) })
+    res.json(await service.getRegistrationPortalConfig({ activeOnly: true }))
   } catch (err) {
     next(err)
   }
@@ -147,7 +147,7 @@ registrationPortalRouter.get('/', async (_req, res, next) => {
 
 registrationPortalRouter.get('/admin', adminOnly, async (_req, res, next) => {
   try {
-    res.json({ links: await service.getRegistrationPortalLinks() })
+    res.json(await service.getRegistrationPortalConfig())
   } catch (err) {
     next(err)
   }
@@ -155,11 +155,11 @@ registrationPortalRouter.get('/admin', adminOnly, async (_req, res, next) => {
 
 registrationPortalRouter.put('/', adminOnly, async (req, res, next) => {
   try {
-    const links = await service.updateRegistrationPortalLinks(
-      req.body?.links ?? req.body,
+    const portal = await service.updateRegistrationPortalConfig(
+      req.body,
       req.user.sub
     )
-    res.json({ links })
+    res.json(portal)
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.issues[0]?.message ?? 'Dados inválidos.' })

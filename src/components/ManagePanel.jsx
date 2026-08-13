@@ -19,6 +19,12 @@ import { useI18n } from '../hooks/useI18n'
 import { DEFAULT_TRANSLATIONS, TRANSLATION_KEYS, LANGUAGES } from '../i18n'
 import defaultLogoUrl from '../assets/cclx_line_logo.png'
 
+const DEFAULT_PORTAL_HEADER = {
+  logoUrl: '',
+  title: 'Inscrições e ligações',
+  description: 'Encontra aqui as inscrições abertas e os canais oficiais da comunidade.',
+}
+
 // Mapa de estilos: utilitários Tailwind (tema neutro shadcn). Substitui o
 // antigo CSS module, mantendo intactas as referências styles.* no JSX.
 const styles = {
@@ -554,8 +560,10 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   // Aparência (admin): estado de upload/reposição do logótipo.
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [savingBranding, setSavingBranding] = useState(false)
+  const [portalHeader, setPortalHeader] = useState(DEFAULT_PORTAL_HEADER)
   const [portalLinks, setPortalLinks] = useState([])
   const [savingPortalLinks, setSavingPortalLinks] = useState(false)
+  const [uploadingPortalLogo, setUploadingPortalLogo] = useState(false)
   const [uploadingPortalLink, setUploadingPortalLink] = useState(null)
   // Sobreposição: aviso em tempo real no formulário + política (admin).
   const [overlapInfo, setOverlapInfo] = useState({ mode: 'off', conflicts: [] })
@@ -778,7 +786,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
   const openRegistrationPortal = async () => {
     setBusy(true)
     try {
-      setPortalLinks(await eventsService.getRegistrationPortalLinks({ includeInactive: true }))
+      const portal = await eventsService.getRegistrationPortalLinks({ includeInactive: true })
+      setPortalHeader(portal.header || DEFAULT_PORTAL_HEADER)
+      setPortalLinks(portal.links || [])
       setView('registrationPortal')
     } catch (err) {
       toast.error(err.message)
@@ -828,11 +838,38 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
     }
   }
 
+  const uploadPortalLogo = async (file) => {
+    if (!file) return
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Formato inválido. Apenas PNG ou JPG.')
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error('Imagem demasiado grande (máx. 5MB).')
+      return
+    }
+    setUploadingPortalLogo(true)
+    try {
+      const logoUrl = await eventsService.uploadEventImage(file)
+      setPortalHeader((header) => ({ ...header, logoUrl }))
+      toast.success('Logótipo carregado. Guarde as alterações para publicar.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploadingPortalLogo(false)
+    }
+  }
+
   const handleSavePortalLinks = async () => {
     setSavingPortalLinks(true)
     try {
-      setPortalLinks(await eventsService.updateRegistrationPortalLinks(portalLinks))
-      toast.success('Links do portal guardados.')
+      const portal = await eventsService.updateRegistrationPortalLinks({
+        header: portalHeader,
+        links: portalLinks,
+      })
+      setPortalHeader(portal.header)
+      setPortalLinks(portal.links)
+      toast.success('Portal de inscrições guardado.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -3314,6 +3351,43 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
             <p className="m-0 text-sm text-muted-foreground">
               Estes links aparecem no portal público juntamente com os eventos selecionados.
             </p>
+            <section className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4" aria-labelledby="portal-header-settings-title">
+              <h3 id="portal-header-settings-title" className="m-0 text-sm font-bold text-foreground">Cabeçalho do portal</h3>
+              <div className="flex items-center gap-3">
+                <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black p-3">
+                  <img src={portalHeader.logoUrl || defaultLogoUrl} alt="Pré-visualização do logótipo" className="h-full w-full object-contain" />
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  <label className={`${styles.ghostBtn} cursor-pointer`}>
+                    <i className="ti ti-upload" aria-hidden="true" />
+                    {uploadingPortalLogo ? 'A carregar…' : 'Carregar logótipo'}
+                    <input
+                      className="sr-only"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      disabled={uploadingPortalLogo}
+                      onChange={(event) => {
+                        uploadPortalLogo(event.target.files?.[0])
+                        event.target.value = ''
+                      }}
+                    />
+                  </label>
+                  {portalHeader.logoUrl && (
+                    <button type="button" className={styles.ghostBtn} onClick={() => setPortalHeader((header) => ({ ...header, logoUrl: '' }))}>
+                      Repor predefinido
+                    </button>
+                  )}
+                </div>
+              </div>
+              <label className={styles.label}>
+                Título
+                <input className={styles.input} value={portalHeader.title} maxLength={100} onChange={(event) => setPortalHeader((header) => ({ ...header, title: event.target.value }))} />
+              </label>
+              <label className={styles.label}>
+                Texto
+                <textarea className={styles.textarea} rows={3} value={portalHeader.description} maxLength={240} onChange={(event) => setPortalHeader((header) => ({ ...header, description: event.target.value }))} />
+              </label>
+            </section>
             <div className="flex flex-col gap-3">
               {portalLinks.map((link, index) => (
                 <div key={index} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
@@ -3396,9 +3470,9 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
               Adicionar link
             </button>
             <div className={styles.formActions}>
-              <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingPortalLinks}>Voltar</button>
-              <button type="button" className={styles.primaryBtn} onClick={handleSavePortalLinks} disabled={savingPortalLinks}>
-                {savingPortalLinks ? 'A guardar…' : 'Guardar links'}
+              <button type="button" className={styles.ghostBtn} onClick={goHome} disabled={savingPortalLinks || uploadingPortalLogo}>Voltar</button>
+              <button type="button" className={styles.primaryBtn} onClick={handleSavePortalLinks} disabled={savingPortalLinks || uploadingPortalLogo}>
+                {savingPortalLinks ? 'A guardar…' : 'Guardar portal'}
               </button>
             </div>
           </div>

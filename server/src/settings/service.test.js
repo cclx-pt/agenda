@@ -1,7 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeLoop } from '../loop/config.js'
-import { normalizeRegistrationPortalLinks } from './portalLinks.js'
+import {
+  DEFAULT_REGISTRATION_PORTAL_HEADER,
+  normalizeRegistrationPortalConfig,
+  normalizeRegistrationPortalLinks,
+  parseStoredRegistrationPortalConfig,
+} from './portalLinks.js'
 
 test('normalizeLoop sanitizes fixed media slides and their durations', () => {
   const loop = normalizeLoop({
@@ -55,4 +60,34 @@ test('normalizeRegistrationPortalLinks preserves image URLs and array order', ()
     { title: 'Segundo', imageUrl: '/uploads/second.png' },
     { title: 'Primeiro', imageUrl: 'https://example.com/first.png' },
   ])
+})
+
+test('parseStoredRegistrationPortalConfig upgrades legacy link arrays with the default header', () => {
+  const config = parseStoredRegistrationPortalConfig([
+    { title: 'CCLX', url: 'https://example.com' },
+  ])
+
+  assert.deepEqual(config.header, DEFAULT_REGISTRATION_PORTAL_HEADER)
+  assert.equal(config.links[0].title, 'CCLX')
+})
+
+test('normalizeRegistrationPortalConfig trims the header and preserves link order', () => {
+  const config = normalizeRegistrationPortalConfig({
+    header: {
+      logoUrl: ' /uploads/portal.png ',
+      title: ' Agenda CCLX ',
+      description: ' Inscrições abertas ',
+    },
+    links: [
+      { title: 'Segundo', url: 'https://example.com/2' },
+      { title: 'Primeiro', url: 'https://example.com/1' },
+    ],
+  })
+
+  assert.deepEqual(config.header, {
+    logoUrl: '/uploads/portal.png',
+    title: 'Agenda CCLX',
+    description: 'Inscrições abertas',
+  })
+  assert.deepEqual(config.links.map(({ title }) => title), ['Segundo', 'Primeiro'])
 })

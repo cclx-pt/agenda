@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { config } from '../config.js'
 import { normalizeLoop } from '../loop/config.js'
 import * as repo from './repository.js'
-import { normalizeRegistrationPortalLinks, parseStoredRegistrationPortalLinks } from './portalLinks.js'
+import {
+  normalizeRegistrationPortalConfig,
+  parseStoredRegistrationPortalConfig,
+} from './portalLinks.js'
 
 // Chave da definição da integração com a inChurch.
 const KEY = 'inchurch_integration'
@@ -136,16 +139,19 @@ export async function updateBranding(input, actorId) {
 // outros destinos que não correspondem a eventos).
 const REGISTRATION_PORTAL_LINKS_KEY = 'registration_portal_links'
 
-export async function getRegistrationPortalLinks({ activeOnly = false } = {}) {
+export async function getRegistrationPortalConfig({ activeOnly = false } = {}) {
   const stored = await repo.get(REGISTRATION_PORTAL_LINKS_KEY)
-  const links = parseStoredRegistrationPortalLinks(stored)
-  return activeOnly ? links.filter((link) => link.active) : links
+  const config = parseStoredRegistrationPortalConfig(stored)
+  return {
+    ...config,
+    links: activeOnly ? config.links.filter((link) => link.active) : config.links,
+  }
 }
 
-export async function updateRegistrationPortalLinks(input, actorId) {
-  const links = normalizeRegistrationPortalLinks(input)
-  await repo.set(REGISTRATION_PORTAL_LINKS_KEY, links, actorId)
-  return links
+export async function updateRegistrationPortalConfig(input, actorId) {
+  const portal = normalizeRegistrationPortalConfig(input)
+  await repo.set(REGISTRATION_PORTAL_LINKS_KEY, portal, actorId)
+  return portal
 }
 
 // ── Métodos de pagamento (geridos na Administração de convites) ──

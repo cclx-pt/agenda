@@ -229,16 +229,14 @@ export async function updateBranding(branding) {
 
 export async function getRegistrationPortalLinks({ includeInactive = false } = {}) {
   const path = includeInactive ? '/data/registration-portal/admin' : '/data/registration-portal'
-  const { links } = await request(path)
-  return links
+  return request(path)
 }
 
-export async function updateRegistrationPortalLinks(links) {
-  const { links: saved } = await request('/data/registration-portal', {
+export async function updateRegistrationPortalLinks(portal) {
+  return request('/data/registration-portal', {
     method: 'PUT',
-    body: { links },
+    body: portal,
   })
-  return saved
 }
 
 // ── Métodos de pagamento ─────────────────────────
