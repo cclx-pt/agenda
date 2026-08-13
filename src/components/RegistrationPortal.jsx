@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { fetchEvents } from '../services/apiService'
 import { getRegistrationPortalLinks } from '../services/eventsService'
-import { eventDestination, selectRegistrationEvents } from '../utils/registrationPortal'
+import { classifyPortalEntries, eventDestination, selectRegistrationEvents } from '../utils/registrationPortal'
 import defaultLogoUrl from '../assets/cclx_line_logo.png'
 
 const defaultHeader = {
@@ -68,6 +68,9 @@ export default function RegistrationPortal() {
     }
   }, [])
 
+  const configured = classifyPortalEntries(data.links)
+  const hasRegistrations = data.events.length > 0 || configured.registrations.length > 0
+
   return (
     <main className="min-h-screen bg-white text-[#17191c]">
       <div className="mx-auto flex min-h-screen w-full max-w-[680px] flex-col px-4 pb-12 pt-10 sm:px-6 sm:pt-14">
@@ -92,7 +95,7 @@ export default function RegistrationPortal() {
           <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">{error}</p>
         ) : (
           <div className="flex flex-col gap-8">
-            {data.events.length > 0 && (
+            {hasRegistrations && (
               <section aria-labelledby="portal-events-title">
                 <h2 id="portal-events-title" className="mb-3 text-center text-xs font-bold uppercase text-[#6b7078]">
                   Próximas inscrições
@@ -123,46 +126,35 @@ export default function RegistrationPortal() {
                       <ArrowUpRight size={18} className="text-[#555a62] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
                     </a>
                   ))}
-                </div>
-              </section>
-            )}
-
-            {data.links.length > 0 && (
-              <section aria-labelledby="portal-links-title">
-                <h2 id="portal-links-title" className="mb-3 text-center text-xs font-bold uppercase text-[#6b7078]">
-                  Ligações CCLX
-                </h2>
-                <div className="flex flex-col gap-4">
-                  {data.links.map((link, index) => {
-                    const PlatformIcon = platformIcons[link.platform] || LinkIcon
+                  {configured.registrations.map((entry, index) => {
+                    const PlatformIcon = platformIcons[entry.platform] || LinkIcon
                     return (
-                      <a
-                        key={`${link.url}-${index}`}
-                        href={link.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group grid min-h-[66px] grid-cols-[50px_1fr_auto] items-center gap-3 rounded-[33px] border border-[#dfe1e5] bg-[#f1f2f4] p-[7px] pr-5 transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#e8eaed] focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 focus:ring-offset-white"
-                      >
-                        <span className="flex h-[50px] w-[50px] items-center justify-center overflow-hidden rounded-full bg-white text-[#34383e]">
-                          {link.imageUrl ? (
-                            <img src={link.imageUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <PlatformIcon size={22} aria-hidden="true" />
-                          )}
-                        </span>
-                        <span className="min-w-0">
-                          <strong className="block text-sm leading-5">{link.title}</strong>
-                          {link.description && <span className="mt-0.5 block text-xs text-[#666b73]">{link.description}</span>}
-                        </span>
-                        <ArrowUpRight size={18} className="text-[#555a62] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
-                      </a>
+                      <PortalEntry
+                        key={`${entry.url}-${index}`}
+                        entry={entry}
+                        icon={PlatformIcon}
+                      />
                     )
                   })}
                 </div>
               </section>
             )}
 
-            {data.events.length === 0 && data.links.length === 0 && (
+            {configured.links.length > 0 && (
+              <section aria-labelledby="portal-links-title">
+                <h2 id="portal-links-title" className="mb-3 text-center text-xs font-bold uppercase text-[#6b7078]">
+                  Ligações CCLX
+                </h2>
+                <div className="flex flex-col gap-4">
+                  {configured.links.map((link, index) => {
+                    const PlatformIcon = platformIcons[link.platform] || LinkIcon
+                    return <PortalEntry key={`${link.url}-${index}`} entry={link} icon={PlatformIcon} />
+                  })}
+                </div>
+              </section>
+            )}
+
+            {!hasRegistrations && configured.links.length === 0 && (
               <p className="rounded-2xl border border-[#dfe1e5] bg-[#f1f2f4] p-6 text-center text-sm text-[#666b73]">
                 Não existem inscrições ou ligações disponíveis neste momento.
               </p>
@@ -173,5 +165,29 @@ export default function RegistrationPortal() {
         <footer className="mt-auto pt-12 text-center text-xs text-[#7a7f87]">Comunidade Cristã de Lisboa</footer>
       </div>
     </main>
+  )
+}
+
+function PortalEntry({ entry, icon: PlatformIcon }) {
+  return (
+    <a
+      href={entry.url}
+      target="_blank"
+      rel="noreferrer"
+      className="group grid min-h-[66px] grid-cols-[50px_1fr_auto] items-center gap-3 rounded-[33px] border border-[#dfe1e5] bg-[#f1f2f4] p-[7px] pr-5 transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#e8eaed] focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 focus:ring-offset-white"
+    >
+      <span className="flex h-[50px] w-[50px] items-center justify-center overflow-hidden rounded-full bg-white text-[#34383e]">
+        {entry.imageUrl ? (
+          <img src={entry.imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <PlatformIcon size={22} aria-hidden="true" />
+        )}
+      </span>
+      <span className="min-w-0">
+        <strong className="block text-sm leading-5">{entry.title}</strong>
+        {entry.description && <span className="mt-0.5 block text-xs text-[#666b73]">{entry.description}</span>}
+      </span>
+      <ArrowUpRight size={18} className="text-[#555a62] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+    </a>
   )
 }

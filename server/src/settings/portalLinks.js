@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 const portalLinkSchema = z.object({
+  type: z.enum(['link', 'registration']).default('link'),
   title: z.string().trim().min(1).max(100),
   url: z.string().trim().url().refine((value) => /^https?:\/\//i.test(value), 'Link inválido (use http/https).'),
   platform: z.enum(['youtube', 'instagram', 'facebook', 'website', 'other']).default('other'),

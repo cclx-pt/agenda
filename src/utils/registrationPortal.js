@@ -28,3 +28,11 @@ export function selectRegistrationEvents(events, now = new Date()) {
     )
     .sort((left, right) => eventStartTime(left) - eventStartTime(right))
 }
+
+export function classifyPortalEntries(entries) {
+  const list = Array.isArray(entries) ? entries : []
+  return {
+    registrations: list.filter((entry) => entry.type === 'registration'),
+    links: list.filter((entry) => entry.type !== 'registration'),
+  }
+}
