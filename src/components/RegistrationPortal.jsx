@@ -78,8 +78,7 @@ export default function RegistrationPortal() {
           <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-black p-5 ring-2 ring-[#d9dce1] ring-offset-4 ring-offset-white">
             <img src={data.header.logoUrl || defaultLogoUrl} alt="CCLX" className="h-auto w-full object-contain" />
           </div>
-          <p className="text-xs font-bold uppercase text-[#6b7078]">CCLX</p>
-          <h1 className="mt-2 text-3xl font-extrabold sm:text-4xl">{data.header.title}</h1>
+          <h1 className="text-3xl font-extrabold sm:text-4xl">{data.header.title}</h1>
           <p className="mt-3 max-w-md text-sm leading-6 text-[#5d626a]">
             {data.header.description}
           </p>
