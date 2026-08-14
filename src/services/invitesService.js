@@ -167,7 +167,7 @@ export async function regenerateCheckinLink(inviteId) {
   return link
 }
 
-// Link público Self Follow-up (organizador): obter/criar e rodar (revoga o antigo).
+// Link de Self Follow-up: totais agregados, protegido por token revogável.
 export async function getFollowupLink(inviteId) {
   const { link } = await request(`/data/invites/${inviteId}/follow-up/link`)
   return link
@@ -180,7 +180,7 @@ export async function regenerateFollowupLink(inviteId) {
 
 export async function publicFollowupStats(slug, token) {
   const { stats } = await request(
-    `/data/public/invite/${encodeURIComponent(slug)}/follow-up?k=${encodeURIComponent(token)}`
+    `/data/public/invite/${encodeURIComponent(slug)}/follow-up/stats?k=${encodeURIComponent(token)}`
   )
   return stats
 }

@@ -232,6 +232,65 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_by UUID REFERENCES users (id) ON DELETE SET NULL
 );
 
+-- ── Campanhas de financiamento ─────────────────────────────────
+-- Registo financeiro autónomo dos convites. Donativos são append-only na API;
+-- correções contabilísticas devem ser documentadas, nunca apagadas.
+CREATE TABLE IF NOT EXISTS funding_campaigns (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug             TEXT NOT NULL UNIQUE,
+  title            TEXT NOT NULL,
+  purpose          TEXT NOT NULL,
+  target_eur       NUMERIC(12,2) NOT NULL CHECK (target_eur > 0),
+  deadline         DATE NOT NULL,
+  configurations   TEXT[] NOT NULL CHECK (cardinality(configurations) > 0),
+  visibility_mode  TEXT NOT NULL DEFAULT 'V1' CHECK (visibility_mode IN ('V1','V2','V3')),
+  phase_plan       TEXT,
+  status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','closed')),
+  created_by       UUID REFERENCES users (id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS funding_pledges (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id         UUID NOT NULL REFERENCES funding_campaigns (id) ON DELETE RESTRICT,
+  donor_name          TEXT NOT NULL,
+  contact             TEXT,
+  pledged_amount      NUMERIC(12,2) NOT NULL CHECK (pledged_amount > 0),
+  schedule            TEXT NOT NULL CHECK (schedule IN ('one_shot','monthly_12','annual','weekly','monthly_rolling')),
+  promised_date       DATE,
+  status              TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','partial','fulfilled','overdue')),
+  last_follow_up      DATE,
+  consent_recorded    BOOLEAN NOT NULL DEFAULT FALSE,
+  access_granted      BOOLEAN NOT NULL DEFAULT FALSE,
+  access_revoked_date DATE,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_funding_pledges_campaign ON funding_pledges (campaign_id);
+
+CREATE TABLE IF NOT EXISTS funding_donations (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id      UUID NOT NULL REFERENCES funding_campaigns (id) ON DELETE RESTRICT,
+  receipt_no       TEXT NOT NULL,
+  donation_date    DATE NOT NULL,
+  amount_eur       NUMERIC(12,2) NOT NULL CHECK (amount_eur > 0),
+  channel          TEXT NOT NULL CHECK (channel IN ('cash','mbway','transfer','online','other')),
+  config_id        TEXT NOT NULL CHECK (config_id IN ('C1','C2','C3','C4','C5')),
+  donor_name       TEXT NOT NULL DEFAULT 'anonymous',
+  donor_contact    TEXT,
+  pledge_ref       UUID REFERENCES funding_pledges (id) ON DELETE RESTRICT,
+  proof_ref        TEXT NOT NULL,
+  recorded_by      UUID REFERENCES users (id) ON DELETE SET NULL,
+  reconciled       BOOLEAN NOT NULL DEFAULT FALSE,
+  reconciled_by    UUID REFERENCES users (id) ON DELETE SET NULL,
+  reconciled_at    TIMESTAMPTZ,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (campaign_id, receipt_no)
+);
+CREATE INDEX IF NOT EXISTS idx_funding_donations_campaign_date
+  ON funding_donations (campaign_id, donation_date DESC);
+
 -- ── Igrejas / organizações ──────────────────────────────────────
 -- Fonte única da verdade das igrejas geridas no backoffice. `external_id` é o
 -- ID da inChurch (responsible_church.id) usado para ligar os eventos importados.

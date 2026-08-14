@@ -633,35 +633,6 @@ export async function regenerateCheckinLink(user, inviteId) {
   return checkinLinkPayload(invite, token)
 }
 
-// Contexto (cabeçalho) da página de check-in móvel — valida o token.
-export async function checkinContext(slug, rawToken) {
-  const invite = await loadInviteByCheckinToken(slug, rawToken)
-  return {
-    title: invite.title,
-    slug: invite.slug,
-    startDatetime: invite.startDatetime,
-    location: invite.location ?? null,
-    community: invite.community ?? null,
-    status: invite.status,
-  }
-}
-
-// Procura uma inscrição a partir do link móvel (autenticado pelo token).
-export async function checkinLookupPublic(slug, rawToken, rawCode) {
-  const invite = await loadInviteByCheckinToken(slug, rawToken)
-  const guest = await resolveCheckinGuest(invite, rawCode)
-  return buildCheckinResult(invite, guest)
-}
-
-// Aceita (ou anula) o check-in a partir do link móvel (autenticado pelo token).
-export async function acceptCheckinPublic(slug, rawToken, guestId, { on = true } = {}) {
-  const invite = await loadInviteByCheckinToken(slug, rawToken)
-  const guest = await repo.findGuestById(guestId)
-  if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
-  return repo.setCheckedIn(guest.id, on)
-}
-
-// ── Self Follow-up: painel público de KPIs por link secreto ────────────────
 function followupLinkPayload(invite, token) {
   const base = (config.appUrl || '').replace(/\/+$/, '')
   return {
@@ -713,17 +684,47 @@ export async function regenerateFollowupLink(user, inviteId) {
 
 export async function followupStats(slug, rawToken) {
   const invite = await loadInviteByFollowupToken(slug, rawToken)
-  const [guests, tickets] = await Promise.all([repo.listGuests(invite.id), repo.listTickets(invite.id)])
+  const [guests, tickets] = await Promise.all([
+    repo.listGuests(invite.id),
+    repo.listTickets(invite.id),
+  ])
   return {
     event: {
       title: invite.title,
       startDatetime: invite.startDatetime,
-      endDatetime: invite.endDatetime,
       location: invite.location ?? null,
     },
-    updatedAt: new Date().toISOString(),
     ...buildFollowupStats(guests, tickets),
+    updatedAt: new Date().toISOString(),
   }
+}
+
+// Contexto (cabeçalho) da página de check-in móvel — valida o token.
+export async function checkinContext(slug, rawToken) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  return {
+    title: invite.title,
+    slug: invite.slug,
+    startDatetime: invite.startDatetime,
+    location: invite.location ?? null,
+    community: invite.community ?? null,
+    status: invite.status,
+  }
+}
+
+// Procura uma inscrição a partir do link móvel (autenticado pelo token).
+export async function checkinLookupPublic(slug, rawToken, rawCode) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  const guest = await resolveCheckinGuest(invite, rawCode)
+  return buildCheckinResult(invite, guest)
+}
+
+// Aceita (ou anula) o check-in a partir do link móvel (autenticado pelo token).
+export async function acceptCheckinPublic(slug, rawToken, guestId, { on = true } = {}) {
+  const invite = await loadInviteByCheckinToken(slug, rawToken)
+  const guest = await repo.findGuestById(guestId)
+  if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
+  return repo.setCheckedIn(guest.id, on)
 }
 
 // Pré-visualização (organizador): mesma forma do payload público, sem exigir publicação.

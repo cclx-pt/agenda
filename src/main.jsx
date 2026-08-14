@@ -12,6 +12,7 @@ import InvitePage from './components/invite/InvitePage'
 import InviteManage from './components/invite/InviteManage'
 import InviteCheckin from './components/invite/InviteCheckin'
 import InviteFollowup from './components/invite/InviteFollowup'
+import FundingPage from './components/funding/FundingPage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -34,6 +35,8 @@ const isLoopRoute = routePath.startsWith('/loop/')
 const isRegistrationPortalRoute = routePath === '/inscricoes'
 const loopChurch = isLoopRoute ? decodeURIComponent(routePath.slice('/loop/'.length)) : null
 const isInviteRoute = routePath.startsWith('/invite/')
+const isFundingRoute = routePath.startsWith('/funding/')
+const fundingSlug = isFundingRoute ? decodeURIComponent(routePath.slice('/funding/'.length).split('/')[0]) : null
 // /invite/<slug> (landing) ou /invite/<slug>/inscricao (página só de inscrição).
 // ?preview=<id> → pré-visualização do organizador (funciona com rascunho/fechado).
 let inviteSlug = null
@@ -75,6 +78,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           ) : (
             <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
           )}
+        </I18nProvider>
+      ) : isFundingRoute ? (
+        <I18nProvider>
+          <FundingPage slug={fundingSlug} />
         </I18nProvider>
       ) : isLogsRoute ? (
         <LogsPage />
