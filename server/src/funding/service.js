@@ -84,6 +84,10 @@ export async function getLedger(id) {
   return { campaign, donations, pledges, reconciledTotal }
 }
 
+export async function getCampaignPortal(id) {
+  return publicCampaignView(await requireCampaign(id))
+}
+
 export async function addDonation(campaignId, input, actorId) {
   const campaign = await requireCampaign(campaignId)
   const data = donationSchema.parse(input)

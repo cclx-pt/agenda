@@ -165,6 +165,15 @@ export default function FundingAdmin() {
     }
   }
 
+  const copyPortalLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/funding/${encodeURIComponent(selected.slug)}`)
+      toast.success('Link do portal copiado.')
+    } catch {
+      toast.error('Não foi possível copiar o link.')
+    }
+  }
+
   const toggleConfig = (id) => setCampaignForm((current) => ({
     ...current,
     configurations: current.configurations.includes(id)
@@ -188,7 +197,7 @@ export default function FundingAdmin() {
       {showSetup && (
         <form className="grid grid-cols-2 gap-3 border-y border-border py-4 max-[560px]:grid-cols-1" onSubmit={submitCampaign}>
           <label className={labelClass}>Nome<input required className={inputClass} value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} /></label>
-          <label className={labelClass}>Identificador público<input required pattern="[a-z0-9-]+" className={inputClass} placeholder="obras-da-igreja" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value.toLowerCase() })} /></label>
+          <label className={labelClass}>Endereço do portal<input required pattern="[a-z0-9-]+" className={inputClass} placeholder="obras-da-igreja" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value.toLowerCase() })} /><span className="font-normal">/funding/{campaignForm.slug || 'nome-da-campanha'}</span></label>
           <label className={`${labelClass} col-span-2 max-[560px]:col-span-1`}>Propósito<textarea required className={inputClass} rows="2" value={campaignForm.purpose} onChange={(event) => setCampaignForm({ ...campaignForm, purpose: event.target.value })} /></label>
           <label className={labelClass}>Objetivo (€)<input required min="0.01" step="0.01" type="number" className={inputClass} value={campaignForm.targetEur} onChange={(event) => setCampaignForm({ ...campaignForm, targetEur: event.target.value })} /></label>
           <label className={labelClass}>Data limite<input required type="date" className={inputClass} value={campaignForm.deadline} onChange={(event) => setCampaignForm({ ...campaignForm, deadline: event.target.value })} /></label>
@@ -213,7 +222,13 @@ export default function FundingAdmin() {
       {selected && ledger && (
         <>
           <section className="border-b border-border pb-5">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-bold">{selected.title}</h3><p className="text-sm text-muted-foreground">{selected.purpose}</p></div><div className="flex gap-2">{selected.status === 'active' && selected.visibilityMode === 'V1' && <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}`} target="_blank" rel="noreferrer"><i className="ti ti-external-link" aria-hidden="true" />Abrir página</a>}<button type="button" disabled={busy || selected.status === 'closed'} className={ghostClass} onClick={activateCampaign}><i className={`ti ${selected.status === 'active' ? 'ti-lock' : 'ti-rocket'}`} aria-hidden="true" />{selected.status === 'active' ? 'Encerrar' : 'Ativar'}</button></div></div>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-bold">{selected.title}</h3><p className="text-sm text-muted-foreground">{selected.purpose}</p></div><div className="flex gap-2"><button type="button" disabled={busy || selected.status === 'closed'} className={ghostClass} onClick={activateCampaign}><i className={`ti ${selected.status === 'active' ? 'ti-lock' : 'ti-rocket'}`} aria-hidden="true" />{selected.status === 'active' ? 'Encerrar' : 'Ativar'}</button></div></div>
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase text-muted-foreground">Portal da campanha</span><code className="block truncate text-sm text-foreground">{window.location.origin}/funding/{selected.slug}</code><span className="text-xs text-muted-foreground">{selected.status === 'active' && selected.visibilityMode === 'V1' ? 'Publicado' : 'Ainda não publicado · disponível em pré-visualização para administradores'}</span></div>
+              <button type="button" className={ghostClass} onClick={copyPortalLink}><i className="ti ti-copy" aria-hidden="true" />Copiar</button>
+              <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}?preview=${encodeURIComponent(selected.id)}`} target="_blank" rel="noreferrer"><i className="ti ti-eye" aria-hidden="true" />Pré-visualizar</a>
+              {selected.status === 'active' && selected.visibilityMode === 'V1' && <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}`} target="_blank" rel="noreferrer"><i className="ti ti-external-link" aria-hidden="true" />Abrir portal</a>}
+            </div>
             <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${selected.percentage}%` }} /></div>
             <div className="grid grid-cols-4 gap-3 max-[560px]:grid-cols-2">
               {[['Recebido', money.format(selected.totalReceived)], ['Progresso', `${selected.percentage}%`], ['Por angariar', money.format(selected.remainingEur)], ['Comprometido', money.format(selected.pledgedTotal)]].map(([label, value]) => <div key={label}><span className="block text-xs text-muted-foreground">{label}</span><strong className="text-base text-foreground">{value}</strong></div>)}

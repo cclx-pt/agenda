@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CalendarDays, Check, HandHeart, Landmark, Loader2, ShieldCheck, Target } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Check, HandHeart, Landmark, Loader2, Lock, ShieldCheck, Target } from 'lucide-react'
+import { useAuth } from '../../hooks/useAuth'
 import { useI18n } from '../../hooks/useI18n'
 import { useTheme } from '../../hooks/useTheme'
 import * as fundingService from '../../services/fundingService'
 import defaultLogoUrl from '../../assets/cclx_line_logo.png'
+import LoginModal from '../LoginModal'
 import ThemeToggle from '../ThemeToggle'
 
 const CONFIG_LABELS = {
@@ -26,20 +28,43 @@ const date = new Intl.DateTimeFormat('pt-PT', {
   year: 'numeric',
 })
 
-export default function FundingPage({ slug }) {
+export default function FundingPage({ slug, previewId = null }) {
+  const { loading: authLoading, isAuthenticated } = useAuth()
   const { logoUrl } = useI18n()
   const { toggle, isDark } = useTheme()
   const [campaign, setCampaign] = useState(null)
   const [error, setError] = useState('')
+  const [loginOpen, setLoginOpen] = useState(false)
 
   useEffect(() => {
-    fundingService.getPublicCampaign(slug)
+    if (previewId && (authLoading || !isAuthenticated)) return
+    const request = previewId
+      ? fundingService.getCampaignPortal(previewId)
+      : fundingService.getPublicCampaign(slug)
+    request
       .then((result) => {
+        if (result.slug !== slug) throw new Error('O portal não corresponde a esta campanha.')
         setCampaign(result)
         document.title = `${result.title} · Agenda CCLX`
       })
       .catch((requestError) => setError(requestError.message))
-  }, [slug])
+  }, [authLoading, isAuthenticated, previewId, slug])
+
+  if (previewId && !authLoading && !isAuthenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="max-w-md text-center">
+          <Lock className="mx-auto mb-4 h-10 w-10 text-muted-foreground" aria-hidden="true" />
+          <h1 className="text-2xl font-bold">Pré-visualização reservada</h1>
+          <p className="mt-2 text-muted-foreground">Entre com a mesma conta da Agenda para pré-visualizar este portal.</p>
+          <button type="button" className="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setLoginOpen(true)}>
+            <Lock className="h-4 w-4" aria-hidden="true" /> Entrar na Agenda
+          </button>
+        </div>
+        {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+      </main>
+    )
+  }
 
   if (error) {
     return (
@@ -76,6 +101,12 @@ export default function FundingPage({ slug }) {
           </a>
         </div>
       </header>
+
+      {previewId && (
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          Pré-visualização do portal · apenas visível na sessão de administração
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <aside className="flex w-full flex-col border-b border-border bg-card p-4 md:w-[280px] md:flex-shrink-0 md:border-b-0 md:border-r md:p-5">

@@ -43,6 +43,10 @@ fundingRouter.get('/:id/ledger', asyncHandler(async (req, res) => {
   res.json(await service.getLedger(req.params.id))
 }))
 
+fundingRouter.get('/:id/portal', asyncHandler(async (req, res) => {
+  res.json({ campaign: await service.getCampaignPortal(req.params.id) })
+}))
+
 fundingRouter.post('/:id/donations', asyncHandler(async (req, res) => {
   res.status(201).json({ donation: await service.addDonation(req.params.id, req.body, req.user.sub) })
 }))

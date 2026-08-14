@@ -26,6 +26,10 @@ export async function getLedger(id) {
   return request(`/data/funding/${id}/ledger`)
 }
 
+export async function getCampaignPortal(id) {
+  return (await request(`/data/funding/${id}/portal`)).campaign
+}
+
 export async function addDonation(campaignId, payload) {
   return (await request(`/data/funding/${campaignId}/donations`, { method: 'POST', body: payload })).donation
 }
