@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import DateField from '../DateField'
 import * as fundingService from '../../services/fundingService'
 
 const CONFIGS = [
@@ -10,6 +11,12 @@ const CONFIGS = [
   ['C5', 'Mensal contínuo'],
 ]
 
+const PHASE_PLANS = [
+  ['', 'Manter a visibilidade escolhida durante toda a campanha'],
+  ['V2 → V1 no lançamento', 'Começar reservada e publicar no lançamento'],
+  ['V2 → V3 aos 25% → V1 no lançamento', 'Começar reservada, abrir aos doadores aos 25% e publicar no lançamento'],
+]
+
 const inputClass = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring'
 const labelClass = 'flex flex-col gap-1.5 text-xs font-semibold text-muted-foreground'
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50'
@@ -17,6 +24,7 @@ const ghostClass = 'inline-flex items-center justify-center gap-2 rounded-md bor
 
 const today = () => new Date().toISOString().slice(0, 10)
 const money = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' })
+const displayDate = (value) => value ? value.split('-').reverse().join('-') : ''
 
 const emptyCampaign = {
   slug: '', title: '', purpose: '', targetEur: '', deadline: '',
@@ -204,6 +212,17 @@ export default function FundingAdmin() {
     }
   }
 
+  const previewCampaign = async () => {
+    setBusy(true)
+    try {
+      await fundingService.getCampaignPortal(selected.id)
+      window.location.assign(`/funding/${encodeURIComponent(selected.slug)}?preview=${encodeURIComponent(selected.id)}`)
+    } catch (error) {
+      toast.error(`Não foi possível pré-visualizar: ${error.message}`)
+      setBusy(false)
+    }
+  }
+
   const toggleConfig = (id) => setCampaignForm((current) => ({
     ...current,
     configurations: current.configurations.includes(id)
@@ -230,13 +249,13 @@ export default function FundingAdmin() {
           <label className={labelClass}>Endereço do portal<input required disabled={!!editingId} pattern="[a-z0-9-]+" className={inputClass} placeholder="obras-da-igreja" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value.toLowerCase() })} /><span className="font-normal">/funding/{campaignForm.slug || 'nome-da-campanha'}{editingId ? ' · o endereço não pode ser alterado' : ''}</span></label>
           <label className={`${labelClass} col-span-2 max-[560px]:col-span-1`}>Propósito<textarea required className={inputClass} rows="2" value={campaignForm.purpose} onChange={(event) => setCampaignForm({ ...campaignForm, purpose: event.target.value })} /></label>
           <label className={labelClass}>Objetivo (€)<input required min="0.01" step="0.01" type="number" className={inputClass} value={campaignForm.targetEur} onChange={(event) => setCampaignForm({ ...campaignForm, targetEur: event.target.value })} /></label>
-          <label className={labelClass}>Data limite<input required type="date" className={inputClass} value={campaignForm.deadline} onChange={(event) => setCampaignForm({ ...campaignForm, deadline: event.target.value })} /></label>
+          <label className={labelClass}>Data limite<DateField required separator="-" className={inputClass} value={campaignForm.deadline} onChange={(value) => setCampaignForm({ ...campaignForm, deadline: value })} ariaLabel="Data limite" /></label>
           <fieldset className="col-span-2 max-[560px]:col-span-1">
             <legend className="mb-2 text-xs font-semibold text-muted-foreground">Modelos de contribuição</legend>
             <div className="flex flex-wrap gap-x-4 gap-y-2">{CONFIGS.map(([id, label]) => <label key={id} className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={campaignForm.configurations.includes(id)} onChange={() => toggleConfig(id)} /> <strong>{id}</strong> {label}</label>)}</div>
           </fieldset>
           <label className={labelClass}>Visibilidade<select className={inputClass} value={campaignForm.visibilityMode} onChange={(event) => setCampaignForm({ ...campaignForm, visibilityMode: event.target.value })}><option value="V1">V1 · Totais públicos</option><option value="V2">V2 · Equipa e conselho</option><option value="V3">V3 · Acesso de doadores</option></select></label>
-          <label className={labelClass}>Plano de fases<input className={inputClass} placeholder="V2 → V3 aos 25% → V1" value={campaignForm.phasePlan} onChange={(event) => setCampaignForm({ ...campaignForm, phasePlan: event.target.value })} /></label>
+          <label className={labelClass}>Plano de publicação (opcional)<select className={inputClass} value={campaignForm.phasePlan} onChange={(event) => setCampaignForm({ ...campaignForm, phasePlan: event.target.value })}>{campaignForm.phasePlan && !PHASE_PLANS.some(([value]) => value === campaignForm.phasePlan) && <option value={campaignForm.phasePlan}>{campaignForm.phasePlan}</option>}{PHASE_PLANS.map(([value, label]) => <option key={value || 'none'} value={value}>{label}</option>)}</select><span className="font-normal">Regista a decisão da equipa. A mudança de visibilidade continua a ser feita manualmente em Editar.</span></label>
           <div className="col-span-2 flex justify-end max-[560px]:col-span-1"><button disabled={busy} className={buttonClass}>{editingId ? 'Guardar alterações' : 'Criar campanha'}</button></div>
         </form>
       )}
@@ -256,7 +275,7 @@ export default function FundingAdmin() {
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-3">
               <div className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase text-muted-foreground">Portal da campanha</span><code className="block truncate text-sm text-foreground">{window.location.origin}/funding/{selected.slug}</code><span className="text-xs text-muted-foreground">{selected.status === 'active' && selected.visibilityMode === 'V1' ? 'Publicado' : 'Ainda não publicado · disponível em pré-visualização para administradores'}</span></div>
               <button type="button" className={ghostClass} onClick={copyPortalLink}><i className="ti ti-copy" aria-hidden="true" />Copiar</button>
-              <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}?preview=${encodeURIComponent(selected.id)}`} target="_blank" rel="noreferrer"><i className="ti ti-eye" aria-hidden="true" />Pré-visualizar</a>
+              <button type="button" className={ghostClass} onClick={previewCampaign} disabled={busy}><i className="ti ti-eye" aria-hidden="true" />Pré-visualizar</button>
               {selected.status === 'active' && selected.visibilityMode === 'V1' && <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}`} target="_blank" rel="noreferrer"><i className="ti ti-external-link" aria-hidden="true" />Abrir portal</a>}
             </div>
             <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${selected.percentage}%` }} /></div>
@@ -268,7 +287,7 @@ export default function FundingAdmin() {
           {showDonation && (
             <form className="flex max-w-2xl flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4" onSubmit={submitDonation}>
               <h3 className="font-bold">Registar donativo</h3>
-              <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Recibo<input required className={inputClass} value={donationForm.receiptNo} onChange={(event) => setDonationForm({ ...donationForm, receiptNo: event.target.value })} /></label><label className={labelClass}>Data<input required type="date" className={inputClass} value={donationForm.date} onChange={(event) => setDonationForm({ ...donationForm, date: event.target.value })} /></label></div>
+              <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Recibo<input required className={inputClass} value={donationForm.receiptNo} onChange={(event) => setDonationForm({ ...donationForm, receiptNo: event.target.value })} /></label><label className={labelClass}>Data<DateField required separator="-" className={inputClass} value={donationForm.date} onChange={(value) => setDonationForm({ ...donationForm, date: value })} ariaLabel="Data do donativo" /></label></div>
               <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Valor (€)<input required type="number" min="0.01" step="0.01" className={inputClass} value={donationForm.amountEur} onChange={(event) => setDonationForm({ ...donationForm, amountEur: event.target.value })} /></label><label className={labelClass}>Canal<select className={inputClass} value={donationForm.channel} onChange={(event) => setDonationForm({ ...donationForm, channel: event.target.value })}><option value="transfer">Transferência</option><option value="mbway">MB Way</option><option value="cash">Numerário</option><option value="online">Online</option><option value="other">Outro</option></select></label></div>
               <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Modelo<select className={inputClass} value={donationForm.configId} onChange={(event) => setDonationForm({ ...donationForm, configId: event.target.value })}>{selected.configurations.map((id) => <option key={id}>{id}</option>)}</select></label><label className={labelClass}>Doador (opcional)<input className={inputClass} value={donationForm.donorName} onChange={(event) => setDonationForm({ ...donationForm, donorName: event.target.value })} /></label></div>
               <label className={labelClass}>Referência da prova<input required className={inputClass} placeholder="Extrato, ficheiro ou envelope" value={donationForm.proofRef} onChange={(event) => setDonationForm({ ...donationForm, proofRef: event.target.value })} /></label>
@@ -278,7 +297,7 @@ export default function FundingAdmin() {
 
           <section className="border-t border-border pt-5">
             <div className="mb-3 flex items-end justify-between"><div><h3 className="font-bold">Registo e reconciliação</h3><p className="text-xs text-muted-foreground">{ledger.donations.length} movimentos · {money.format(ledger.reconciledTotal)} reconciliados</p></div></div>
-            {ledger.donations.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">Ainda não existem donativos.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b border-border text-xs text-muted-foreground"><tr><th className="pb-2">Data / recibo</th><th className="pb-2">Origem</th><th className="pb-2">Valor</th><th className="pb-2">Prova</th><th className="pb-2 text-right">Estado</th></tr></thead><tbody>{ledger.donations.map((donation) => <tr key={donation.id} className="border-b border-border/60"><td className="py-3"><strong className="block">{donation.date}</strong><span className="text-xs text-muted-foreground">{donation.receiptNo}</span></td><td className="py-3">{donation.donorName === 'anonymous' ? 'Anónimo' : donation.donorName}<span className="block text-xs text-muted-foreground">{donation.channel} · {donation.configId}</span></td><td className="py-3 font-semibold">{money.format(donation.amountEur)}</td><td className="max-w-[170px] truncate py-3 text-xs text-muted-foreground" title={donation.proofRef}>{donation.proofRef}</td><td className="py-3 text-right"><button type="button" className={donation.reconciled ? 'text-emerald-600' : 'text-amber-600'} onClick={() => reconcile(donation)} disabled={busy}><i className={`ti ${donation.reconciled ? 'ti-circle-check-filled' : 'ti-clock'}`} aria-hidden="true" /> <span className="ml-1 text-xs font-semibold">{donation.reconciled ? 'Reconciliado' : 'Pendente'}</span></button></td></tr>)}</tbody></table></div>}
+            {ledger.donations.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">Ainda não existem donativos.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b border-border text-xs text-muted-foreground"><tr><th className="pb-2">Data / recibo</th><th className="pb-2">Origem</th><th className="pb-2">Valor</th><th className="pb-2">Prova</th><th className="pb-2 text-right">Estado</th></tr></thead><tbody>{ledger.donations.map((donation) => <tr key={donation.id} className="border-b border-border/60"><td className="py-3"><strong className="block">{displayDate(donation.date)}</strong><span className="text-xs text-muted-foreground">{donation.receiptNo}</span></td><td className="py-3">{donation.donorName === 'anonymous' ? 'Anónimo' : donation.donorName}<span className="block text-xs text-muted-foreground">{donation.channel} · {donation.configId}</span></td><td className="py-3 font-semibold">{money.format(donation.amountEur)}</td><td className="max-w-[170px] truncate py-3 text-xs text-muted-foreground" title={donation.proofRef}>{donation.proofRef}</td><td className="py-3 text-right"><button type="button" className={donation.reconciled ? 'text-emerald-600' : 'text-amber-600'} onClick={() => reconcile(donation)} disabled={busy}><i className={`ti ${donation.reconciled ? 'ti-circle-check-filled' : 'ti-clock'}`} aria-hidden="true" /> <span className="ml-1 text-xs font-semibold">{donation.reconciled ? 'Reconciliado' : 'Pendente'}</span></button></td></tr>)}</tbody></table></div>}
           </section>
         </>
       )}

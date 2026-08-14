@@ -1,31 +1,31 @@
 import { useRef, useState } from 'react'
 import { Calendar } from 'lucide-react'
 
-// 'YYYY-MM-DD' → 'DD/MM/AAAA' (exibição).
-function isoToDisplay(iso) {
+// 'YYYY-MM-DD' → formato português configurado (exibição).
+function isoToDisplay(iso, separator) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+  return m ? `${m[3]}${separator}${m[2]}${separator}${m[1]}` : ''
 }
 
-// 'DD/MM/AAAA' completa e válida → 'YYYY-MM-DD'; caso contrário null.
+// Data portuguesa completa e válida → 'YYYY-MM-DD'; caso contrário null.
 function displayToIso(text) {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text)
-  if (!m) return null
-  const dd = Number(m[1])
-  const mm = Number(m[2])
-  const yyyy = Number(m[3])
+  const digits = String(text).replace(/\D/g, '')
+  if (digits.length !== 8) return null
+  const dd = Number(digits.slice(0, 2))
+  const mm = Number(digits.slice(2, 4))
+  const yyyy = Number(digits.slice(4))
   const d = new Date(Date.UTC(yyyy, mm - 1, dd))
   // Rejeita datas impossíveis (ex.: 31/02/2026) que o Date "arruma".
   if (d.getUTCFullYear() !== yyyy || d.getUTCMonth() !== mm - 1 || d.getUTCDate() !== dd) return null
-  return `${m[3]}-${m[2]}-${m[1]}`
+  return `${digits.slice(4)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`
 }
 
-// Aplica a máscara DD/MM/AAAA aos dígitos escritos.
-function maskDate(raw) {
+// Aplica a máscara portuguesa aos dígitos escritos.
+function maskDate(raw, separator) {
   const d = String(raw).replace(/\D/g, '').slice(0, 8)
   if (d.length <= 2) return d
-  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`
-  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`
+  if (d.length <= 4) return `${d.slice(0, 2)}${separator}${d.slice(2)}`
+  return `${d.slice(0, 2)}${separator}${d.slice(2, 4)}${separator}${d.slice(4)}`
 }
 
 /**
@@ -47,19 +47,20 @@ export default function DateField({
   id,
   className = '',
   ariaLabel,
+  separator = '/',
 }) {
-  const [text, setText] = useState(() => isoToDisplay(value))
+  const [text, setText] = useState(() => isoToDisplay(value, separator))
   const [lastValue, setLastValue] = useState(value)
   const nativeRef = useRef(null)
 
   // Ressincroniza o texto quando o valor externo muda (edição/reset do form).
   if (value !== lastValue) {
     setLastValue(value)
-    setText(isoToDisplay(value))
+    setText(isoToDisplay(value, separator))
   }
 
   function handleText(e) {
-    const masked = maskDate(e.target.value)
+    const masked = maskDate(e.target.value, separator)
     setText(masked)
     if (masked === '') {
       onChange('')
@@ -90,7 +91,7 @@ export default function DateField({
         id={id}
         type="text"
         inputMode="numeric"
-        placeholder="dd/mm/aaaa"
+        placeholder={`dd${separator}mm${separator}aaaa`}
         aria-label={ariaLabel}
         className="min-w-0 flex-1 bg-transparent outline-none disabled:cursor-not-allowed"
         value={text}

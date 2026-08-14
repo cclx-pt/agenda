@@ -23,8 +23,8 @@ const money = new Intl.NumberFormat('pt-PT', {
 })
 
 const date = new Intl.DateTimeFormat('pt-PT', {
-  day: 'numeric',
-  month: 'long',
+  day: '2-digit',
+  month: '2-digit',
   year: 'numeric',
 })
 
@@ -116,7 +116,7 @@ export default function FundingPage({ slug, previewId = null }) {
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-1">
             <div><dt className="text-xs font-semibold text-muted-foreground">Objetivo</dt><dd className="mt-0.5 text-xl font-bold">{money.format(campaign.targetEur)}</dd></div>
-            <div><dt className="text-xs font-semibold text-muted-foreground">Data limite</dt><dd className="mt-1 flex items-center gap-1.5 text-sm font-semibold"><CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{date.format(deadline)}</dd></div>
+            <div><dt className="text-xs font-semibold text-muted-foreground">Data limite</dt><dd className="mt-1 flex items-center gap-1.5 text-sm font-semibold"><CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{date.format(deadline).replaceAll('/', '-')}</dd></div>
           </dl>
           <div className="mt-5 hidden border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground md:block">Os valores apresentados são agregados. Os dados individuais permanecem reservados.</div>
         </aside>

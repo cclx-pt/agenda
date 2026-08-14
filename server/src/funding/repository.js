@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { pool } from '../db/pool.js'
 
+function toDateStr(value) {
+  if (!value) return null
+  if (typeof value === 'string') return value.slice(0, 10)
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function mapCampaign(row) {
   if (!row) return null
   return {
@@ -9,7 +20,7 @@ function mapCampaign(row) {
     title: row.title,
     purpose: row.purpose,
     targetEur: Number(row.target_eur),
-    deadline: row.deadline,
+    deadline: toDateStr(row.deadline),
     configurations: row.configurations ?? [],
     visibilityMode: row.visibility_mode,
     phasePlan: row.phase_plan ?? null,
@@ -30,7 +41,7 @@ function mapDonation(row) {
     id: row.id,
     campaignId: row.campaign_id,
     receiptNo: row.receipt_no,
-    date: row.donation_date,
+    date: toDateStr(row.donation_date),
     amountEur: Number(row.amount_eur),
     channel: row.channel,
     configId: row.config_id,
@@ -56,13 +67,13 @@ function mapPledge(row) {
     contact: row.contact ?? null,
     pledgedAmount: Number(row.pledged_amount),
     schedule: row.schedule,
-    promisedDate: row.promised_date ?? null,
+    promisedDate: toDateStr(row.promised_date),
     receivedToDate: Number(row.received_to_date ?? 0),
     status: row.status,
-    lastFollowUp: row.last_follow_up ?? null,
+    lastFollowUp: toDateStr(row.last_follow_up),
     consentRecorded: !!row.consent_recorded,
     accessGranted: !!row.access_granted,
-    accessRevokedDate: row.access_revoked_date ?? null,
+    accessRevokedDate: toDateStr(row.access_revoked_date),
     createdAt: row.created_at,
   }
 }
