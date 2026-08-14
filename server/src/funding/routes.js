@@ -39,6 +39,11 @@ fundingRouter.put('/:id', asyncHandler(async (req, res) => {
   res.json({ campaign: await service.updateCampaign(req.params.id, req.body) })
 }))
 
+fundingRouter.delete('/:id', asyncHandler(async (req, res) => {
+  await service.deleteCampaign(req.params.id)
+  res.status(204).end()
+}))
+
 fundingRouter.get('/:id/ledger', asyncHandler(async (req, res) => {
   res.json(await service.getLedger(req.params.id))
 }))
@@ -55,10 +60,6 @@ fundingRouter.patch('/:id/donations/:donationId/reconcile', asyncHandler(async (
   res.json({ donation: await service.reconcileDonation(
     req.params.id, req.params.donationId, req.body?.reconciled !== false, req.user.sub
   ) })
-}))
-
-fundingRouter.post('/:id/pledges', asyncHandler(async (req, res) => {
-  res.status(201).json({ pledge: await service.addPledge(req.params.id, req.body) })
 }))
 
 export const publicFundingRouter = Router()

@@ -22,6 +22,10 @@ export async function updateCampaign(id, payload) {
   return (await request(`/data/funding/${id}`, { method: 'PUT', body: payload })).campaign
 }
 
+export async function deleteCampaign(id) {
+  await request(`/data/funding/${id}`, { method: 'DELETE' })
+}
+
 export async function getLedger(id) {
   return request(`/data/funding/${id}/ledger`)
 }
@@ -39,10 +43,6 @@ export async function setDonationReconciled(campaignId, donationId, reconciled) 
     method: 'PATCH',
     body: { reconciled },
   })).donation
-}
-
-export async function addPledge(campaignId, payload) {
-  return (await request(`/data/funding/${campaignId}/pledges`, { method: 'POST', body: payload })).pledge
 }
 
 export async function getPublicCampaign(slug) {

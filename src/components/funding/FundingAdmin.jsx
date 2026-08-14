@@ -25,12 +25,7 @@ const emptyCampaign = {
 
 const emptyDonation = {
   receiptNo: '', date: today(), amountEur: '', channel: 'transfer', configId: 'C1',
-  donorName: '', donorContact: '', pledgeRef: null, proofRef: '', notes: '',
-}
-
-const emptyPledge = {
-  donorName: '', contact: '', pledgedAmount: '', schedule: 'monthly_12',
-  promisedDate: '', consentRecorded: false, accessGranted: false,
+  donorName: '', donorContact: '', proofRef: '', notes: '',
 }
 
 function campaignPayload(form) {
@@ -43,8 +38,9 @@ export default function FundingAdmin() {
   const [ledger, setLedger] = useState(null)
   const [campaignForm, setCampaignForm] = useState(emptyCampaign)
   const [donationForm, setDonationForm] = useState(emptyDonation)
-  const [pledgeForm, setPledgeForm] = useState(emptyPledge)
   const [showSetup, setShowSetup] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [showDonation, setShowDonation] = useState(false)
   const [busy, setBusy] = useState(true)
 
   const selected = campaigns.find((item) => item.id === selectedId) ?? null
@@ -72,6 +68,9 @@ export default function FundingAdmin() {
 
   const chooseCampaign = async (id) => {
     setSelectedId(id)
+    setShowSetup(false)
+    setEditingId(null)
+    setShowDonation(false)
     setBusy(true)
     try {
       setLedger(await fundingService.getLedger(id))
@@ -86,11 +85,62 @@ export default function FundingAdmin() {
     event.preventDefault()
     setBusy(true)
     try {
-      const created = await fundingService.createCampaign(campaignPayload(campaignForm))
+      const saved = editingId
+        ? await fundingService.updateCampaign(editingId, campaignPayload(campaignForm))
+        : await fundingService.createCampaign(campaignPayload(campaignForm))
       setCampaignForm(emptyCampaign)
       setShowSetup(false)
-      await loadCampaigns(created.id)
-      toast.success('Campanha criada.')
+      setEditingId(null)
+      await loadCampaigns(saved.id)
+      toast.success(editingId ? 'Campanha atualizada.' : 'Campanha criada.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openNewCampaign = () => {
+    setCampaignForm(emptyCampaign)
+    setEditingId(null)
+    setShowSetup(true)
+  }
+
+  const editCampaign = () => {
+    setCampaignForm({
+      slug: selected.slug,
+      title: selected.title,
+      purpose: selected.purpose,
+      targetEur: selected.targetEur,
+      deadline: selected.deadline,
+      configurations: selected.configurations,
+      visibilityMode: selected.visibilityMode,
+      phasePlan: selected.phasePlan ?? '',
+      status: selected.status,
+    })
+    setEditingId(selected.id)
+    setShowSetup(true)
+    setShowDonation(false)
+  }
+
+  const cancelCampaignForm = () => {
+    setCampaignForm(emptyCampaign)
+    setEditingId(null)
+    setShowSetup(false)
+  }
+
+  const deleteCampaign = async () => {
+    if (!window.confirm(`Eliminar a campanha "${selected.title}"? Esta ação é irreversível.`)) return
+    setBusy(true)
+    try {
+      await fundingService.deleteCampaign(selected.id)
+      const items = await fundingService.listCampaigns()
+      const nextId = items[0]?.id ?? null
+      setCampaigns(items)
+      setSelectedId(nextId)
+      setLedger(nextId ? await fundingService.getLedger(nextId) : null)
+      setShowDonation(false)
+      toast.success('Campanha eliminada.')
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -120,32 +170,12 @@ export default function FundingAdmin() {
         amountEur: Number(donationForm.amountEur),
         donorName: donationForm.donorName || null,
         donorContact: donationForm.donorContact || null,
-        pledgeRef: donationForm.pledgeRef || null,
         notes: donationForm.notes || null,
       })
       setDonationForm({ ...emptyDonation, date: today(), configId: selected.configurations[0] })
+      setShowDonation(false)
       await loadCampaigns(selected.id)
       toast.success('Donativo registado.')
-    } catch (error) {
-      toast.error(error.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const submitPledge = async (event) => {
-    event.preventDefault()
-    setBusy(true)
-    try {
-      await fundingService.addPledge(selected.id, {
-        ...pledgeForm,
-        pledgedAmount: Number(pledgeForm.pledgedAmount),
-        contact: pledgeForm.contact || null,
-        promisedDate: pledgeForm.promisedDate || null,
-      })
-      setPledgeForm(emptyPledge)
-      await loadCampaigns(selected.id)
-      toast.success('Compromisso registado.')
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -188,7 +218,7 @@ export default function FundingAdmin() {
           <p className="text-xs font-bold uppercase text-primary">Financiamento</p>
           <h2 className="text-xl font-bold text-foreground">Campanhas e tesouraria</h2>
         </div>
-        <button type="button" className={buttonClass} onClick={() => setShowSetup((value) => !value)}>
+        <button type="button" className={buttonClass} onClick={showSetup ? cancelCampaignForm : openNewCampaign}>
           <i className={`ti ${showSetup ? 'ti-x' : 'ti-plus'}`} aria-hidden="true" />
           {showSetup ? 'Cancelar' : 'Nova campanha'}
         </button>
@@ -197,7 +227,7 @@ export default function FundingAdmin() {
       {showSetup && (
         <form className="grid grid-cols-2 gap-3 border-y border-border py-4 max-[560px]:grid-cols-1" onSubmit={submitCampaign}>
           <label className={labelClass}>Nome<input required className={inputClass} value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} /></label>
-          <label className={labelClass}>Endereço do portal<input required pattern="[a-z0-9-]+" className={inputClass} placeholder="obras-da-igreja" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value.toLowerCase() })} /><span className="font-normal">/funding/{campaignForm.slug || 'nome-da-campanha'}</span></label>
+          <label className={labelClass}>Endereço do portal<input required disabled={!!editingId} pattern="[a-z0-9-]+" className={inputClass} placeholder="obras-da-igreja" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value.toLowerCase() })} /><span className="font-normal">/funding/{campaignForm.slug || 'nome-da-campanha'}{editingId ? ' · o endereço não pode ser alterado' : ''}</span></label>
           <label className={`${labelClass} col-span-2 max-[560px]:col-span-1`}>Propósito<textarea required className={inputClass} rows="2" value={campaignForm.purpose} onChange={(event) => setCampaignForm({ ...campaignForm, purpose: event.target.value })} /></label>
           <label className={labelClass}>Objetivo (€)<input required min="0.01" step="0.01" type="number" className={inputClass} value={campaignForm.targetEur} onChange={(event) => setCampaignForm({ ...campaignForm, targetEur: event.target.value })} /></label>
           <label className={labelClass}>Data limite<input required type="date" className={inputClass} value={campaignForm.deadline} onChange={(event) => setCampaignForm({ ...campaignForm, deadline: event.target.value })} /></label>
@@ -207,7 +237,7 @@ export default function FundingAdmin() {
           </fieldset>
           <label className={labelClass}>Visibilidade<select className={inputClass} value={campaignForm.visibilityMode} onChange={(event) => setCampaignForm({ ...campaignForm, visibilityMode: event.target.value })}><option value="V1">V1 · Totais públicos</option><option value="V2">V2 · Equipa e conselho</option><option value="V3">V3 · Acesso de doadores</option></select></label>
           <label className={labelClass}>Plano de fases<input className={inputClass} placeholder="V2 → V3 aos 25% → V1" value={campaignForm.phasePlan} onChange={(event) => setCampaignForm({ ...campaignForm, phasePlan: event.target.value })} /></label>
-          <div className="col-span-2 flex justify-end max-[560px]:col-span-1"><button disabled={busy} className={buttonClass}>Criar campanha</button></div>
+          <div className="col-span-2 flex justify-end max-[560px]:col-span-1"><button disabled={busy} className={buttonClass}>{editingId ? 'Guardar alterações' : 'Criar campanha'}</button></div>
         </form>
       )}
 
@@ -222,7 +252,7 @@ export default function FundingAdmin() {
       {selected && ledger && (
         <>
           <section className="border-b border-border pb-5">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-bold">{selected.title}</h3><p className="text-sm text-muted-foreground">{selected.purpose}</p></div><div className="flex gap-2"><button type="button" disabled={busy || selected.status === 'closed'} className={ghostClass} onClick={activateCampaign}><i className={`ti ${selected.status === 'active' ? 'ti-lock' : 'ti-rocket'}`} aria-hidden="true" />{selected.status === 'active' ? 'Encerrar' : 'Ativar'}</button></div></div>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-bold">{selected.title}</h3><p className="text-sm text-muted-foreground">{selected.purpose}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={ghostClass} onClick={editCampaign}><i className="ti ti-pencil" aria-hidden="true" />Editar</button><button type="button" className={ghostClass} onClick={() => { setDonationForm({ ...emptyDonation, date: today(), configId: selected.configurations[0] }); setShowDonation((value) => !value); setShowSetup(false) }}><i className="ti ti-receipt" aria-hidden="true" />{showDonation ? 'Fechar donativo' : 'Registar donativo'}</button><button type="button" disabled={busy || selected.status === 'closed'} className={ghostClass} onClick={activateCampaign}><i className={`ti ${selected.status === 'active' ? 'ti-lock' : 'ti-rocket'}`} aria-hidden="true" />{selected.status === 'active' ? 'Encerrar' : 'Ativar'}</button><button type="button" disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-md border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50" onClick={deleteCampaign}><i className="ti ti-trash" aria-hidden="true" />Eliminar</button></div></div>
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-3">
               <div className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase text-muted-foreground">Portal da campanha</span><code className="block truncate text-sm text-foreground">{window.location.origin}/funding/{selected.slug}</code><span className="text-xs text-muted-foreground">{selected.status === 'active' && selected.visibilityMode === 'V1' ? 'Publicado' : 'Ainda não publicado · disponível em pré-visualização para administradores'}</span></div>
               <button type="button" className={ghostClass} onClick={copyPortalLink}><i className="ti ti-copy" aria-hidden="true" />Copiar</button>
@@ -230,31 +260,21 @@ export default function FundingAdmin() {
               {selected.status === 'active' && selected.visibilityMode === 'V1' && <a className={ghostClass} href={`/funding/${encodeURIComponent(selected.slug)}`} target="_blank" rel="noreferrer"><i className="ti ti-external-link" aria-hidden="true" />Abrir portal</a>}
             </div>
             <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${selected.percentage}%` }} /></div>
-            <div className="grid grid-cols-4 gap-3 max-[560px]:grid-cols-2">
-              {[['Recebido', money.format(selected.totalReceived)], ['Progresso', `${selected.percentage}%`], ['Por angariar', money.format(selected.remainingEur)], ['Comprometido', money.format(selected.pledgedTotal)]].map(([label, value]) => <div key={label}><span className="block text-xs text-muted-foreground">{label}</span><strong className="text-base text-foreground">{value}</strong></div>)}
+            <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-1">
+              {[['Recebido', money.format(selected.totalReceived)], ['Progresso', `${selected.percentage}%`], ['Por angariar', money.format(selected.remainingEur)]].map(([label, value]) => <div key={label}><span className="block text-xs text-muted-foreground">{label}</span><strong className="text-base text-foreground">{value}</strong></div>)}
             </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-5 max-[680px]:grid-cols-1">
-            <form className="flex flex-col gap-3" onSubmit={submitDonation}>
+          {showDonation && (
+            <form className="flex max-w-2xl flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4" onSubmit={submitDonation}>
               <h3 className="font-bold">Registar donativo</h3>
               <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Recibo<input required className={inputClass} value={donationForm.receiptNo} onChange={(event) => setDonationForm({ ...donationForm, receiptNo: event.target.value })} /></label><label className={labelClass}>Data<input required type="date" className={inputClass} value={donationForm.date} onChange={(event) => setDonationForm({ ...donationForm, date: event.target.value })} /></label></div>
               <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Valor (€)<input required type="number" min="0.01" step="0.01" className={inputClass} value={donationForm.amountEur} onChange={(event) => setDonationForm({ ...donationForm, amountEur: event.target.value })} /></label><label className={labelClass}>Canal<select className={inputClass} value={donationForm.channel} onChange={(event) => setDonationForm({ ...donationForm, channel: event.target.value })}><option value="transfer">Transferência</option><option value="mbway">MB Way</option><option value="cash">Numerário</option><option value="online">Online</option><option value="other">Outro</option></select></label></div>
               <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Modelo<select className={inputClass} value={donationForm.configId} onChange={(event) => setDonationForm({ ...donationForm, configId: event.target.value })}>{selected.configurations.map((id) => <option key={id}>{id}</option>)}</select></label><label className={labelClass}>Doador (opcional)<input className={inputClass} value={donationForm.donorName} onChange={(event) => setDonationForm({ ...donationForm, donorName: event.target.value })} /></label></div>
               <label className={labelClass}>Referência da prova<input required className={inputClass} placeholder="Extrato, ficheiro ou envelope" value={donationForm.proofRef} onChange={(event) => setDonationForm({ ...donationForm, proofRef: event.target.value })} /></label>
-              <button disabled={busy} className={buttonClass}><i className="ti ti-receipt" aria-hidden="true" />Guardar no registo</button>
+              <div className="flex justify-end gap-2"><button type="button" className={ghostClass} onClick={() => setShowDonation(false)}>Cancelar</button><button disabled={busy} className={buttonClass}><i className="ti ti-receipt" aria-hidden="true" />Guardar no registo</button></div>
             </form>
-
-            <form className="flex flex-col gap-3" onSubmit={submitPledge}>
-              <h3 className="font-bold">Registar compromisso</h3>
-              <label className={labelClass}>Doador<input required className={inputClass} value={pledgeForm.donorName} onChange={(event) => setPledgeForm({ ...pledgeForm, donorName: event.target.value })} /></label>
-              <label className={labelClass}>Contacto reservado<input className={inputClass} value={pledgeForm.contact} onChange={(event) => setPledgeForm({ ...pledgeForm, contact: event.target.value })} /></label>
-              <div className="grid grid-cols-2 gap-3"><label className={labelClass}>Valor (€)<input required type="number" min="0.01" step="0.01" className={inputClass} value={pledgeForm.pledgedAmount} onChange={(event) => setPledgeForm({ ...pledgeForm, pledgedAmount: event.target.value })} /></label><label className={labelClass}>Cadência<select className={inputClass} value={pledgeForm.schedule} onChange={(event) => setPledgeForm({ ...pledgeForm, schedule: event.target.value })}><option value="one_shot">Único</option><option value="monthly_12">Mensal, 12 meses</option><option value="annual">Anual</option><option value="weekly">Semanal</option><option value="monthly_rolling">Mensal contínuo</option></select></label></div>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pledgeForm.consentRecorded} onChange={(event) => setPledgeForm({ ...pledgeForm, consentRecorded: event.target.checked })} /> Consentimento de contacto registado</label>
-              {selected.visibilityMode === 'V3' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pledgeForm.accessGranted} onChange={(event) => setPledgeForm({ ...pledgeForm, accessGranted: event.target.checked })} /> Acesso V3 autorizado</label>}
-              <button disabled={busy} className={ghostClass}><i className="ti ti-handshake" aria-hidden="true" />Guardar compromisso</button>
-            </form>
-          </div>
+          )}
 
           <section className="border-t border-border pt-5">
             <div className="mb-3 flex items-end justify-between"><div><h3 className="font-bold">Registo e reconciliação</h3><p className="text-xs text-muted-foreground">{ledger.donations.length} movimentos · {money.format(ledger.reconciledTotal)} reconciliados</p></div></div>

@@ -11,7 +11,6 @@ export class FundingError extends Error {
 }
 
 const CONFIG_IDS = ['C1', 'C2', 'C3', 'C4', 'C5']
-const SCHEDULES = ['one_shot', 'monthly_12', 'annual', 'weekly', 'monthly_rolling']
 const CHANNELS = ['cash', 'mbway', 'transfer', 'online', 'other']
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -42,16 +41,6 @@ const donationSchema = z.object({
   notes: nullableText(1000),
 })
 
-const pledgeSchema = z.object({
-  donorName: z.string().trim().min(2, 'Indique o nome do doador.').max(160),
-  contact: nullableText(240),
-  pledgedAmount: z.coerce.number().positive('O compromisso deve ser superior a zero.').max(10000000),
-  schedule: z.enum(SCHEDULES),
-  promisedDate: z.string().regex(DATE_RE).optional().nullable(),
-  consentRecorded: z.boolean().default(false),
-  accessGranted: z.boolean().default(false),
-})
-
 async function requireCampaign(id) {
   const campaign = await repo.findCampaignById(id)
   if (!campaign) throw new FundingError(404, 'Campanha não encontrada.')
@@ -75,6 +64,13 @@ export async function updateCampaign(id, input) {
   const data = campaignSchema.parse({ ...input, slug: input.slug ?? current.slug })
   if (data.slug !== current.slug) throw new FundingError(400, 'O identificador não pode ser alterado.')
   return campaignProgress(await repo.updateCampaign(id, data))
+}
+
+export async function deleteCampaign(id) {
+  await requireCampaign(id)
+  if (!(await repo.deleteEmptyCampaign(id))) {
+    throw new FundingError(409, 'Não é possível eliminar uma campanha com movimentos financeiros.')
+  }
 }
 
 export async function getLedger(id) {
@@ -111,11 +107,6 @@ export async function reconcileDonation(campaignId, donationId, reconciled, acto
   const donation = await repo.setDonationReconciled(campaignId, donationId, reconciled, actorId)
   if (!donation) throw new FundingError(404, 'Donativo não encontrado.')
   return donation
-}
-
-export async function addPledge(campaignId, input) {
-  await requireCampaign(campaignId)
-  return repo.insertPledge(campaignId, pledgeSchema.parse(input))
 }
 
 export async function getPublicCampaign(slug) {

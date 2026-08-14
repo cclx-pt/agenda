@@ -124,6 +124,17 @@ export async function updateCampaign(id, data) {
   return findCampaignById(id)
 }
 
+export async function deleteEmptyCampaign(id) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM funding_campaigns c
+     WHERE c.id=$1
+       AND NOT EXISTS (SELECT 1 FROM funding_donations d WHERE d.campaign_id=c.id)
+       AND NOT EXISTS (SELECT 1 FROM funding_pledges p WHERE p.campaign_id=c.id)`,
+    [id]
+  )
+  return rowCount > 0
+}
+
 export async function listDonations(campaignId) {
   const { rows } = await pool.query(
     'SELECT * FROM funding_donations WHERE campaign_id=$1 ORDER BY donation_date DESC, created_at DESC',
