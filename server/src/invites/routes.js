@@ -304,7 +304,6 @@ invitesRouter.post(
   })
 )
 
-// Self Follow-up: link público, só de leitura, com KPIs agregados das inscrições.
 invitesRouter.get(
   '/:id/follow-up/link',
   manageRoles,
@@ -396,6 +395,13 @@ publicInvitesRouter.get(
   })
 )
 
+publicInvitesRouter.get(
+  '/:slug/follow-up/stats',
+  asyncHandler(async (req, res) => {
+    res.json({ stats: await service.followupStats(req.params.slug, req.query.k) })
+  })
+)
+
 // GET /checkin/lookup — procura uma inscrição pelo código/QR do bilhete.
 publicInvitesRouter.get(
   '/:slug/checkin/lookup',
@@ -413,15 +419,6 @@ publicInvitesRouter.post(
         on: req.body?.on !== false,
       }),
     })
-  })
-)
-
-// GET /follow-up?k=<token> — KPIs agregados, sem dados pessoais dos inscritos.
-publicInvitesRouter.get(
-  '/:slug/follow-up',
-  asyncHandler(async (req, res) => {
-    res.set('Cache-Control', 'no-store')
-    res.json({ stats: await service.followupStats(req.params.slug, req.query.k) })
   })
 )
 

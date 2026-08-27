@@ -13,8 +13,6 @@ import PaymentMethodsAdmin from '../PaymentMethodsAdmin'
 import InviteSubmissionsAdmin from './InviteSubmissionsAdmin'
 import InviteSettingsAdmin from './InviteSettingsAdmin'
 import CheckinAdmin from './CheckinAdmin'
-import FollowupLinkCard from './FollowupLinkCard'
-import InviteCommunications from './InviteCommunications'
 import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
@@ -208,7 +206,7 @@ const SAVE_LABEL = {
   pagina: 'Guardar página',
 }
 
-function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
+function InviteEditor({ invite, onBack, onSaved }) {
   const [settings, setSettings] = useState(() => ({
     eventId: invite.eventId ?? '',
     title: invite.title ?? '',
@@ -393,7 +391,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
 
   // Bilhetes: adicionar/editar/remover tipos.
   const addTicket = () =>
-    setTickets((t) => [...t, { id: null, name: '', description: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', childMaxAge: '', adultMinAge: '', active: true }])
+    setTickets((t) => [...t, { id: null, name: '', kind: 'individual', partyType: 'single', price: '', capacity: '', groupSize: '', paymentMethods: [], mbEntity: '', mbReference: '', mbNumbers: [], refundDeadline: '', childMaxAge: '', adultMinAge: '', active: true }])
   const setTicketField = (i, k, v) => setTickets((t) => t.map((tk, idx) => (idx === i ? { ...tk, [k]: v } : tk)))
   const removeTicket = (i) => setTickets((t) => t.filter((_, idx) => idx !== i))
 
@@ -440,7 +438,6 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
           .map((t) => ({
             id: t.id || null,
             name: t.name.trim(),
-            description: (t.description || '').trim() || null,
             kind: normalizeKind(t.kind),
             partyType: normalizePartyType(t),
             price: t.kind === 'gratis' ? 0 : t.price === '' || t.price == null ? null : Number(t.price),
@@ -721,8 +718,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
     { id: 'definicoes', label: 'Definições' },
     ...(isInternal ? [{ id: 'bilhetes', label: 'Bilhetes' }, { id: 'inscricao', label: 'Inscrição' }] : []),
     { id: 'pagina', label: 'Página' },
-    ...(isInternal ? [{ id: 'comunicacoes', label: 'Comunicações' }] : []),
-    ...(isInternal ? [{ id: 'checkin', label: 'Check-in' }] : []),
+    ...(isInternal ? [{ id: 'inscricoes', label: 'Inscrições' }, { id: 'checkin', label: 'Check-in' }] : []),
   ]
   const activeTab = tabs.some((t) => t.id === tab) ? tab : 'definicoes'
   const roadmap = [
@@ -737,6 +733,7 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
       ? [{ label: 'Inscrição', tabId: 'definicoes', done: Boolean(settings.registrationUrl.trim()) }]
       : []),
     { label: 'Página', tabId: 'pagina', done: pageBlocks.length > 0 },
+    ...(isInternal ? [{ label: 'Inscrições', tabId: 'inscricoes', done: invite.status === 'publicado' }] : []),
   ]
 
   return (
@@ -763,20 +760,18 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
             <Eye className="h-4 w-4" aria-hidden="true" />
             Pré-visualizar
           </a>
-          {isInternal ? (
-            <button type="button" onClick={onManageRegistrations} className={ghostBtn}>
-              <Users className="h-4 w-4" aria-hidden="true" />
-              Gestão de Inscrições
-            </button>
-          ) : null}
+          <a href={publicUrl(invite.slug)} target="_blank" rel="noreferrer" className={ghostBtn}>
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            Abrir
+          </a>
           {invite.status !== 'publicado' ? (
             <button type="button" onClick={() => changeStatus('publicado')} disabled={busy} className={primaryBtn}>
               <Send className="h-4 w-4" aria-hidden="true" />
               Publicar
             </button>
           ) : (
-            <button type="button" onClick={() => changeStatus('rascunho')} disabled={busy} className={ghostBtn}>
-              Reverter para rascunho
+            <button type="button" onClick={() => changeStatus('fechado')} disabled={busy} className={ghostBtn}>
+              Fechar inscrições
             </button>
           )}
         </div>
@@ -995,14 +990,6 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
                         ))}
                       </select>
                     </div>
-                    <textarea
-                      className={inputCls}
-                      rows="2"
-                      maxLength="500"
-                      placeholder="Descrição do bilhete (ex.: acesso gratuito para voluntários)"
-                      value={t.description ?? ''}
-                      onChange={(e) => setTicketField(i, 'description', e.target.value)}
-                    />
                     <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                       Tipo de inscrição
                       <select className={inputCls} value={normalizePartyType(t)} onChange={(e) => setTicketField(i, 'partyType', e.target.value)}>
@@ -1270,7 +1257,6 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
             </div>
           </div>
         </section>
-        <FollowupLinkCard invite={invite} />
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
             <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-muted-foreground">Formulário de inscrição</h3>
@@ -1362,8 +1348,6 @@ function InviteEditor({ invite, onBack, onSaved, onManageRegistrations }) {
       ) : null}
 
       {activeTab === 'checkin' ? <CheckinAdmin invite={invite} /> : null}
-
-      {activeTab === 'comunicacoes' ? <InviteCommunications invite={invite} tickets={tickets} /> : null}
 
       {activeTab === 'inscricoes' ? (
         <>
@@ -1587,11 +1571,6 @@ export default function InvitesAdmin() {
           load()
         }}
         onSaved={(updated) => setEditing((prev) => ({ ...updated, blocks: updated.blocks ?? prev.blocks }))}
-        onManageRegistrations={() => {
-          setEditingId(null)
-          setEditing(null)
-          setAdminTab('inscricoes')
-        }}
       />
     )
   }
@@ -1683,6 +1662,9 @@ export default function InvitesAdmin() {
                 <button type="button" onClick={() => copyLink(inv.slug)} className={ghostBtn} aria-label="Copiar link">
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 </button>
+                <a href={publicUrl(inv.slug)} target="_blank" rel="noreferrer" className={ghostBtn} aria-label="Abrir">
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                </a>
                 <button type="button" onClick={() => deleteInvite(inv)} disabled={busy} className="inline-flex items-center rounded-lg border border-destructive/40 bg-transparent px-3 py-2 text-destructive transition-colors hover:bg-destructive/10" aria-label="Eliminar">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>

@@ -69,9 +69,24 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;')
 }
 
-export function ticketPaymentMethodsTitle(ticket) {
-  if (!ticket || ticket.isFree) return null
-  return ticket.isDonation ? 'Métodos de Doação' : 'Métodos de Pagamento'
+export function renderTicketPaymentMethods(ticket) {
+  const methods = ticket && !ticket.isFree ? ticket.methods || [] : []
+  if (!methods.length) return { text: '', html: '' }
+  const title = ticket.isDonation ? 'Métodos de Doação' : 'Métodos de Pagamento'
+  return {
+    text: `${title}:\n${methods.map((method) => `- ${method.label}${method.detail ? `: ${method.detail}` : ''}`).join('\n')}`,
+    html: `<div style="margin:12px 0;padding:12px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">
+        <p style="margin:0 0 6px;font-weight:700;color:#111827">${title}</p>
+        ${methods
+          .map(
+            (method) =>
+              `<p style="margin:0 0 4px;color:#374151;font-size:14px"><strong>${escapeHtml(method.label)}</strong>${
+                method.detail ? ` — ${escapeHtml(method.detail)}` : ''
+              }</p>`
+          )
+          .join('')}
+      </div>`,
+  }
 }
 
 function campaignBlockHtml(block) {
@@ -174,8 +189,7 @@ export async function sendRsvpConfirmationEmail(
           ? 'Grátis'
           : ''
     : ''
-  const methods = ticket && !ticket.isFree ? ticket.methods || [] : []
-  const methodsTitle = ticketPaymentMethodsTitle(ticket)
+  const methodsSection = renderTicketPaymentMethods(ticket)
 
   const text =
     `${name ? `Olá ${name},` : 'Olá,'}\n\nRecebemos a tua inscrição em ${title}.` +
@@ -185,9 +199,7 @@ export async function sendRsvpConfirmationEmail(
     (ticket?.name ? `\n\nBilhete: ${ticket.name}` : '') +
     (valueLine ? `\n${valueLine}` : '') +
     (code ? `\nCódigo do bilhete: ${code}` : '') +
-    (methods.length
-      ? `\n\n${methodsTitle}:\n${methods.map((m) => `- ${m.label}${m.detail ? `: ${m.detail}` : ''}`).join('\n')}`
-      : '') +
+    (methodsSection.text ? `\n\n${methodsSection.text}` : '') +
     (ticket?.requireReceipt ? `\n\nAnexa o comprovativo do pagamento aqui:\n${bilheteLink}` : '') +
     (Array.isArray(data) && data.length
       ? `\n\nDados da inscrição:\n${data.map((d) => `- ${d.label}: ${d.value}`).join('\n')}`
@@ -197,20 +209,6 @@ export async function sendRsvpConfirmationEmail(
       ? `\n\nGerir a tua inscrição (cancelar / pedir reembolso):\nCódigo de reserva: ${manage.code}\nSenha: ${manage.password}\n${manage.url}`
       : '') +
     `\n\nVerifica este email — tem os dados do teu bilhete.\n\nAgenda CCLX`
-
-  const methodsHtml = methods.length
-    ? `<div style="margin:12px 0;padding:12px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">
-        <p style="margin:0 0 6px;font-weight:700;color:#111827">${methodsTitle}</p>
-        ${methods
-          .map(
-            (m) =>
-              `<p style="margin:0 0 4px;color:#374151;font-size:14px"><strong>${escapeHtml(m.label)}</strong>${
-                m.detail ? ` — ${escapeHtml(m.detail)}` : ''
-              }</p>`
-          )
-          .join('')}
-      </div>`
-    : ''
 
   const ticketHtml = ticket
     ? `<div style="margin:16px 0;padding:14px;border:1px solid #e5e7eb;border-radius:10px">
@@ -256,7 +254,7 @@ export async function sendRsvpConfirmationEmail(
       ${statusMessage ? `<p style="margin:12px 0;padding:12px;background:#f3f4f6;border-radius:8px">${escapeHtml(statusMessage)}</p>` : ''}
       ${ticketHtml}
       ${dataHtml}
-      ${methodsHtml}
+      ${methodsSection.html}
       ${
         ticket?.isDonation
           ? `<div style="margin:16px 0;padding:14px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px">
