@@ -36,4 +36,4 @@ Registo das alterações realizadas no lote de correções iniciado em 28/08/202
 - **Ficheiros:** `server/src/invites/service.js`, `server/src/invites/service.test.js`, `src/components/invite/InvitePage.jsx`.
 - **Validação:** Teste focado do schema 1/1; testes frontend 82/82; lint sem erros; build de produção concluído. A suite backend completa mantém falhas não relacionadas nos testes de eventos/subcategorias.
 - **Commit:** `89c17aa`.
-- **Deploy:** Pendente.
+- **Deploy:** Staging concluído; produção via PR #5.
