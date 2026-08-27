@@ -43,19 +43,26 @@ function classifyPeople(guest, ticket) {
   return result
 }
 
-function isConfirmed(guest) {
-  const excludedPayments = ['pending', 'awaiting_validation', 'expired', 'refund_requested', 'refunded']
-  return guest?.rsvpState === 'confirmed' && !excludedPayments.includes(guest?.paymentState)
+function ticketNeedsPayment(ticket) {
+  return !!ticket && ticket.kind === 'individual' && Number(ticket.price) > 0
 }
 
-function registrationSituation(guest) {
+function isConfirmed(guest, ticket) {
+  if (guest?.rsvpState !== 'confirmed') return false
+  if (!ticketNeedsPayment(ticket)) return true
+  const excludedPayments = ['pending', 'awaiting_validation', 'expired', 'refund_requested', 'refunded']
+  return !excludedPayments.includes(guest?.paymentState)
+}
+
+function registrationSituation(guest, ticket) {
   const rsvp = guest?.rsvpState
   const payment = guest?.paymentState
-  if (payment === 'refunded') return 'reembolsado'
-  if (payment === 'refund_requested') return 'reembolso'
   if (rsvp === 'declined' || rsvp === 'cancelled') return 'cancelada'
   if (rsvp === 'waitlisted') return 'espera'
   if (rsvp === 'confirmed') {
+    if (!ticketNeedsPayment(ticket)) return 'confirmada'
+    if (payment === 'refunded') return 'reembolsado'
+    if (payment === 'refund_requested') return 'reembolso'
     if (payment === 'pending') return 'comprovativo'
     if (payment === 'awaiting_validation') return 'validacao'
     if (payment === 'expired') return 'expirada'
@@ -107,9 +114,9 @@ export function buildFollowupStats(guests, tickets = []) {
   const days = new Map()
 
   for (const guest of guests) {
-    situations[registrationSituation(guest)] += 1
-    if (!isConfirmed(guest)) continue
     const ticket = ticketById.get(guest.ticketId)
+    situations[registrationSituation(guest, ticket)] += 1
+    if (!isConfirmed(guest, ticket)) continue
     const counts = classifyPeople(guest, ticket)
     people.adultos += counts.adultos
     people.jovens += counts.jovens

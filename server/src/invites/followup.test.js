@@ -3,7 +3,10 @@ import assert from 'node:assert/strict'
 import { buildFollowupStats } from './followup.js'
 
 test('buildFollowupStats counts registrations and confirmed people by church', () => {
-  const tickets = [{ id: 'family', name: 'Família', childMaxAge: 10, adultMinAge: 18 }]
+  const tickets = [
+    { id: 'family', name: 'Família', kind: 'grupo', childMaxAge: 10, adultMinAge: 18 },
+    { id: 'paid', name: 'Pago', kind: 'individual', price: 20 },
+  ]
   const guests = [
     {
       ticketId: 'family',
@@ -27,6 +30,7 @@ test('buildFollowupStats counts registrations and confirmed people by church', (
       extra: { comunidade: 'Sede' },
     },
     {
+      ticketId: 'paid',
       rsvpState: 'confirmed',
       paymentState: 'pending',
       extra: { comunidade: 'Almada' },
@@ -66,4 +70,27 @@ test('buildFollowupStats counts registrations and confirmed people by church', (
       { date: '2026-08-27', registrations: 3, people: 7, adultos: 3, jovens: 1, criancas: 3 },
     ],
   })
+})
+
+test('buildFollowupStats uses payment statuses only for paid tickets', () => {
+  const tickets = [
+    { id: 'paid', name: 'Pago', kind: 'individual', price: 20 },
+    { id: 'free', name: 'Grátis', kind: 'gratis', price: 0 },
+    { id: 'donation', name: 'Doação', kind: 'voluntaria', price: 5 },
+  ]
+  const guests = [
+    { ticketId: 'paid', rsvpState: 'confirmed', paymentState: 'pending', extra: {} },
+    { ticketId: 'free', rsvpState: 'confirmed', paymentState: 'pending', extra: {} },
+    { ticketId: 'donation', rsvpState: 'confirmed', paymentState: 'awaiting_validation', extra: {} },
+    { ticketId: 'donation', rsvpState: 'cancelled', paymentState: 'not_applicable', extra: {} },
+  ]
+
+  const stats = buildFollowupStats(guests, tickets)
+
+  assert.equal(stats.situations.comprovativo, 1)
+  assert.equal(stats.situations.validacao, 0)
+  assert.equal(stats.situations.confirmada, 2)
+  assert.equal(stats.situations.cancelada, 1)
+  assert.equal(stats.confirmedRegistrations, 2)
+  assert.equal(stats.people.total, 2)
 })

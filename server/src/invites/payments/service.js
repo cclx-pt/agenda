@@ -165,6 +165,10 @@ export async function attachReceipt(slug, guestToken, receiptUrl) {
   const guest = await invitesRepo.findGuestByToken(guestToken)
   if (!guest || guest.inviteId !== invite.id) throw new InviteError(404, 'Inscrição não encontrada.')
 
+  const ticket = guest.ticketId ? await invitesRepo.findTicketById(guest.ticketId).catch(() => null) : null
+  const needsPayment = ticket?.kind === 'individual' && Number(ticket.price) > 0
+  if (!needsPayment) throw new InviteError(409, 'Este bilhete não necessita de comprovativo.')
+
   let payment = await repo.findLatestByGuest(guest.id)
   if (!payment) {
     // Sem pagamento iniciado ainda: cria um por transferência.
@@ -178,16 +182,8 @@ export async function attachReceipt(slug, guestToken, receiptUrl) {
       provider: getConnector(invite.paymentProvider || DEFAULT_PROVIDER).name,
     })
   }
-  // Doação (contribuição voluntária): o comprovativo é opcional e NÃO precisa de
-  // validação do organizador → fica logo "pago" (validado automaticamente). Os
-  // restantes bilhetes ficam "em validação" até o organizador confirmar.
-  let nextState = 'awaiting_validation'
-  if (guest.ticketId) {
-    const ticket = await invitesRepo.findTicketById(guest.ticketId).catch(() => null)
-    if (ticket?.kind === 'voluntaria') nextState = 'paid'
-  }
-  const updated = await repo.update(payment.id, { status: nextState, receiptUrl })
-  await invitesRepo.updateGuest(guest.id, { paymentState: nextState })
+  const updated = await repo.update(payment.id, { status: 'awaiting_validation', receiptUrl })
+  await invitesRepo.updateGuest(guest.id, { paymentState: 'awaiting_validation' })
   return safePayment(updated, null)
 }
 

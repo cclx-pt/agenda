@@ -35,15 +35,15 @@ function renderPaymentFlow(guestStatus) {
   )
 }
 
-it('shows confirmation for completed donation tickets', () => {
-  renderPaymentFlow({ isDonation: true, showReceipt: true, paymentState: 'paid' })
+it('allows a donation without offering receipt upload', () => {
+  renderPaymentFlow({ isDonation: true, showPayment: true, showReceipt: false, paymentState: 'not_applicable' })
 
-  expect(screen.getByText('Pagamento confirmado. Obrigado!')).toBeInTheDocument()
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByText(/A tua inscrição está confirmada/)).toBeInTheDocument()
+  expect(screen.queryByText(/comprovativo/i)).not.toBeInTheDocument()
 })
 
 it('shows the payment method resolved during registration', () => {
-  renderPaymentFlow({ isDonation: false, showReceipt: true, paymentState: 'pending' })
+  renderPaymentFlow({ isDonation: false, showPayment: true, showReceipt: true, paymentState: 'pending' })
 
   expect(screen.getByRole('heading', { name: 'Pagamento' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Como pagar — Transferência bancária' })).toBeInTheDocument()
@@ -51,7 +51,7 @@ it('shows the payment method resolved during registration', () => {
 })
 
 it('omits the payment-method section for free tickets', () => {
-  renderPaymentFlow({ isDonation: false, showReceipt: false, paymentState: null })
+  renderPaymentFlow({ isDonation: false, showPayment: false, showReceipt: false, paymentState: null })
 
   expect(screen.queryByText(/Métodos de (Doação|Pagamento)/)).not.toBeInTheDocument()
 })

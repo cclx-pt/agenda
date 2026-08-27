@@ -863,7 +863,8 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
     ticketId: guestStatus?.ticketId,
   })
   const isDonation = !!guestStatus?.isDonation
-  const receiptReq = !isDonation && receiptRequired(invite, guestStatus?.paymentMethod)
+  const canUploadReceipt = !!guestStatus?.showReceipt
+  const receiptReq = canUploadReceipt && receiptRequired(invite, guestStatus?.paymentMethod)
 
   // Abre o JotForm numa NOVA página (link real com target=_blank → nunca é
   // bloqueado como popup); valida o telemóvel antes de navegar.
@@ -937,11 +938,11 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             <p className="m-0 text-sm text-foreground">
               Confirma a operação na app <strong>MB WAY</strong> no teu telemóvel.
               {isDonation
-                ? ' Se quiseres, podes anexar o comprovativo.'
+                ? ' A tua inscrição já está confirmada e não é necessário enviar comprovativo.'
                 : ' Depois de pagares com sucesso, carrega aqui o comprovativo para confirmarmos a tua inscrição.'}
             </p>
           </div>
-          <label
+          {canUploadReceipt ? <label
             className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
             style={{ backgroundColor: accent }}
           >
@@ -952,7 +953,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
             )}
             {uploading ? 'A enviar…' : `Carregar comprovativo${receiptReq ? ' (obrigatório)' : ' (opcional)'}`}
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
-          </label>
+          </label> : null}
           <a
             href={jotformUrl}
             target="_blank"
@@ -972,9 +973,7 @@ function MbwayFlow({ slug, guestToken, invite, guestStatus, accent, onUpdate }) 
 // Fluxo de pagamento do convidado (aparece só para eventos pagos, a quem já se
 // inscreveu). Escolha do método → instruções (IBAN/referência) → comprovativo.
 export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent, onUpdate }) {
-  // Mostra a secção de pagamento/comprovativo quando o bilhete do convidado NÃO
-  // é grátis (pago OU doação). O anexo do comprovativo está sempre ligado ao bilhete.
-  const applicable = !!guestToken && !!guestStatus && guestStatus.showReceipt
+  const applicable = !!guestToken && !!guestStatus && (guestStatus.showPayment ?? guestStatus.showReceipt)
   const [payment, setPayment] = useState(null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -1062,29 +1061,28 @@ export function PaymentFlowCard({ slug, guestToken, invite, guestStatus, accent,
 
   // Método do bilhete (o convidado já não escolhe — vem resolvido do bilhete).
   const isDonation = !!guestStatus.isDonation
-  // Doação = contribuição voluntária → comprovativo sempre OPCIONAL. Caso
-  // contrário, respeita a configuração do método (paymentMethodReceipt).
-  const receiptReq = !isDonation && receiptRequired(invite, payMethod)
+  const canUploadReceipt = !!guestStatus.showReceipt
+  const receiptReq = canUploadReceipt && receiptRequired(invite, payMethod)
   const methods = payMethod ? [payMethod] : []
   const instr = payment?.instructions
 
   // Anexar comprovativo — sempre disponível, ligado ao bilhete (mostra se é
   // obrigatório ou opcional). Não obriga a "iniciar" o pagamento primeiro.
-  const receiptBlock = (
+  const receiptBlock = canUploadReceipt ? (
     <div className="mt-3 flex flex-col gap-1.5 border-t border-border/60 pt-3">
       <p className="m-0 text-sm text-foreground">
-        {receiptReq ? 'Este bilhete exige comprovativo de pagamento.' : 'Comprovativo opcional para este bilhete.'}
+        Este bilhete exige comprovativo de pagamento.
       </p>
       <label
         className="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90"
         style={{ backgroundColor: accent }}
       >
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
-        {uploading ? 'A enviar…' : `Anexar comprovativo${receiptReq ? ' (obrigatório)' : ' (opcional)'}`}
+        {uploading ? 'A enviar…' : `Anexar comprovativo${receiptReq ? ' (obrigatório)' : ''}`}
         <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={onReceipt} />
       </label>
     </div>
-  )
+  ) : null
 
   return (
     <div className={cardCls}>

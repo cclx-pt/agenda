@@ -40,14 +40,6 @@ function formatEventDate(startValue, endValue) {
   return `${startLabel} – ${end.toLocaleString('pt-PT', dateOptions)}`
 }
 
-function formatDay(value) {
-  if (!value) return ''
-  const date = new Date(`${value}T12:00:00`)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
 function Kpi({ label, value, icon: Icon, detail }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -81,7 +73,7 @@ function BreakdownTable({ rows, firstColumn, emptyMessage }) {
         <tbody className="divide-y divide-border">
           {rows.map((row) => (
             <tr key={row.name || row.date} className="hover:bg-muted/30">
-              <td className="max-w-[280px] px-4 py-3 font-medium text-foreground">{row.name || formatDay(row.date)}</td>
+              <td className="max-w-[280px] px-4 py-3 font-medium text-foreground">{row.name}</td>
               <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{row.registrations}</td>
               <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{row.people}</td>
               <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{row.adultos}</td>
@@ -180,10 +172,9 @@ export default function InviteFollowup({ slug, token }) {
 
       <div className="mx-auto max-w-5xl px-4 py-6">
         <Tabs defaultValue="geral">
-          <TabsList className="grid h-auto w-full grid-cols-3 sm:w-auto sm:min-w-[420px]">
+          <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:min-w-[280px]">
             <TabsTrigger value="geral" className="gap-2"><BarChart3 className="h-4 w-4" /> Geral</TabsTrigger>
             <TabsTrigger value="detalhe" className="gap-2"><Building2 className="h-4 w-4" /> Detalhe</TabsTrigger>
-            <TabsTrigger value="dia" className="gap-2"><CalendarDays className="h-4 w-4" /> Por dia</TabsTrigger>
           </TabsList>
 
           <TabsContent value="geral" className="mt-5 space-y-5">
@@ -232,12 +223,6 @@ export default function InviteFollowup({ slug, token }) {
             </section>
           </TabsContent>
 
-          <TabsContent value="dia" className="mt-5">
-            <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-              <div className="border-b border-border px-4 py-3"><h2 className="m-0 text-sm font-semibold">Inscrições confirmadas por dia</h2><p className="m-0 mt-1 text-xs text-muted-foreground">Adultos, jovens e crianças pela data de inscrição</p></div>
-              <BreakdownTable rows={[...(stats.byDay || [])].reverse()} firstColumn="Dia" emptyMessage="Ainda não há inscrições confirmadas por dia." />
-            </section>
-          </TabsContent>
         </Tabs>
 
         <p className="m-0 mt-5 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground"><Clock3 className="h-3.5 w-3.5" /> Atualização automática a cada 30 segundos · última leitura às {updated}</p>

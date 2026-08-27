@@ -787,11 +787,15 @@ function resolveGuestMethod(guest, ticket) {
 // método do bilhete escolhido (mbway/transferencia/referencia); null se grátis.
 function guestStatusPayload(guest, paymentMethod = null, ticket = null) {
   if (!guest) return null
+  const isDonation = ticket?.kind === 'voluntaria'
+  const isPaid = ticketNeedsPayment(ticket)
   const hasPayment = !!paymentMethod
   let nextAction = 'none'
   let message = ''
   if (guest.rsvpState === 'confirmed') {
-    if (guest.paymentState === 'pending') {
+    if (!isPaid) {
+      message = 'A tua presença está confirmada. Até breve!'
+    } else if (guest.paymentState === 'pending') {
       nextAction = 'pay'
       message = hasPayment
         ? 'A tua presença está reservada. Falta concluir o pagamento para poderes confirmar.'
@@ -808,8 +812,6 @@ function guestStatusPayload(guest, paymentMethod = null, ticket = null) {
   } else if (guest.rsvpState === 'declined') {
     message = 'Registámos que não vais poder estar presente.'
   }
-  const isDonation = ticket?.kind === 'voluntaria'
-  const isPaid = ticketNeedsPayment(ticket)
   return {
     rsvpState: guest.rsvpState,
     paymentState: guest.paymentState,
@@ -819,9 +821,8 @@ function guestStatusPayload(guest, paymentMethod = null, ticket = null) {
     ticketId: guest.ticketId ?? null,
     code: guest.code ?? null,
     isDonation,
-    // Mostra a secção de pagamento/comprovativo quando o bilhete NÃO é grátis
-    // (pago ou doação) — o anexo do comprovativo está sempre ligado ao bilhete.
-    showReceipt: !!ticket && (isDonation || isPaid),
+    showPayment: !!ticket && (isDonation || isPaid),
+    showReceipt: isPaid,
     nextAction,
     message,
   }
