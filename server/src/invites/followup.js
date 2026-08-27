@@ -48,31 +48,102 @@ function isConfirmed(guest) {
   return guest?.rsvpState === 'confirmed' && !excludedPayments.includes(guest?.paymentState)
 }
 
+function registrationSituation(guest) {
+  const rsvp = guest?.rsvpState
+  const payment = guest?.paymentState
+  if (payment === 'refunded') return 'reembolsado'
+  if (payment === 'refund_requested') return 'reembolso'
+  if (rsvp === 'declined' || rsvp === 'cancelled') return 'cancelada'
+  if (rsvp === 'waitlisted') return 'espera'
+  if (rsvp === 'confirmed') {
+    if (payment === 'pending') return 'comprovativo'
+    if (payment === 'awaiting_validation') return 'validacao'
+    if (payment === 'expired') return 'expirada'
+    return 'confirmada'
+  }
+  return 'pendente'
+}
+
+function registrationDay(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Lisbon',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function addCounts(target, counts) {
+  target.registrations += 1
+  target.adultos += counts.adultos
+  target.jovens += counts.jovens
+  target.criancas += counts.criancas
+  target.people += counts.total
+}
+
+function emptyBreakdown(name) {
+  return { name, registrations: 0, people: 0, adultos: 0, jovens: 0, criancas: 0 }
+}
+
 export function buildFollowupStats(guests, tickets = []) {
   const ticketById = new Map(tickets.map((ticket) => [ticket.id, ticket]))
   const people = { adultos: 0, jovens: 0, criancas: 0, total: 0 }
+  const situations = {
+    confirmada: 0,
+    comprovativo: 0,
+    validacao: 0,
+    espera: 0,
+    cancelada: 0,
+    reembolso: 0,
+    reembolsado: 0,
+    expirada: 0,
+    pendente: 0,
+  }
   const churches = new Map()
+  const ticketStats = new Map()
+  const days = new Map()
 
   for (const guest of guests) {
+    situations[registrationSituation(guest)] += 1
     if (!isConfirmed(guest)) continue
-    const counts = classifyPeople(guest, ticketById.get(guest.ticketId))
+    const ticket = ticketById.get(guest.ticketId)
+    const counts = classifyPeople(guest, ticket)
     people.adultos += counts.adultos
     people.jovens += counts.jovens
     people.criancas += counts.criancas
     people.total += counts.total
     const church = registrationChurch(guest)
-    const current = churches.get(church) || { name: church, registrations: 0, people: 0 }
-    current.registrations += 1
-    current.people += counts.total
+    const current = churches.get(church) || emptyBreakdown(church)
+    addCounts(current, counts)
     churches.set(church, current)
+
+    const ticketName = ticket?.name || 'Sem bilhete'
+    const currentTicket = ticketStats.get(ticketName) || emptyBreakdown(ticketName)
+    addCounts(currentTicket, counts)
+    ticketStats.set(ticketName, currentTicket)
+
+    const day = registrationDay(guest.createdAt)
+    if (day) {
+      const currentDay = days.get(day) || { date: day, registrations: 0, people: 0, adultos: 0, jovens: 0, criancas: 0 }
+      addCounts(currentDay, counts)
+      days.set(day, currentDay)
+    }
   }
 
   return {
     registrations: guests.length,
-    confirmedRegistrations: [...guests].filter(isConfirmed).length,
+    confirmedRegistrations: situations.confirmada,
+    situations,
     people,
     byChurch: [...churches.values()].sort(
       (a, b) => b.registrations - a.registrations || a.name.localeCompare(b.name, 'pt')
     ),
+    byTicket: [...ticketStats.values()].sort(
+      (a, b) => b.registrations - a.registrations || a.name.localeCompare(b.name, 'pt')
+    ),
+    byDay: [...days.values()].sort((a, b) => a.date.localeCompare(b.date)),
   }
 }
