@@ -75,7 +75,8 @@ function VideoUploadField({ value, onChange }) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (file.type !== 'video/mp4') {
+    const isMp4 = file.type === 'video/mp4' || (!file.type && file.name.toLowerCase().endsWith('.mp4'))
+    if (!isMp4) {
       toast.error('Formato inválido. Seleciona um vídeo MP4.')
       return
     }

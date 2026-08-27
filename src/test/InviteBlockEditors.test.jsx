@@ -46,7 +46,7 @@ describe('InviteBlockEditors uploads', () => {
     const onChange = vi.fn()
     const content = { items: [{ type: 'video', url: '', title: '', caption: '' }] }
     const { container } = render(<BlockEditor type="multimedia" content={content} onChange={onChange} />)
-    const file = new File(['video'], 'programa.mp4', { type: 'video/mp4' })
+    const file = new File(['video'], 'programa.mp4')
 
     await userEvent.upload(container.querySelector('input[type="file"]'), file)
 

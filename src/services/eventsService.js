@@ -438,7 +438,7 @@ export async function uploadEventImage(file) {
 export async function uploadMultimediaVideo(file) {
   const { signedUrl, publicUrl } = await request('/data/uploads/sign-video', {
     method: 'POST',
-    body: { contentType: file.type, size: file.size },
+    body: { contentType: 'video/mp4', size: file.size },
   })
   const form = new FormData()
   form.append('cacheControl', '3600')
