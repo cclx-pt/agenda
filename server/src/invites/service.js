@@ -126,6 +126,7 @@ const BLOCK_TYPES = [
   'agenda',
   'workshops',
   'rsvp',
+  'tickets',
   'pagamento',
   'localizacao',
   'partilha',
@@ -227,7 +228,7 @@ const blockSchema = z.object({
   content: z.record(z.any()).optional().default({}),
   visible: z.boolean().optional().default(true),
 })
-const blocksSchema = z.array(blockSchema).max(100)
+export const blocksSchema = z.array(blockSchema).max(100)
 
 const rsvpSchema = z.object({
   name: z.string().trim().min(1, 'Indique o seu nome.').max(200),
