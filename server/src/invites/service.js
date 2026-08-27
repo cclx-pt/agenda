@@ -693,6 +693,7 @@ export async function followupStats(slug, rawToken) {
     event: {
       title: invite.title,
       startDatetime: invite.startDatetime,
+      endDatetime: invite.endDatetime,
       location: invite.location ?? null,
     },
     ...buildFollowupStats(guests, tickets),

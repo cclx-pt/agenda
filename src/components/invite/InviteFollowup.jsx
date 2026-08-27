@@ -18,14 +18,26 @@ const SITUATIONS = [
   ['pendente', 'Pendentes', 'bg-zinc-500'],
 ]
 
-function formatEventDate(value) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleString('pt-PT', {
+function formatEventDate(startValue, endValue) {
+  if (!startValue) return null
+  const start = new Date(startValue)
+  if (Number.isNaN(start.getTime())) return null
+  const dateOptions = {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
     timeZone: 'Europe/Lisbon',
-  })
+  }
+  const startLabel = start.toLocaleString('pt-PT', dateOptions)
+  if (!endValue) return startLabel
+  const end = new Date(endValue)
+  if (Number.isNaN(end.getTime())) return startLabel
+  const dateKey = (date) => date.toLocaleDateString('en-CA', { timeZone: 'Europe/Lisbon' })
+  if (dateKey(start) === dateKey(end)) {
+    const endTime = end.toLocaleTimeString('pt-PT', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon',
+    })
+    return `${startLabel} – ${endTime}`
+  }
+  return `${startLabel} – ${end.toLocaleString('pt-PT', dateOptions)}`
 }
 
 function formatDay(value) {
@@ -156,7 +168,7 @@ export default function InviteFollowup({ slug, token }) {
             <span className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary"><BarChart3 className="h-4 w-4" /> Acompanhamento de inscrições</span>
             <h1 className="m-0 text-2xl font-bold leading-tight text-foreground">{stats.event.title}</h1>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
-              {formatEventDate(stats.event.startDatetime) ? <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" /> {formatEventDate(stats.event.startDatetime)}</span> : null}
+              {formatEventDate(stats.event.startDatetime, stats.event.endDatetime) ? <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" /> {formatEventDate(stats.event.startDatetime, stats.event.endDatetime)}</span> : null}
               {stats.event.location ? <span className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {stats.event.location}</span> : null}
             </div>
           </div>
