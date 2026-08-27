@@ -20,4 +20,5 @@ Registo das alterações realizadas no lote de correções iniciado em 28/08/202
 - **Alteração:** Aceitar a extensão `.mp4` quando o MIME type estiver vazio e enviar sempre o tipo canónico `video/mp4` ao pedir o upload assinado.
 - **Ficheiros:** `src/components/invite/InviteBlockEditors.jsx`, `src/services/eventsService.js`, `src/test/InviteBlockEditors.test.jsx`.
 - **Validação:** Teste focado 10/10; upload assinado real contra o Storage de staging HTTP 200; lint sem erros; build de produção concluído. O ficheiro de teste no Storage foi removido.
-- **Commit:** Pendente.
+- **Commit:** `b1bb5a3`.
+- **Deploy:** Staging e produção concluídos via PR #3.
