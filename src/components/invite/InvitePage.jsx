@@ -4,7 +4,7 @@ import { Ticket, Loader2, CheckCircle2, Clock, CreditCard, Upload, Plus, Trash2,
 import * as invitesService from '../../services/invitesService'
 import {
   BannerCard, OverviewCard, InfoExtraCard, NarrativeCard, MultimediaCard, GoodToKnowCard, SpeakersCard, AgendaCard, WorkshopsCard,
-  PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
+  TicketsCard, PaymentCard, LocationCard, FaqsCard, ShareCard, FooterCard,
 } from './InviteCards'
 import { fmtDateRange, inviteRsvpHref, inviteHomeHref, ticketPrice } from './inviteUtils'
 import {
@@ -23,6 +23,7 @@ const BLOCK_COMPONENTS = {
   oradores: SpeakersCard,
   agenda: AgendaCard,
   workshops: WorkshopsCard,
+  tickets: TicketsCard,
   pagamento: PaymentCard,
   localizacao: LocationCard,
   faqs: FaqsCard,
