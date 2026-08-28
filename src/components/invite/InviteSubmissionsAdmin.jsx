@@ -35,6 +35,8 @@ const SITUACAO_OPTIONS = [
   { value: 'comprovativo', label: 'Pendente comprovativo' },
   { value: 'validacao', label: 'Aprovação de comprovativo pendente' },
   { value: 'espera', label: 'Lista de espera' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'expirada', label: 'Expirada' },
   { value: 'cancelada', label: 'Cancelada' },
   { value: 'reembolso', label: 'Reembolso pedido' },
   { value: 'reembolsado', label: 'Reembolsado' },
@@ -50,6 +52,7 @@ const PAY_LABEL = {
   refunded: 'Reembolsado',
   not_applicable: 'Sem pagamento',
 }
+const PAYMENT_OPTIONS = Object.entries(PAY_LABEL).map(([value, label]) => ({ value, label }))
 // Estados de pagamento em que o organizador pode marcar como reembolsado.
 const REFUNDABLE_PAY = new Set(['paid', 'awaiting_validation', 'refund_requested'])
 
@@ -117,6 +120,7 @@ export default function InviteSubmissionsAdmin() {
   const [filterChurch, setFilterChurch] = useState('')
   const [filterTicket, setFilterTicket] = useState('')
   const [filterSituacao, setFilterSituacao] = useState('')
+  const [filterPayment, setFilterPayment] = useState('')
   const [searchName, setSearchName] = useState('')
   const [searchPhone, setSearchPhone] = useState('')
   const [searchEmail, setSearchEmail] = useState('')
@@ -160,11 +164,33 @@ export default function InviteSubmissionsAdmin() {
     if (filterChurch && registrationChurch(r) !== filterChurch) return false
     if (filterTicket && (r.ticket?.name || 'Sem bilhete') !== filterTicket) return false
     if (filterSituacao && inscricaoSituacao(r) !== filterSituacao) return false
+    if (filterPayment && (r.paymentState || 'not_applicable') !== filterPayment) return false
     if (searchName && !String(r.name || '').toLocaleLowerCase('pt-PT').includes(searchName.trim().toLocaleLowerCase('pt-PT'))) return false
     if (searchPhone && !String(r.phone || '').replace(/\D/g, '').includes(searchPhone.replace(/\D/g, ''))) return false
     if (searchEmail && !String(r.email || '').toLocaleLowerCase('pt-PT').includes(searchEmail.trim().toLocaleLowerCase('pt-PT'))) return false
     return true
   })
+
+  const hasFilters = !!(
+    filterInvite ||
+    filterChurch ||
+    filterTicket ||
+    filterSituacao ||
+    filterPayment ||
+    searchName ||
+    searchPhone ||
+    searchEmail
+  )
+  const clearFilters = () => {
+    setFilterInvite('')
+    setFilterChurch('')
+    setFilterTicket('')
+    setFilterSituacao('')
+    setFilterPayment('')
+    setSearchName('')
+    setSearchPhone('')
+    setSearchEmail('')
+  }
 
   // Opções de filtro derivadas das respostas de cada inscrição.
   const churchOptions = [...new Set((rows || []).map(registrationChurch))].sort((a, b) =>
@@ -186,6 +212,8 @@ export default function InviteSubmissionsAdmin() {
     espera: countSit('espera'),
     cancelada: countSit('cancelada'),
     reembolso: countSit('reembolso') + countSit('reembolsado'),
+    pendente: countSit('pendente'),
+    expirada: countSit('expirada'),
   }
 
   // Repartição das inscrições visíveis (respeita os filtros ativos). As pessoas
@@ -404,6 +432,17 @@ export default function InviteSubmissionsAdmin() {
             </select>
           </label>
           <label className={labelCls}>
+            Pagamento
+            <select className={selectCls} value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}>
+              <option value="">Todos os pagamentos</option>
+              {PAYMENT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={labelCls}>
             Nome
             <input className={inputCls} value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Pesquisar nome" />
           </label>
@@ -417,6 +456,11 @@ export default function InviteSubmissionsAdmin() {
           </label>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
+          {hasFilters ? (
+            <button type="button" onClick={clearFilters} className={ghostBtn}>
+              Limpar filtros
+            </button>
+          ) : null}
           <button type="button" onClick={load} className={ghostBtn}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Atualizar
@@ -429,13 +473,15 @@ export default function InviteSubmissionsAdmin() {
       </div>
 
       {filterInvite ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-9">
           {[
             { label: 'Inscrições do evento', value: eventStats.total, cls: 'text-foreground' },
             { label: 'Confirmadas', value: eventStats.confirmada, cls: 'text-emerald-700 dark:text-emerald-400' },
             { label: 'Pendente comprovativo', value: eventStats.comprovativo, cls: 'text-amber-700 dark:text-amber-400' },
             { label: 'Aprovação pendente', value: eventStats.validacao, cls: 'text-sky-700 dark:text-sky-400' },
             { label: 'Lista de espera', value: eventStats.espera, cls: 'text-amber-700 dark:text-amber-400' },
+            { label: 'Pendentes', value: eventStats.pendente, cls: 'text-muted-foreground' },
+            { label: 'Expiradas', value: eventStats.expirada, cls: 'text-muted-foreground' },
             { label: 'Canceladas', value: eventStats.cancelada, cls: 'text-red-700 dark:text-red-400' },
             { label: 'Reembolsos', value: eventStats.reembolso, cls: 'text-orange-700 dark:text-orange-400' },
           ].map((s) => (
