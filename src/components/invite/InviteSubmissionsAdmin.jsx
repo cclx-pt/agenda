@@ -405,14 +405,21 @@ export default function InviteSubmissionsAdmin() {
   // Schema + instruções .md, todos a respeitar o esquema do convite selecionado.
   const selectedInvite = invites.find((i) => i.id === filterInvite) || null
   const downloadKit = (which) => {
-    if (!selectedInvite) return
+    if (!selectedInvite) {
+      toast.error('Seleciona primeiro um convite no filtro “Convite” para gerar o kit.')
+      return
+    }
     const kit = buildRegistrationKit(selectedInvite, eventRows)
     const files = []
     if (which === 'data' || which === 'all') files.push([kit.dataFile, JSON.stringify(kit.data, null, 2), 'application/json'])
     if (which === 'schema' || which === 'all') files.push([kit.schemaFile, JSON.stringify(kit.schema, null, 2), 'application/json'])
     if (which === 'md' || which === 'all') files.push([kit.mdFile, kit.markdown, 'text/markdown;charset=utf-8'])
-    // Escalona para o browser permitir vários downloads seguidos.
-    files.forEach(([name, content, mime], i) => setTimeout(() => downloadText(name, content, mime), i * 150))
+    // 1.º download síncrono (preserva o gesto do clique); restantes escalonados.
+    files.forEach(([name, content, mime], i) => {
+      if (i === 0) downloadText(name, content, mime)
+      else setTimeout(() => downloadText(name, content, mime), i * 250)
+    })
+    toast.success(files.length > 1 ? `${files.length} ficheiros descarregados.` : 'Ficheiro descarregado.')
   }
 
   if (loading) {
@@ -509,30 +516,37 @@ export default function InviteSubmissionsAdmin() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                disabled={!selectedInvite}
                 className={ghostBtn}
-                title={selectedInvite ? 'Descarregar dados, schema e instruções deste convite' : 'Seleciona um convite para gerar o kit'}
+                title="Descarregar dados, schema e instruções para construir um dashboard com IA"
               >
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
                 Kit dashboard IA
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel className="truncate">{selectedInvite?.title || 'Kit para dashboard IA'}</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="z-[400] w-64">
+              <DropdownMenuLabel className="truncate">{selectedInvite ? selectedInvite.title : 'Kit para dashboard IA'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => downloadKit('data')}>
-                <Database className="mr-2 h-4 w-4" aria-hidden="true" /> Dados (JSON)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => downloadKit('schema')}>
-                <Braces className="mr-2 h-4 w-4" aria-hidden="true" /> Schema (JSON)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => downloadKit('md')}>
-                <FileText className="mr-2 h-4 w-4" aria-hidden="true" /> Instruções (.md)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => downloadKit('all')}>
-                <FileDown className="mr-2 h-4 w-4" aria-hidden="true" /> Descarregar tudo
-              </DropdownMenuItem>
+              {selectedInvite ? (
+                <>
+                  <DropdownMenuItem onClick={() => downloadKit('data')}>
+                    <Database className="mr-2 h-4 w-4" aria-hidden="true" /> Dados (JSON)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => downloadKit('schema')}>
+                    <Braces className="mr-2 h-4 w-4" aria-hidden="true" /> Schema (JSON)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => downloadKit('md')}>
+                    <FileText className="mr-2 h-4 w-4" aria-hidden="true" /> Instruções (.md)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => downloadKit('all')}>
+                    <FileDown className="mr-2 h-4 w-4" aria-hidden="true" /> Descarregar tudo
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem disabled className="whitespace-normal text-xs">
+                  Seleciona primeiro um convite no filtro “Convite”.
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
