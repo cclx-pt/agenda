@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import {
   inscricaoSituacao,
   SITUACAO_LABEL,
@@ -11,6 +19,7 @@ import {
   registrationChurch,
 } from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
+import { buildRegistrationKit } from './registrationExport'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -55,6 +64,19 @@ const PAY_LABEL = {
 const PAYMENT_OPTIONS = Object.entries(PAY_LABEL).map(([value, label]) => ({ value, label }))
 // Estados de pagamento em que o organizador pode marcar como reembolsado.
 const REFUNDABLE_PAY = new Set(['paid', 'awaiting_validation', 'refund_requested'])
+
+// Descarrega texto como ficheiro (dados/schema/instruções do kit de dashboard).
+function downloadText(name, content, mime) {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 // Rótulo curto da composição (ex.: "2A · 1J · 3C").
 function peopleLabel(p) {
@@ -379,6 +401,20 @@ export default function InviteSubmissionsAdmin() {
     URL.revokeObjectURL(url)
   }
 
+  // Kit para construir um dashboard num motor de IA (por convite): dados + JSON
+  // Schema + instruções .md, todos a respeitar o esquema do convite selecionado.
+  const selectedInvite = invites.find((i) => i.id === filterInvite) || null
+  const downloadKit = (which) => {
+    if (!selectedInvite) return
+    const kit = buildRegistrationKit(selectedInvite, eventRows)
+    const files = []
+    if (which === 'data' || which === 'all') files.push([kit.dataFile, JSON.stringify(kit.data, null, 2), 'application/json'])
+    if (which === 'schema' || which === 'all') files.push([kit.schemaFile, JSON.stringify(kit.schema, null, 2), 'application/json'])
+    if (which === 'md' || which === 'all') files.push([kit.mdFile, kit.markdown, 'text/markdown;charset=utf-8'])
+    // Escalona para o browser permitir vários downloads seguidos.
+    files.forEach(([name, content, mime], i) => setTimeout(() => downloadText(name, content, mime), i * 150))
+  }
+
   if (loading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">A carregar…</p>
   }
@@ -469,6 +505,36 @@ export default function InviteSubmissionsAdmin() {
             <Download className="h-4 w-4" aria-hidden="true" />
             Exportar Excel
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={!selectedInvite}
+                className={ghostBtn}
+                title={selectedInvite ? 'Descarregar dados, schema e instruções deste convite' : 'Seleciona um convite para gerar o kit'}
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                Kit dashboard IA
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel className="truncate">{selectedInvite?.title || 'Kit para dashboard IA'}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => downloadKit('data')}>
+                <Database className="mr-2 h-4 w-4" aria-hidden="true" /> Dados (JSON)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => downloadKit('schema')}>
+                <Braces className="mr-2 h-4 w-4" aria-hidden="true" /> Schema (JSON)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => downloadKit('md')}>
+                <FileText className="mr-2 h-4 w-4" aria-hidden="true" /> Instruções (.md)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => downloadKit('all')}>
+                <FileDown className="mr-2 h-4 w-4" aria-hidden="true" /> Descarregar tudo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
