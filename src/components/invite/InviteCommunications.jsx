@@ -294,7 +294,6 @@ export default function InviteCommunications({ invite, tickets = [] }) {
   const [campaign, setCampaign] = useState(EMPTY)
   const [campaignId, setCampaignId] = useState(null)
   const [audienceCount, setAudienceCount] = useState(null)
-  const [testEmail, setTestEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(false)
 
@@ -375,7 +374,12 @@ export default function InviteCommunications({ invite, tickets = [] }) {
     }
   }
   const sendTest = async () => {
-    if (!testEmail.trim()) return toast.error('Indique o email de teste.')
+    const testEmail = window.prompt('Email destinatário para o teste:')?.trim()
+    if (!testEmail) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+      toast.error('Indique um email de teste válido.')
+      return
+    }
     const saved = await save()
     if (!saved) return
     setBusy(true)
@@ -684,15 +688,6 @@ export default function InviteCommunications({ invite, tickets = [] }) {
             <Save className="h-4 w-4" />
             Guardar
           </button>
-          <label className="min-w-[220px] flex-1 text-xs font-medium">
-            Email de teste
-            <input
-              type="email"
-              className={inputCls + ' mt-1'}
-              value={testEmail}
-              onChange={(event) => setTestEmail(event.target.value)}
-            />
-          </label>
           <button type="button" className={ghostBtn} disabled={busy} onClick={sendTest}>
             <Send className="h-4 w-4" />
             Enviar teste

@@ -13,6 +13,7 @@ import PaymentMethodsAdmin from '../PaymentMethodsAdmin'
 import InviteSubmissionsAdmin from './InviteSubmissionsAdmin'
 import InviteSettingsAdmin from './InviteSettingsAdmin'
 import CheckinAdmin from './CheckinAdmin'
+import InviteCommunications from './InviteCommunications'
 import { useAuth } from '../../hooks/useAuth'
 import { BlockEditor, RsvpEditor } from './InviteBlockEditors'
 import { RsvpCard } from './InvitePage'
@@ -718,6 +719,7 @@ function InviteEditor({ invite, onBack, onSaved }) {
     { id: 'definicoes', label: 'Definições' },
     ...(isInternal ? [{ id: 'bilhetes', label: 'Bilhetes' }, { id: 'inscricao', label: 'Inscrição' }] : []),
     { id: 'pagina', label: 'Página' },
+    ...(isInternal ? [{ id: 'comunicacoes', label: 'Comunicações' }] : []),
     ...(isInternal ? [{ id: 'inscricoes', label: 'Inscrições' }, { id: 'checkin', label: 'Check-in' }] : []),
   ]
   const activeTab = tabs.some((t) => t.id === tab) ? tab : 'definicoes'
@@ -1348,6 +1350,8 @@ function InviteEditor({ invite, onBack, onSaved }) {
       ) : null}
 
       {activeTab === 'checkin' ? <CheckinAdmin invite={invite} /> : null}
+
+      {activeTab === 'comunicacoes' ? <InviteCommunications invite={invite} tickets={tickets} /> : null}
 
       {activeTab === 'inscricoes' ? (
         <>
