@@ -92,8 +92,21 @@ const styles = {
   check: 'flex cursor-pointer items-center gap-[7px] text-[13px] font-medium text-foreground',
   formActions: 'mt-1 flex justify-end gap-2',
   backBtn: 'inline-flex cursor-pointer rounded-md border-none bg-transparent px-1 py-0.5 text-lg text-muted-foreground transition-colors hover:bg-accent',
+  homeIntro: 'rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-background to-background p-5 max-[560px]:p-4',
+  homeEyebrow: 'mb-1.5 block text-[11px] font-bold uppercase tracking-[0.14em] text-primary',
+  homeHeading: 'text-xl font-bold leading-tight text-foreground max-[560px]:text-lg',
+  homeDescription: 'mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground',
+  homeSectionHeader: 'mt-2 flex flex-col gap-0.5',
+  homeSectionTitle: 'text-sm font-bold text-foreground',
+  homeSectionDesc: 'text-xs text-muted-foreground',
+  quickActions: 'mt-5 grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
+  quickActionCard: 'group flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-primary/20 bg-background p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 [&>i]:mb-1 [&>i]:text-2xl [&>i]:text-primary',
+  quickActionPrimary: 'border-primary bg-primary text-primary-foreground hover:border-primary hover:bg-primary/90 [&>i]:text-primary-foreground',
+  quickActionTitle: 'text-[15px] font-bold',
+  quickActionDesc: 'text-xs opacity-75',
+  quickActionLink: 'mt-2 inline-flex items-center gap-1 text-xs font-bold [&>i]:text-sm [&>i]:transition-transform group-hover:[&>i]:translate-x-0.5',
   menu: 'grid grid-cols-2 gap-3 max-[560px]:grid-cols-1',
-  menuCard: 'flex cursor-pointer flex-col gap-1 rounded-xl border border-border bg-muted/40 p-4 text-left transition-colors hover:border-ring hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:text-2xl [&>i]:text-primary',
+  menuCard: 'group flex cursor-pointer flex-col gap-1 rounded-xl border border-border bg-muted/40 p-4 text-left transition-colors hover:border-ring hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&>i]:text-2xl [&>i]:text-primary',
   menuTitle: 'text-[15px] font-bold text-foreground',
   menuDesc: 'text-xs text-muted-foreground',
   userForm: 'flex flex-col gap-3 rounded-[10px] border border-border bg-muted/40 p-3.5',
@@ -2037,7 +2050,47 @@ export default function ManagePanel({ onClose, initialView = 'home', initialEdit
 
         {view === 'home' ? (
           <div className={styles.body}>
-            <p className={styles.muted}>{t('manageAgendaQ')}</p>
+            <section className={styles.homeIntro} aria-labelledby="manage-home-title">
+              <span className={styles.homeEyebrow}>{t('manageHomeEyebrow')}</span>
+              <h4 id="manage-home-title" className={styles.homeHeading}>
+                {t('manageHomeTitle')}
+              </h4>
+              <p className={styles.homeDescription}>{t('manageHomeDesc')}</p>
+              {isManager && (
+                <div className={styles.quickActions}>
+                  <button
+                    className={`${styles.quickActionCard} ${styles.quickActionPrimary}`}
+                    onClick={openNew}
+                    disabled={busy}
+                  >
+                    <i className="ti ti-calendar-plus" aria-hidden="true" />
+                    <span className={styles.quickActionTitle}>{t('newEvent')}</span>
+                    <span className={styles.quickActionDesc}>{t('newEventDesc')}</span>
+                    <span className={styles.quickActionLink}>
+                      {t('newEventAction')}
+                      <i className="ti ti-arrow-right" aria-hidden="true" />
+                    </span>
+                  </button>
+                  <button
+                    className={styles.quickActionCard}
+                    onClick={() => setView('events')}
+                    disabled={busy}
+                  >
+                    <i className="ti ti-calendar-event" aria-hidden="true" />
+                    <span className={styles.quickActionTitle}>{t('manageEvents')}</span>
+                    <span className={styles.quickActionDesc}>{t('manageEventsDesc')}</span>
+                    <span className={styles.quickActionLink}>
+                      {t('manageEventsAction')}
+                      <i className="ti ti-arrow-right" aria-hidden="true" />
+                    </span>
+                  </button>
+                </div>
+              )}
+            </section>
+            <div className={styles.homeSectionHeader}>
+              <h4 className={styles.homeSectionTitle}>{t('managementTools')}</h4>
+              <p className={styles.homeSectionDesc}>{t('managementToolsDesc')}</p>
+            </div>
             <div className={styles.menu}>
               {isAdmin && (
                 <button className={styles.menuCard} onClick={openUsers} disabled={busy}>
