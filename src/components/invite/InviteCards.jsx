@@ -88,17 +88,36 @@ function OverviewCard({ block }) {
 
 function OverviewPlusCard({ block, accent }) {
   const c = block.content || {}
+  const [imageExpanded, setImageExpanded] = useState(false)
   const buttons = (Array.isArray(c.buttons) ? c.buttons : [])
     .map((button) => ({ ...button, safeUrl: contentLinkUrl(button?.url) }))
     .filter((button) => button?.label?.trim() && button.safeUrl)
+  useEffect(() => {
+    if (!imageExpanded) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setImageExpanded(false)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [imageExpanded])
   return (
     <div className={`${cardCls} overflow-hidden`}>
       {c.imageUrl ? (
-        <img
-          src={c.imageUrl}
-          alt={c.imageAlt || ''}
-          className="-mx-6 -mt-6 mb-6 aspect-[16/9] w-[calc(100%+3rem)] object-cover"
-        />
+        <button
+          type="button"
+          className="group relative -mx-6 -mt-6 mb-6 block w-[calc(100%+3rem)] cursor-zoom-in bg-muted"
+          onClick={() => setImageExpanded(true)}
+          aria-label={`Ampliar ${c.imageAlt || 'imagem'}`}
+        >
+          <img
+            src={c.imageUrl}
+            alt={c.imageAlt || ''}
+            className="block h-auto w-full"
+          />
+          <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <ZoomIn className="h-4 w-4" aria-hidden="true" />
+          </span>
+        </button>
       ) : null}
       <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-xl font-bold text-foreground">
         {c.showIcon !== false ? <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
@@ -128,6 +147,30 @@ function OverviewPlusCard({ block, accent }) {
               </a>
             )
           })}
+        </div>
+      ) : null}
+      {imageExpanded ? (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={c.imageAlt || 'Imagem ampliada'}
+          onClick={() => setImageExpanded(false)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+            onClick={() => setImageExpanded(false)}
+            aria-label="Fechar imagem ampliada"
+          >
+            <X className="h-6 w-6" aria-hidden="true" />
+          </button>
+          <img
+            src={c.imageUrl}
+            alt={c.imageAlt || ''}
+            className="max-h-[90vh] max-w-[95vw] object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
         </div>
       ) : null}
     </div>

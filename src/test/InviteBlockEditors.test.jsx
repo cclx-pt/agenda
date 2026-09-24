@@ -89,6 +89,12 @@ describe('InviteBlockEditors uploads', () => {
     expect(screen.getByRole('link', { name: /Programa/i })).not.toHaveAttribute('target')
     expect(screen.getByRole('link', { name: /Website/i })).toHaveAttribute('target', '_blank')
     expect(screen.queryByRole('link', { name: /Link inseguro/i })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ampliar Pessoas reunidas' }))
+    expect(screen.getByRole('dialog', { name: 'Pessoas reunidas' })).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Pessoas reunidas' })).not.toBeInTheDocument()
   })
 
   it('uses the direct video uploader for multimedia MP4 files', async () => {
