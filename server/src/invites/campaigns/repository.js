@@ -18,6 +18,8 @@ function mapCampaign(row) {
     failedCount: Number(row.failed_count ?? 0),
     skippedCount: Number(row.skipped_count ?? 0),
     createdBy: row.created_by ?? null,
+    scheduledAt: row.scheduled_at ?? null,
+    cancelledAt: row.cancelled_at ?? null,
     queuedAt: row.queued_at ?? null,
     processingStartedAt: row.processing_started_at ?? null,
     leaseExpiresAt: row.lease_expires_at ?? null,
@@ -40,6 +42,8 @@ function mapRecipient(row) {
     attemptCount: Number(row.attempt_count ?? 0),
     nextAttemptAt: row.next_attempt_at ?? null,
     lastAttemptAt: row.last_attempt_at ?? null,
+    provider: row.provider ?? null,
+    providerMessageId: row.provider_message_id ?? null,
     sentAt: row.sent_at ?? null,
   }
 }
@@ -97,6 +101,52 @@ export async function updateDraft(id, data) {
   return rowCount ? findById(id) : null
 }
 
+export async function scheduleDraft(id, scheduledAt) {
+  const { rows } = await pool.query(
+    `UPDATE invite_campaigns SET
+       status = 'scheduled', scheduled_at = $2, updated_at = now()
+     WHERE id = $1 AND status IN ('draft', 'scheduled')
+     RETURNING *`,
+    [id, scheduledAt]
+  )
+  return mapCampaign(rows[0])
+}
+
+export async function cancelScheduled(id) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query(
+      `UPDATE invite_campaigns SET
+         status = 'cancelled', cancelled_at = now(), updated_at = now()
+       WHERE id = $1 AND status = 'scheduled'
+       RETURNING *`,
+      [id]
+    )
+    if (rows[0]) {
+      await client.query(
+        `UPDATE invite_campaign_recipients
+         SET status = 'skipped', error = 'Envio agendado cancelado.'
+         WHERE campaign_id = $1 AND status = 'pending'`,
+        [id]
+      )
+      await client.query(
+        `UPDATE invite_campaigns SET
+           skipped_count = recipient_count, updated_at = now()
+         WHERE id = $1`,
+        [id]
+      )
+    }
+    await client.query('COMMIT')
+    return rows[0] ? findById(id) : null
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 export async function removeDraft(id) {
   const { rowCount } = await pool.query(
     "DELETE FROM invite_campaigns WHERE id = $1 AND status = 'draft'",
@@ -114,6 +164,23 @@ export async function queueForSending(id) {
     [id]
   )
   return mapCampaign(rows[0])
+}
+
+export async function queueDueScheduled(limit = 20) {
+  const { rows } = await pool.query(
+    `UPDATE invite_campaigns SET
+       status = 'queued', queued_at = now(), updated_at = now()
+     WHERE id IN (
+       SELECT id FROM invite_campaigns
+       WHERE status = 'scheduled' AND scheduled_at <= now()
+       ORDER BY scheduled_at
+       FOR UPDATE SKIP LOCKED
+       LIMIT $1
+     )
+     RETURNING *`,
+    [limit]
+  )
+  return rows.map(mapCampaign)
 }
 
 export async function insertRecipients(campaignId, recipients) {
@@ -289,7 +356,13 @@ export async function claimRecipientBatch(campaignId, limit = 20) {
 
 export async function markRecipientAttempt(
   id,
-  { status, error = null, nextAttemptAt = null }
+  {
+    status,
+    error = null,
+    nextAttemptAt = null,
+    provider = null,
+    providerMessageId = null,
+  }
 ) {
   await pool.query(
     `UPDATE invite_campaign_recipients SET
@@ -298,9 +371,11 @@ export async function markRecipientAttempt(
        attempt_count = attempt_count + 1,
        last_attempt_at = now(),
        next_attempt_at = COALESCE($4, next_attempt_at),
+       provider = COALESCE($5, provider),
+       provider_message_id = COALESCE($6, provider_message_id),
        sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END
      WHERE id = $1 AND status = 'processing'`,
-    [id, status, error, nextAttemptAt]
+    [id, status, error, nextAttemptAt, provider, providerMessageId]
   )
 }
 
@@ -411,6 +486,219 @@ export async function listDueCampaignIds(limit = 5) {
     [limit]
   )
   return rows.map((row) => row.id)
+}
+
+function mapSegment(row) {
+  return {
+    id: row.id,
+    inviteId: row.invite_id,
+    name: row.name,
+    audience: row.audience ?? {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function listSegments(inviteId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_campaign_segments WHERE invite_id = $1 ORDER BY name',
+    [inviteId]
+  )
+  return rows.map(mapSegment)
+}
+
+export async function upsertSegment(inviteId, id, name, audience, actorId) {
+  const { rows } = id
+    ? await pool.query(
+        `UPDATE invite_campaign_segments
+         SET name = $3, audience = $4, updated_at = now()
+         WHERE id = $1 AND invite_id = $2
+         RETURNING *`,
+        [id, inviteId, name, JSON.stringify(audience)]
+      )
+    : await pool.query(
+        `INSERT INTO invite_campaign_segments
+           (id, invite_id, name, audience, created_by)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (invite_id, name) DO UPDATE SET
+           audience = EXCLUDED.audience, updated_at = now()
+         RETURNING *`,
+        [randomUUID(), inviteId, name, JSON.stringify(audience), actorId ?? null]
+      )
+  return mapSegment(rows[0])
+}
+
+export async function removeSegment(inviteId, id) {
+  const { rowCount } = await pool.query(
+    'DELETE FROM invite_campaign_segments WHERE id = $1 AND invite_id = $2',
+    [id, inviteId]
+  )
+  return rowCount > 0
+}
+
+function mapAutomation(row) {
+  return {
+    id: row.id,
+    inviteId: row.invite_id,
+    triggerType: row.trigger_type,
+    offsetMinutes: Number(row.offset_minutes),
+    enabled: !!row.enabled,
+    templateKey: row.template_key,
+    audience: row.audience ?? {},
+    lastRunKey: row.last_run_key ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function listAutomations(inviteId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_campaign_automations WHERE invite_id = $1 ORDER BY created_at',
+    [inviteId]
+  )
+  return rows.map(mapAutomation)
+}
+
+export async function upsertAutomation(inviteId, data, actorId) {
+  const values = [
+    data.id ?? randomUUID(),
+    inviteId,
+    data.triggerType,
+    data.offsetMinutes,
+    data.enabled,
+    data.templateKey,
+    JSON.stringify(data.audience),
+    actorId ?? null,
+  ]
+  const { rows } = data.id
+    ? await pool.query(
+        `UPDATE invite_campaign_automations SET
+           trigger_type = $3, offset_minutes = $4, enabled = $5,
+           template_key = $6, audience = $7, updated_at = now()
+         WHERE id = $1 AND invite_id = $2
+         RETURNING *`,
+        values.slice(0, 7)
+      )
+    : await pool.query(
+        `INSERT INTO invite_campaign_automations
+           (id, invite_id, trigger_type, offset_minutes, enabled, template_key, audience, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (invite_id, trigger_type, offset_minutes, template_key)
+         DO UPDATE SET
+           enabled = EXCLUDED.enabled,
+           audience = EXCLUDED.audience,
+           updated_at = now()
+         RETURNING *`,
+        values
+      )
+  return mapAutomation(rows[0])
+}
+
+export async function removeAutomation(inviteId, id) {
+  const { rowCount } = await pool.query(
+    'DELETE FROM invite_campaign_automations WHERE id = $1 AND invite_id = $2',
+    [id, inviteId]
+  )
+  return rowCount > 0
+}
+
+export async function listDueAutomations(limit = 20) {
+  const { rows } = await pool.query(
+    `SELECT a.*, i.title, i.slug, i.start_datetime, i.end_datetime
+     FROM invite_campaign_automations a
+     JOIN invites i ON i.id = a.invite_id
+     WHERE a.enabled = TRUE
+       AND (
+         (
+           a.trigger_type = 'before_event'
+           AND i.start_datetime IS NOT NULL
+           AND i.start_datetime - (a.offset_minutes * interval '1 minute') <= now()
+           AND i.start_datetime > now()
+         )
+         OR (
+           a.trigger_type = 'after_event'
+           AND COALESCE(i.end_datetime, i.start_datetime) IS NOT NULL
+           AND COALESCE(i.end_datetime, i.start_datetime)
+             + (a.offset_minutes * interval '1 minute') <= now()
+         )
+         OR (
+           a.trigger_type = 'payment_pending'
+           AND i.start_datetime IS NOT NULL
+           AND i.start_datetime - (a.offset_minutes * interval '1 minute') <= now()
+           AND i.start_datetime > now()
+         )
+       )
+     ORDER BY a.updated_at
+     LIMIT $1`,
+    [limit]
+  )
+  return rows
+}
+
+export async function claimAutomationRun(id, runKey) {
+  const { rowCount } = await pool.query(
+    `UPDATE invite_campaign_automations SET last_run_key = $2, updated_at = now()
+     WHERE id = $1 AND last_run_key IS DISTINCT FROM $2`,
+    [id, runKey]
+  )
+  return rowCount > 0
+}
+
+export async function releaseAutomationRun(id, runKey) {
+  await pool.query(
+    `UPDATE invite_campaign_automations SET last_run_key = NULL, updated_at = now()
+     WHERE id = $1 AND last_run_key = $2`,
+    [id, runKey]
+  )
+}
+
+export async function insertDeliveryEvent({
+  campaignId,
+  recipientId,
+  provider,
+  eventType,
+  providerEventId = null,
+  detail = {},
+}) {
+  await pool.query(
+    `INSERT INTO invite_campaign_delivery_events
+       (id, campaign_id, recipient_id, provider, event_type, provider_event_id, detail)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (provider, provider_event_id) DO NOTHING`,
+    [
+      randomUUID(),
+      campaignId,
+      recipientId,
+      provider,
+      eventType,
+      providerEventId,
+      JSON.stringify(detail),
+    ]
+  )
+}
+
+export async function getMetrics(campaignId) {
+  const [events, attempts] = await Promise.all([
+    pool.query(
+      `SELECT event_type, COUNT(*)::int AS count
+       FROM invite_campaign_delivery_events
+       WHERE campaign_id = $1
+       GROUP BY event_type`,
+      [campaignId]
+    ),
+    pool.query(
+      `SELECT COALESCE(SUM(attempt_count), 0)::int AS attempts
+       FROM invite_campaign_recipients
+       WHERE campaign_id = $1`,
+      [campaignId]
+    ),
+  ])
+  return {
+    events: Object.fromEntries(
+      events.rows.map((row) => [row.event_type, Number(row.count)])
+    ),
+    attempts: Number(attempts.rows[0].attempts),
+  }
 }
 
 export async function finishFromRecipients(id) {

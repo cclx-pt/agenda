@@ -14,6 +14,17 @@ vi.mock('../services/invitesService', () => ({
   sendInviteCampaign: vi.fn(),
   listInviteCampaignRecipients: vi.fn(),
   retryFailedInviteCampaign: vi.fn(),
+  listInviteCampaignTemplates: vi.fn(),
+  createInviteCampaignFromTemplate: vi.fn(),
+  listInviteCampaignSegments: vi.fn(),
+  saveInviteCampaignSegment: vi.fn(),
+  deleteInviteCampaignSegment: vi.fn(),
+  scheduleInviteCampaign: vi.fn(),
+  cancelInviteCampaignSchedule: vi.fn(),
+  listInviteCampaignAutomations: vi.fn(),
+  saveInviteCampaignAutomation: vi.fn(),
+  deleteInviteCampaignAutomation: vi.fn(),
+  getInviteCampaignMetrics: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -47,6 +58,16 @@ describe('InviteCommunications', () => {
     vi.clearAllMocks()
     invitesService.listInviteCampaigns.mockResolvedValue([sentCampaign])
     invitesService.listInviteCampaignRecipients.mockResolvedValue([])
+    invitesService.listInviteCampaignTemplates.mockResolvedValue([])
+    invitesService.listInviteCampaignSegments.mockResolvedValue([])
+    invitesService.listInviteCampaignAutomations.mockResolvedValue([])
+    invitesService.getInviteCampaignMetrics.mockResolvedValue({
+      provider: { name: 'smtp', capabilities: { deliveryWebhooks: false } },
+      recipients: { total: 0, sent: 0, failed: 0, skipped: 0 },
+      events: {},
+      attempts: 0,
+      rates: { accepted: 0, failed: 0, delivered: null },
+    })
     invitesService.createInviteCampaign.mockImplementation(async (_inviteId, campaign) => ({
       ...campaign,
       id: 'campaign-copy',
@@ -200,5 +221,60 @@ describe('InviteCommunications', () => {
     )
     expect(screen.getByRole('heading', { name: 'Resultados da comunicação' })).toBeInTheDocument()
     expect(await screen.findByText('A aguardar processamento')).toBeInTheDocument()
+  })
+
+  it('creates a draft from a reusable template', async () => {
+    const template = { key: 'event_reminder', label: 'Lembrete antes do evento' }
+    const draft = {
+      ...sentCampaign,
+      id: 'campaign-template',
+      name: template.label,
+      status: 'draft',
+    }
+    invitesService.listInviteCampaignTemplates.mockResolvedValue([template])
+    invitesService.createInviteCampaignFromTemplate.mockResolvedValue(draft)
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Lembrete antes do evento' })
+    )
+
+    await waitFor(() =>
+      expect(invitesService.createInviteCampaignFromTemplate).toHaveBeenCalledWith(
+        'invite-1',
+        'event_reminder'
+      )
+    )
+    expect(screen.getByLabelText('Nome interno')).toHaveValue('Lembrete antes do evento')
+  })
+
+  it('schedules a draft using Lisbon local time', async () => {
+    invitesService.listInviteCampaigns.mockResolvedValue([])
+    invitesService.previewInviteCampaignAudience.mockResolvedValue({ count: 2 })
+    invitesService.scheduleInviteCampaign.mockImplementation(
+      async (_inviteId, campaignId, scheduledAt) => ({
+        ...sentCampaign,
+        id: campaignId,
+        status: 'scheduled',
+        scheduledAt,
+      })
+    )
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    await userEvent.type(screen.getByLabelText('Nome interno'), 'Agendado')
+    await userEvent.type(screen.getByLabelText('Assunto'), 'Informação')
+    await userEvent.type(screen.getByPlaceholderText('Escreva a mensagem…'), 'Mensagem')
+    await userEvent.type(screen.getByLabelText('Agendar (hora de Lisboa)'), '2030-06-01T10:00')
+    await userEvent.click(screen.getByRole('button', { name: 'Agendar' }))
+
+    await waitFor(() =>
+      expect(invitesService.scheduleInviteCampaign).toHaveBeenCalledWith(
+        'invite-1',
+        'campaign-copy',
+        '2030-06-01T09:00:00.000Z'
+      )
+    )
   })
 })

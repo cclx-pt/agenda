@@ -499,12 +499,14 @@ CREATE TABLE IF NOT EXISTS invite_campaigns (
   blocks          JSONB NOT NULL DEFAULT '[]'::jsonb,
   audience        JSONB NOT NULL DEFAULT '{}'::jsonb,
   status          TEXT NOT NULL DEFAULT 'draft'
-                    CHECK (status IN ('draft', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed')),
+                    CHECK (status IN ('draft', 'scheduled', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed', 'cancelled')),
   recipient_count INTEGER NOT NULL DEFAULT 0,
   sent_count      INTEGER NOT NULL DEFAULT 0,
   failed_count    INTEGER NOT NULL DEFAULT 0,
   skipped_count   INTEGER NOT NULL DEFAULT 0,
   created_by      UUID REFERENCES users (id) ON DELETE SET NULL,
+  scheduled_at    TIMESTAMPTZ,
+  cancelled_at    TIMESTAMPTZ,
   queued_at       TIMESTAMPTZ,
   processing_started_at TIMESTAMPTZ,
   lease_expires_at TIMESTAMPTZ,
@@ -528,6 +530,8 @@ CREATE TABLE IF NOT EXISTS invite_campaign_recipients (
   status         TEXT NOT NULL DEFAULT 'pending'
                    CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped')),
   error          TEXT,
+  provider       TEXT,
+  provider_message_id TEXT,
   attempt_count  INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_attempt_at TIMESTAMPTZ,
@@ -537,6 +541,62 @@ CREATE TABLE IF NOT EXISTS invite_campaign_recipients (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_campaign_recipients_campaign
   ON invite_campaign_recipients (campaign_id, status);
+
+CREATE TABLE IF NOT EXISTS invite_campaign_segments (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  audience    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by  UUID REFERENCES users (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (invite_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS invite_campaign_automations (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id      UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  trigger_type   TEXT NOT NULL
+                   CHECK (trigger_type IN ('before_event', 'after_event', 'payment_pending')),
+  offset_minutes INTEGER NOT NULL DEFAULT 0,
+  enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+  template_key   TEXT NOT NULL,
+  audience       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_run_key   TEXT,
+  created_by     UUID REFERENCES users (id) ON DELETE SET NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (invite_id, trigger_type, offset_minutes, template_key)
+);
+CREATE INDEX IF NOT EXISTS idx_invite_campaign_automations_enabled
+  ON invite_campaign_automations (enabled, updated_at);
+
+CREATE TABLE IF NOT EXISTS invite_campaign_delivery_events (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id    UUID NOT NULL REFERENCES invite_campaigns (id) ON DELETE CASCADE,
+  recipient_id   UUID REFERENCES invite_campaign_recipients (id) ON DELETE CASCADE,
+  provider       TEXT NOT NULL,
+  event_type     TEXT NOT NULL
+                   CHECK (event_type IN ('accepted', 'delivered', 'bounced', 'complained', 'failed')),
+  provider_event_id TEXT,
+  detail         JSONB NOT NULL DEFAULT '{}'::jsonb,
+  occurred_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_invite_campaign_delivery_events_campaign
+  ON invite_campaign_delivery_events (campaign_id, event_type);
+
+CREATE TABLE IF NOT EXISTS invite_email_suppressions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email       TEXT NOT NULL,
+  provider    TEXT NOT NULL,
+  reason      TEXT NOT NULL,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  source_event_id TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (email, provider)
+);
 
 -- Visualizações da página (métricas simples; fire-and-forget no pedido público).
 CREATE TABLE IF NOT EXISTS invite_page_views (
@@ -675,7 +735,12 @@ ALTER TABLE invite_guests ADD CONSTRAINT invite_guests_payment_state_check
 -- Resultados parciais e número de tentativas das comunicações.
 ALTER TABLE invite_campaigns DROP CONSTRAINT IF EXISTS invite_campaigns_status_check;
 ALTER TABLE invite_campaigns ADD CONSTRAINT invite_campaigns_status_check
-  CHECK (status IN ('draft', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed'));
+  CHECK (status IN ('draft', 'scheduled', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed', 'cancelled'));
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_invite_campaigns_scheduled
+  ON invite_campaigns (scheduled_at)
+  WHERE status = 'scheduled';
 ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS queued_at TIMESTAMPTZ;
 ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
 ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
@@ -686,6 +751,8 @@ ALTER TABLE invite_campaign_recipients
   ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE invite_campaign_recipients
   ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
+ALTER TABLE invite_campaign_recipients ADD COLUMN IF NOT EXISTS provider TEXT;
+ALTER TABLE invite_campaign_recipients ADD COLUMN IF NOT EXISTS provider_message_id TEXT;
 ALTER TABLE invite_campaign_recipients DROP CONSTRAINT IF EXISTS invite_campaign_recipients_status_check;
 ALTER TABLE invite_campaign_recipients ADD CONSTRAINT invite_campaign_recipients_status_check
   CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped'));

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { matchesFormCondition, resolveAudience, retryDelayMs } from './service.js'
 import { renderInviteCampaignEmail } from '../../auth/email.js'
+import { applyTemplate, campaignTemplates } from './templates.js'
 
 const guests = [
   {
@@ -97,6 +98,29 @@ test('matchesFormCondition supports booleans, numbers and empty answers', () => 
 test('retryDelayMs applies increasing backoff between delivery attempts', () => {
   assert.equal(retryDelayMs(1), 2_000)
   assert.equal(retryDelayMs(2), 10_000)
+})
+
+test('campaign templates provide all reusable stage 6 messages', () => {
+  assert.equal(campaignTemplates.length, 7)
+  assert.deepEqual(
+    campaignTemplates.map((template) => template.key),
+    [
+      'access_information',
+      'event_reminder',
+      'payment_pending',
+      'urgent_change',
+      'cancellation_or_time_change',
+      'post_event_thanks',
+      'post_event_follow_up',
+    ]
+  )
+  const draft = applyTemplate(
+    campaignTemplates[0],
+    { title: 'Conferência' },
+    'https://example.test/invite/conferencia'
+  )
+  assert.equal(draft.subject, 'Informações de acesso — Conferência')
+  assert.equal(draft.blocks[1].url, 'https://example.test/invite/conferencia')
 })
 
 test('renderInviteCampaignEmail escapes authored content', () => {

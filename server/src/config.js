@@ -67,6 +67,10 @@ export const config = {
     from: process.env.MAIL_FROM ?? 'Agenda CCLX <agenda@cclx.pt>',
   },
 
+  campaignEmail: {
+    provider: (process.env.CAMPAIGN_EMAIL_PROVIDER ?? 'smtp').trim().toLowerCase(),
+  },
+
   seed: {
     adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@cclx.pt',
     adminName: process.env.SEED_ADMIN_NAME ?? 'Administrador CCLX',

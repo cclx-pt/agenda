@@ -1,10 +1,18 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { config } from '../../config.js'
-import { sendInviteCampaignEmail } from '../../auth/email.js'
 import * as invitesRepo from '../repository.js'
 import * as campaignsRepo from './repository.js'
 import { InviteError } from '../service.js'
+import {
+  applyTemplate,
+  campaignTemplates,
+  findCampaignTemplate,
+} from './templates.js'
+import {
+  getCampaignProvider,
+  getCampaignProviderInfo,
+} from './provider.js'
 
 const urlSchema = z
   .string()
@@ -39,7 +47,8 @@ const blockSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-const audienceSchema = z.object({
+const audienceSchema = z
+  .object({
   rsvpStates: z.array(z.string().trim().min(1).max(40)).max(20).optional().default([]),
   paymentStates: z.array(z.string().trim().min(1).max(40)).max(20).optional().default([]),
   ticketIds: z.array(z.string().uuid()).max(100).optional().default([]),
@@ -62,25 +71,26 @@ const audienceSchema = z.object({
           'not_empty',
         ]),
         value: z.union([z.string().max(500), z.number(), z.boolean()]).optional(),
-      }).superRefine((audience, context) => {
-        for (const [index, condition] of audience.formConditions.entries()) {
-          if (
-            !['empty', 'not_empty'].includes(condition.operator) &&
-            (condition.value === undefined || condition.value === '')
-          ) {
-            context.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['formConditions', index, 'value'],
-              message: 'Indique o valor do filtro do formulário.',
-            })
-          }
-        }
       })
     )
     .max(20)
     .optional()
     .default([]),
-})
+  })
+  .superRefine((audience, context) => {
+    for (const [index, condition] of audience.formConditions.entries()) {
+      if (
+        !['empty', 'not_empty'].includes(condition.operator) &&
+        (condition.value === undefined || condition.value === '')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['formConditions', index, 'value'],
+          message: 'Indique o valor do filtro do formulário.',
+        })
+      }
+    }
+  })
 
 const campaignSchema = z.object({
   type: z.enum(['update', 'warning', 'reminder', 'post_event']).default('update'),
@@ -94,6 +104,25 @@ const campaignSchema = z.object({
 const testSchema = z.object({
   email: z.string().trim().email('Email de teste inválido.'),
   name: z.string().trim().max(200).optional().default(''),
+})
+
+const segmentSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, 'Indique o nome do segmento.').max(120),
+  audience: audienceSchema,
+})
+
+const scheduleSchema = z.object({
+  scheduledAt: z.coerce.date(),
+})
+
+const automationSchema = z.object({
+  id: z.string().uuid().optional(),
+  triggerType: z.enum(['before_event', 'after_event', 'payment_pending']),
+  offsetMinutes: z.number().int().min(0).max(525_600),
+  enabled: z.boolean().default(true),
+  templateKey: z.string().trim().min(1).max(80),
+  audience: audienceSchema.optional().default({}),
 })
 
 const DELIVERY_BATCH_SIZE = 20
@@ -244,6 +273,23 @@ export async function listRecipients(user, inviteId, campaignId) {
   return campaignsRepo.listRecipients(campaignId)
 }
 
+export async function listTemplates(user, inviteId) {
+  await getInvite(user, inviteId)
+  return campaignTemplates
+}
+
+export async function createFromTemplate(user, inviteId, templateKey) {
+  const invite = await getInvite(user, inviteId)
+  const template = findCampaignTemplate(templateKey)
+  if (!template) throw new InviteError(404, 'Template não encontrado.')
+  const eventLink = `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`
+  return campaignsRepo.insert(
+    inviteId,
+    campaignSchema.parse(applyTemplate(template, invite, eventLink)),
+    user.id
+  )
+}
+
 export async function create(user, inviteId, input) {
   await getInvite(user, inviteId)
   const campaign = campaignSchema.parse(input)
@@ -275,6 +321,33 @@ export async function previewAudience(user, inviteId, input) {
   return { count: recipients.length }
 }
 
+export async function listSegments(user, inviteId) {
+  await getInvite(user, inviteId)
+  return campaignsRepo.listSegments(inviteId)
+}
+
+export async function saveSegment(user, inviteId, input) {
+  await getInvite(user, inviteId)
+  const segment = segmentSchema.parse(input)
+  await assertCurrentFormFields(inviteId, segment.audience)
+  const saved = await campaignsRepo.upsertSegment(
+    inviteId,
+    segment.id,
+    segment.name,
+    segment.audience,
+    user.id
+  )
+  if (!saved) throw new InviteError(404, 'Segmento não encontrado.')
+  return saved
+}
+
+export async function deleteSegment(user, inviteId, segmentId) {
+  await getInvite(user, inviteId)
+  if (!(await campaignsRepo.removeSegment(inviteId, segmentId))) {
+    throw new InviteError(404, 'Segmento não encontrado.')
+  }
+}
+
 function guestLink(invite, token) {
   const base = (config.appUrl || '').replace(/\/+$/, '')
   return `${base}/invite/${encodeURIComponent(invite.slug)}?g=${encodeURIComponent(token)}`
@@ -285,7 +358,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
   if (campaign.status !== 'draft')
     throw new InviteError(409, 'Apenas rascunhos podem ser testados.')
   const recipient = testSchema.parse(input)
-  return sendInviteCampaignEmail(recipient.email, {
+  return getCampaignProvider().send(recipient.email, {
     recipientName: recipient.name,
     eventTitle: invite.title,
     subject: campaign.subject,
@@ -293,6 +366,86 @@ export async function sendTest(user, inviteId, campaignId, input) {
     blocks: campaign.blocks,
     eventLink: `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`,
   })
+}
+
+export async function schedule(user, inviteId, campaignId, input) {
+  const { campaign } = await getCampaign(user, inviteId, campaignId)
+  if (!['draft', 'scheduled'].includes(campaign.status))
+    throw new InviteError(409, 'Esta comunicação já não pode ser agendada.')
+  const { scheduledAt } = scheduleSchema.parse(input)
+  if (scheduledAt.getTime() <= Date.now() + 60_000) {
+    throw new InviteError(400, 'O envio deve ser agendado com pelo menos um minuto de antecedência.')
+  }
+  if (campaign.status === 'draft') {
+    const audience = await audienceFor(inviteId, campaign.audience)
+    if (audience.length === 0)
+      throw new InviteError(400, 'A audiência não tem destinatários com email.')
+    await campaignsRepo.insertRecipients(campaignId, audience)
+  }
+  const scheduled = await campaignsRepo.scheduleDraft(campaignId, scheduledAt)
+  if (!scheduled) throw new InviteError(409, 'A comunicação já não pode ser agendada.')
+  await campaignsRepo.initializeQueuedDelivery(campaignId)
+  return campaignsRepo.findById(campaignId)
+}
+
+export async function cancelSchedule(user, inviteId, campaignId) {
+  await getCampaign(user, inviteId, campaignId)
+  const campaign = await campaignsRepo.cancelScheduled(campaignId)
+  if (!campaign) throw new InviteError(409, 'A comunicação já não pode ser cancelada.')
+  return campaign
+}
+
+export async function listAutomations(user, inviteId) {
+  await getInvite(user, inviteId)
+  return campaignsRepo.listAutomations(inviteId)
+}
+
+export async function saveAutomation(user, inviteId, input) {
+  const invite = await getInvite(user, inviteId)
+  const automation = automationSchema.parse(input)
+  if (!findCampaignTemplate(automation.templateKey)) {
+    throw new InviteError(400, 'Template de automatização inválido.')
+  }
+  if (!invite.startDatetime) {
+    throw new InviteError(400, 'Defina a data do evento antes de criar automatizações.')
+  }
+  await assertCurrentFormFields(inviteId, automation.audience)
+  const saved = await campaignsRepo.upsertAutomation(inviteId, automation, user.id)
+  if (!saved) throw new InviteError(404, 'Automatização não encontrada.')
+  return saved
+}
+
+export async function deleteAutomation(user, inviteId, automationId) {
+  await getInvite(user, inviteId)
+  if (!(await campaignsRepo.removeAutomation(inviteId, automationId))) {
+    throw new InviteError(404, 'Automatização não encontrada.')
+  }
+}
+
+export async function campaignMetrics(user, inviteId, campaignId) {
+  const { campaign } = await getCampaign(user, inviteId, campaignId)
+  const metrics = await campaignsRepo.getMetrics(campaignId)
+  const total = campaign.recipientCount
+  return {
+    provider: getCampaignProviderInfo(),
+    recipients: {
+      total: campaign.recipientCount,
+      sent: campaign.sentCount,
+      failed: campaign.failedCount,
+      skipped: campaign.skippedCount,
+    },
+    events: metrics.events,
+    attempts: metrics.attempts,
+    rates: {
+      accepted: total ? campaign.sentCount / total : 0,
+      failed: total ? campaign.failedCount / total : 0,
+      delivered: getCampaignProviderInfo().capabilities.deliveryWebhooks
+        ? total
+          ? (metrics.events.delivered ?? 0) / total
+          : 0
+        : null,
+    },
+  }
 }
 
 export async function send(user, inviteId, campaignId) {
@@ -323,8 +476,9 @@ function sleep(milliseconds) {
 
 async function deliverRecipient(invite, campaign, recipient) {
   const attemptNumber = recipient.attemptCount + 1
+  let delivery
   try {
-    await sendInviteCampaignEmail(recipient.email, {
+    delivery = await getCampaignProvider().send(recipient.email, {
       recipientName: recipient.name,
       eventTitle: invite.title,
       subject: campaign.subject,
@@ -332,7 +486,9 @@ async function deliverRecipient(invite, campaign, recipient) {
       blocks: campaign.blocks,
       eventLink: guestLink(invite, recipient.guestToken),
     })
-    await campaignsRepo.markRecipientAttempt(recipient.id, { status: 'sent' })
+    if (!delivery.accepted) {
+      throw new Error('O fornecedor de email não aceitou a mensagem.')
+    }
   } catch (error) {
     const message = String(error?.message ?? error).slice(0, 1000)
     const canRetry =
@@ -344,6 +500,41 @@ async function deliverRecipient(invite, campaign, recipient) {
         ? new Date(Date.now() + retryDelayMs(attemptNumber))
         : null,
     })
+    try {
+      await campaignsRepo.insertDeliveryEvent({
+        campaignId: campaign.id,
+        recipientId: recipient.id,
+        provider: getCampaignProviderInfo().name,
+        eventType: 'failed',
+        detail: { message, retryable: canRetry },
+      })
+    } catch (eventError) {
+      console.error(
+        `[campaigns] Falha ao registar evento de erro do destinatário ${recipient.id}:`,
+        eventError
+      )
+    }
+    return
+  }
+
+  await campaignsRepo.markRecipientAttempt(recipient.id, {
+    status: 'sent',
+    provider: delivery.provider,
+    providerMessageId: delivery.messageId,
+  })
+  try {
+    await campaignsRepo.insertDeliveryEvent({
+      campaignId: campaign.id,
+      recipientId: recipient.id,
+      provider: delivery.provider,
+      eventType: 'accepted',
+      providerEventId: delivery.messageId,
+    })
+  } catch (eventError) {
+    console.error(
+      `[campaigns] Falha ao registar aceitação do destinatário ${recipient.id}:`,
+      eventError
+    )
   }
 }
 
@@ -403,6 +594,11 @@ export async function processCampaign(campaignId) {
 }
 
 export async function processDueCampaigns(limit = 5) {
+  const scheduled = await campaignsRepo.queueDueScheduled(limit)
+  for (const campaign of scheduled) {
+    await campaignsRepo.initializeQueuedDelivery(campaign.id)
+  }
+  await processDueAutomations(limit)
   const campaignIds = await campaignsRepo.listDueCampaignIds(limit)
   const results = []
   for (const campaignId of campaignIds) {
@@ -413,6 +609,53 @@ export async function processDueCampaigns(limit = 5) {
     }
   }
   return { processed: results.length, campaigns: results }
+}
+
+async function processDueAutomations(limit) {
+  const due = await campaignsRepo.listDueAutomations(limit)
+  for (const row of due) {
+    const template = findCampaignTemplate(row.template_key)
+    if (!template) continue
+    const eventDatetime =
+      row.trigger_type === 'after_event'
+        ? row.end_datetime ?? row.start_datetime
+        : row.start_datetime
+    const runKey = `${row.id}:${new Date(eventDatetime).toISOString()}`
+    if (!(await campaignsRepo.claimAutomationRun(row.id, runKey))) continue
+
+    const eventLink = `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(row.slug)}`
+    const data = applyTemplate(template, { title: row.title }, eventLink)
+    data.name = `${data.name} (automática)`
+    data.audience = {
+      ...data.audience,
+      ...(row.audience ?? {}),
+      ...(row.trigger_type === 'payment_pending'
+        ? { paymentStates: ['pending', 'awaiting_validation'] }
+        : {}),
+    }
+    try {
+      const campaign = await campaignsRepo.insert(
+        row.invite_id,
+        campaignSchema.parse(data),
+        row.created_by
+      )
+      const audience = await audienceFor(row.invite_id, campaign.audience)
+      if (audience.length === 0) {
+        await campaignsRepo.removeDraft(campaign.id)
+        continue
+      }
+      await campaignsRepo.insertRecipients(campaign.id, audience)
+      await campaignsRepo.queueForSending(campaign.id)
+      await campaignsRepo.initializeQueuedDelivery(campaign.id)
+    } catch (error) {
+      await campaignsRepo.releaseAutomationRun(row.id, runKey)
+      throw error
+    }
+  }
+}
+
+export function providerInfo() {
+  return getCampaignProviderInfo()
 }
 
 export async function retryFailed(user, inviteId, campaignId) {

@@ -130,6 +130,80 @@ export async function retryFailedInviteCampaign(inviteId, campaignId) {
   return campaign
 }
 
+export async function listInviteCampaignTemplates(inviteId) {
+  const { templates } = await request(`/data/invites/${inviteId}/campaigns/templates`)
+  return templates
+}
+
+export async function createInviteCampaignFromTemplate(inviteId, templateKey) {
+  const { campaign } = await request(`/data/invites/${inviteId}/campaigns/from-template`, {
+    method: 'POST',
+    body: { templateKey },
+  })
+  return campaign
+}
+
+export async function listInviteCampaignSegments(inviteId) {
+  const { segments } = await request(`/data/invites/${inviteId}/campaigns/segments`)
+  return segments
+}
+
+export async function saveInviteCampaignSegment(inviteId, payload) {
+  const { segment } = await request(`/data/invites/${inviteId}/campaigns/segments`, {
+    method: 'POST',
+    body: payload,
+  })
+  return segment
+}
+
+export async function deleteInviteCampaignSegment(inviteId, segmentId) {
+  await request(`/data/invites/${inviteId}/campaigns/segments/${segmentId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function scheduleInviteCampaign(inviteId, campaignId, scheduledAt) {
+  const { campaign } = await request(
+    `/data/invites/${inviteId}/campaigns/${campaignId}/schedule`,
+    { method: 'POST', body: { scheduledAt } }
+  )
+  return campaign
+}
+
+export async function cancelInviteCampaignSchedule(inviteId, campaignId) {
+  const { campaign } = await request(
+    `/data/invites/${inviteId}/campaigns/${campaignId}/cancel-schedule`,
+    { method: 'POST' }
+  )
+  return campaign
+}
+
+export async function listInviteCampaignAutomations(inviteId) {
+  const { automations } = await request(`/data/invites/${inviteId}/campaigns/automations`)
+  return automations
+}
+
+export async function saveInviteCampaignAutomation(inviteId, payload) {
+  const { automation } = await request(`/data/invites/${inviteId}/campaigns/automations`, {
+    method: 'POST',
+    body: payload,
+  })
+  return automation
+}
+
+export async function deleteInviteCampaignAutomation(inviteId, automationId) {
+  await request(`/data/invites/${inviteId}/campaigns/automations/${automationId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getInviteCampaignMetrics(inviteId, campaignId) {
+  const { metrics } = await request(
+    `/data/invites/${inviteId}/campaigns/${campaignId}/metrics`
+  )
+  return metrics
+}
+
 // Gestão de uma inscrição (organizador).
 export async function updateInviteGuest(inviteId, guestId, payload) {
   const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'PUT', body: payload })

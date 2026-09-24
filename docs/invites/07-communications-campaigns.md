@@ -32,7 +32,7 @@ Uma campanha segue cinco passos conceptuais:
    bilhete e check-in.
 3. Conteúdo: texto, imagem, vídeo como link, workshops, aviso e botão.
 4. Revisão: pré-visualização, contagem da audiência e envio de teste.
-5. Publicação: envio imediato e consulta do histórico/resultados.
+5. Publicação: envio imediato ou agendado e consulta do histórico/resultados.
 
 ## Fase 1 — comunicações operacionais
 
@@ -55,7 +55,6 @@ Não fazem parte da Fase 1:
 - importação de contactos externos;
 - newsletters gerais desligadas de um convite;
 - campanhas promocionais para pessoas sem inscrição;
-- agendamento e automatizações;
 - tracking de abertura/clique e webhooks de entrega;
 - gestão de consentimentos de marketing e unsubscribe.
 
@@ -97,8 +96,8 @@ snapshot da audiência.
 | 3 | Adicionar detalhes por destinatário, repetição apenas dos falhados e melhorias de validação e confirmação no editor | Concluída | 4–7 dias |
 | 4 | Filtrar a audiência pelas respostas do formulário do convite, com operadores por tipo de campo, combinação AND/OR, contagem prévia e snapshot das condições | Concluída | 4–7 dias |
 | 5 | Processar campanhas de forma assíncrona, em lotes, com tentativas, recuperação de envios interrompidos e progresso | Concluída | 5–10 dias |
-| 6 | Adicionar modelos, segmentos guardados, agendamento e automatizações | Média | 5–10 dias |
-| 7 | Integrar um fornecedor transacional, webhooks, bounce, supressões e métricas de entrega | Média | Dependente do fornecedor |
+| 6 | Adicionar modelos, segmentos guardados, agendamento e automatizações | Concluída | 5–10 dias |
+| 7 | Abstrair o fornecedor mantendo SMTP ativo, persistir eventos e preparar métricas, webhooks e supressões | Concluída | Dependente do fornecedor |
 
 Para a etapa 4, a primeira versão deve disponibilizar igualdade para campos de
 escolha única e checkbox, inclusão para escolha múltipla, comparação para
@@ -119,12 +118,40 @@ No Vercel, o processamento iniciado pelo pedido usa `waitUntil`. O cron diário
 existente também recupera campanhas pendentes como rede de segurança compatível
 com o plano Hobby. Existe ainda uma execução administrativa manual do worker.
 
+### Templates, segmentos e automatizações
+
+O editor inclui sete templates operacionais, segmentos de audiência guardados
+por convite e envio agendado em hora de Lisboa, persistido em UTC. Enquanto uma
+campanha estiver agendada pode ser reagendada ou cancelada. As automatizações
+suportam lembretes antes/depois do evento e pagamentos pendentes, reutilizam
+templates e audiências, e guardam uma chave de execução para não duplicarem uma
+campanha relativa à mesma data do evento.
+
+O browser aberto consulta agendamentos e ativa trabalho vencido. O cron também
+processa agendamentos e automatizações; no plano Vercel Hobby, em que o cron é
+diário, a precisão sem uma sessão de gestão aberta fica limitada à frequência
+permitida pelo plano.
+
+### Fornecedor e métricas
+
+O envio passa por uma interface de fornecedor configurada por
+`CAMPAIGN_EMAIL_PROVIDER`; `smtp` é o adapter ativo e o valor por omissão. Cada
+destinatário guarda fornecedor e identificador da mensagem, e cada tentativa
+gera um evento normalizado. O painel mostra aceites, falhas e tentativas.
+
+“Aceite pelo SMTP” não significa “entregue”. Como SMTP não disponibiliza
+webhooks neste adapter, a interface mostra entrega confirmada como indisponível.
+O modelo já admite eventos `delivered`, `bounced` e `complained`, assim como uma
+tabela de supressões, para uma futura integração transacional com assinatura de
+webhooks validada.
+
 ## Modelo de dados
 
 ### `invite_campaigns`
 
 Guarda o rascunho e o snapshot do conteúdo: convite, tipo, nome interno, assunto,
-preheader, blocos, filtro de audiência, estado, contagens, autor e timestamps.
+preheader, blocos, filtro de audiência, agendamento, estado, contagens, autor e
+timestamps.
 
 ### `invite_campaign_recipients`
 
@@ -132,10 +159,18 @@ Materializa a audiência no momento do envio: inscrição, nome/email/token em
 snapshot, estado individual, erro e data de envio. Uma campanha já enviada nunca
 é recalculada a partir da lista atual de inscrições.
 
+### `invite_campaign_segments`, `invite_campaign_automations` e eventos
+
+Os segmentos preservam filtros reutilizáveis por convite. As automatizações
+guardam trigger, intervalo, template, audiência e chave da última execução. Os
+eventos de entrega são append-only e distinguem aceitação, entrega, bounce,
+complaint e falha. `invite_email_suppressions` fica preparado para o adapter
+transacional futuro, sem suprimir silenciosamente destinatários no SMTP atual.
+
 ## Entrega e segurança
 
-- O transporte atual por Nodemailer é suficiente para a Fase 1 e volumes baixos,
-  mas não deve ser tratado como plataforma de bulk marketing.
+- O adapter atual por Nodemailer/SMTP é suficiente para comunicações operacionais
+  e volumes baixos, mas não deve ser tratado como plataforma de bulk marketing.
 - O HTML das campanhas usa uma estrutura tabelada, estilos inline, documento
   UTF-8 completo e media query simples para manter o layout no Gmail Web,
   Gmail móvel e Outlook. A pré-visualização do editor segue a mesma hierarquia
@@ -144,9 +179,9 @@ snapshot, estado individual, erro e data de envio. Uma campanha já enviada nunc
   `sending`; reenvios acidentais são rejeitados.
 - Conteúdo livre é escapado no servidor. Vídeo é apresentado como link porque a
   maioria dos clientes de email não suporta reprodução incorporada.
-- Antes da Fase 2 deve ser escolhido um fornecedor com agendamento, webhooks,
-  bounce/suppression e boa entregabilidade (por exemplo Brevo, Mailgun, SendGrid
-  ou Amazon SES).
+- Para métricas de entrega, bounce/complaint e supressão automática deve ser
+  escolhido e implementado um adapter transacional (por exemplo Brevo, Mailgun,
+  SendGrid ou Amazon SES).
 - Aberturas não devem ser a métrica principal; cliques e inscrições atribuídas
   são mais fiáveis.
 

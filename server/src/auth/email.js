@@ -206,8 +206,8 @@ export async function sendInviteCampaignEmail(to, data) {
     console.log(`\n[email:mock] Comunicação de convite para: ${to}\n[email:mock] Assunto: ${message.subject}\n`)
     return { mocked: true }
   }
-  await tx.sendMail({ from: config.smtp.from, to, ...message })
-  return { mocked: false }
+  const result = await tx.sendMail({ from: config.smtp.from, to, ...message })
+  return { mocked: false, messageId: result.messageId ?? null }
 }
 
 export function formatInviteDateRange(start, end) {

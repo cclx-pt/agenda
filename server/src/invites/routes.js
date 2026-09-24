@@ -81,6 +81,13 @@ invitesRouter.param('campaignId', (req, res, next, id) => {
   next()
 })
 
+for (const parameter of ['segmentId', 'automationId']) {
+  invitesRouter.param(parameter, (req, res, next, id) => {
+    if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Recurso não encontrado.' })
+    next()
+  })
+}
+
 invitesRouter.get(
   '/',
   manageRoles,
@@ -173,11 +180,12 @@ invitesRouter.get(
 // ── Comunicações operacionais por email ────────────────────────
 invitesRouter.get('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
   const list = await campaigns.list(req.user, req.params.id)
+  const hasScheduled = list.some((campaign) => campaign.status === 'scheduled')
   const active = list.filter((campaign) => ['queued', 'sending'].includes(campaign.status))
-  if (active.length) {
-    scheduleCampaignWork(
-      Promise.all(active.map((campaign) => campaigns.processCampaign(campaign.id)))
-    )
+  if (hasScheduled) {
+    scheduleCampaignWork(campaigns.processDueCampaigns())
+  } else if (active.length) {
+    scheduleCampaignWork(Promise.all(active.map((campaign) => campaigns.processCampaign(campaign.id))))
   }
   res.json({ campaigns: list })
 }))
@@ -190,8 +198,61 @@ invitesRouter.post('/:id/campaigns/audience-preview', manageRoles, asyncHandler(
   res.json({ audience: await campaigns.previewAudience(req.user, req.params.id, req.body) })
 }))
 
+invitesRouter.get('/:id/campaigns/templates', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ templates: await campaigns.listTemplates(req.user, req.params.id) })
+}))
+
+invitesRouter.post('/:id/campaigns/from-template', manageRoles, asyncHandler(async (req, res) => {
+  res.status(201).json({
+    campaign: await campaigns.createFromTemplate(req.user, req.params.id, req.body?.templateKey),
+  })
+}))
+
+invitesRouter.get('/:id/campaigns/segments', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ segments: await campaigns.listSegments(req.user, req.params.id) })
+}))
+
+invitesRouter.post('/:id/campaigns/segments', manageRoles, asyncHandler(async (req, res) => {
+  res.status(201).json({ segment: await campaigns.saveSegment(req.user, req.params.id, req.body) })
+}))
+
+invitesRouter.delete('/:id/campaigns/segments/:segmentId', manageRoles, asyncHandler(async (req, res) => {
+  await campaigns.deleteSegment(req.user, req.params.id, req.params.segmentId)
+  res.json({ ok: true })
+}))
+
+invitesRouter.get('/:id/campaigns/automations', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ automations: await campaigns.listAutomations(req.user, req.params.id) })
+}))
+
+invitesRouter.post('/:id/campaigns/automations', manageRoles, asyncHandler(async (req, res) => {
+  res.status(201).json({
+    automation: await campaigns.saveAutomation(req.user, req.params.id, req.body),
+  })
+}))
+
+invitesRouter.delete('/:id/campaigns/automations/:automationId', manageRoles, asyncHandler(async (req, res) => {
+  await campaigns.deleteAutomation(req.user, req.params.id, req.params.automationId)
+  res.json({ ok: true })
+}))
+
+invitesRouter.get('/:id/campaigns/provider', manageRoles, asyncHandler(async (req, res) => {
+  await campaigns.list(req.user, req.params.id)
+  res.json({ provider: campaigns.providerInfo() })
+}))
+
 invitesRouter.get('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async (req, res) => {
   res.json({ campaign: await campaigns.find(req.user, req.params.id, req.params.campaignId) })
+}))
+
+invitesRouter.get('/:id/campaigns/:campaignId/metrics', manageRoles, asyncHandler(async (req, res) => {
+  res.json({
+    metrics: await campaigns.campaignMetrics(
+      req.user,
+      req.params.id,
+      req.params.campaignId
+    ),
+  })
 }))
 
 invitesRouter.get('/:id/campaigns/:campaignId/recipients', manageRoles, asyncHandler(async (req, res) => {
@@ -215,6 +276,26 @@ invitesRouter.post('/:id/campaigns/:campaignId/send', manageRoles, asyncHandler(
   const campaign = await campaigns.send(req.user, req.params.id, req.params.campaignId)
   scheduleCampaignWork(campaigns.processCampaign(campaign.id))
   res.status(202).json({ campaign })
+}))
+
+invitesRouter.post('/:id/campaigns/:campaignId/schedule', manageRoles, asyncHandler(async (req, res) => {
+  const campaign = await campaigns.schedule(
+    req.user,
+    req.params.id,
+    req.params.campaignId,
+    req.body
+  )
+  res.status(202).json({ campaign })
+}))
+
+invitesRouter.post('/:id/campaigns/:campaignId/cancel-schedule', manageRoles, asyncHandler(async (req, res) => {
+  res.json({
+    campaign: await campaigns.cancelSchedule(
+      req.user,
+      req.params.id,
+      req.params.campaignId
+    ),
+  })
 }))
 
 invitesRouter.post('/:id/campaigns/:campaignId/retry-failed', manageRoles, asyncHandler(async (req, res) => {

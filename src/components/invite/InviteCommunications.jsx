@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  CalendarClock,
   Copy,
   Eye,
   Image,
@@ -12,6 +13,7 @@ import {
   Send,
   Trash2,
   Video,
+  Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import * as invitesService from '../../services/invitesService'
@@ -32,11 +34,13 @@ const TYPES = {
 }
 const STATUS = {
   draft: 'Rascunho',
+  scheduled: 'Agendada',
   queued: 'Em fila',
   sending: 'A enviar',
   sent: 'Enviada',
   sent_with_errors: 'Enviada com falhas',
   failed: 'Falhou',
+  cancelled: 'Cancelada',
 }
 const RSVP = [
   ['confirmed', 'Confirmada'],
@@ -150,7 +154,50 @@ function statusClasses(status) {
   if (status === 'sent_with_errors') return 'bg-amber-100 text-amber-800'
   if (status === 'failed') return 'bg-red-100 text-red-800'
   if (status === 'queued' || status === 'sending') return 'bg-sky-100 text-sky-800'
+  if (status === 'scheduled') return 'bg-violet-100 text-violet-800'
   return 'bg-muted text-muted-foreground'
+}
+
+function lisbonDateTimeToIso(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return null
+  const parts = match.slice(1).map(Number)
+  const desiredUtc = Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4])
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Lisbon',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+  const shown = Object.fromEntries(
+    formatter.formatToParts(new Date(desiredUtc)).map((part) => [part.type, part.value])
+  )
+  const shownUtc = Date.UTC(
+    Number(shown.year),
+    Number(shown.month) - 1,
+    Number(shown.day),
+    Number(shown.hour),
+    Number(shown.minute)
+  )
+  return new Date(desiredUtc + (desiredUtc - shownUtc)).toISOString()
+}
+
+function isoToLisbonDateTime(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Lisbon',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(new Date(value))
+    .replace(' ', 'T')
 }
 
 function BlockEditor({ block, onChange, onRemove }) {
@@ -411,6 +458,16 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   const [validationError, setValidationError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(false)
+  const [templates, setTemplates] = useState([])
+  const [segments, setSegments] = useState([])
+  const [automations, setAutomations] = useState([])
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [metrics, setMetrics] = useState(null)
+  const [automationDraft, setAutomationDraft] = useState({
+    triggerType: 'before_event',
+    offsetMinutes: 1440,
+    templateKey: 'event_reminder',
+  })
 
   const load = useCallback(async () => {
     try {
@@ -423,6 +480,24 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
+  const loadTools = useCallback(async () => {
+    try {
+      const [nextTemplates, nextSegments, nextAutomations] = await Promise.all([
+        invitesService.listInviteCampaignTemplates(invite.id),
+        invitesService.listInviteCampaignSegments(invite.id),
+        invitesService.listInviteCampaignAutomations(invite.id),
+      ])
+      setTemplates(nextTemplates)
+      setSegments(nextSegments)
+      setAutomations(nextAutomations)
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }, [invite.id])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadTools()
+  }, [loadTools])
 
   const readOnly = campaignStatus !== 'draft'
   const processing = campaignStatus === 'queued' || campaignStatus === 'sending'
@@ -457,10 +532,16 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   const loadRecipients = useCallback(async (selectedId) => {
     setLoadingRecipients(true)
     try {
-      setRecipients(await invitesService.listInviteCampaignRecipients(invite.id, selectedId))
+      setRecipients(
+        await invitesService.listInviteCampaignRecipients(invite.id, selectedId)
+      )
+      if (typeof invitesService.getInviteCampaignMetrics === 'function') {
+        setMetrics(await invitesService.getInviteCampaignMetrics(invite.id, selectedId))
+      }
     } catch (error) {
       toast.error(error.message)
       setRecipients([])
+      setMetrics(null)
       setValidationError(null)
     } finally {
       setLoadingRecipients(false)
@@ -468,7 +549,8 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   }, [invite.id])
 
   useEffect(() => {
-    if (!campaigns.some((item) => ['queued', 'sending'].includes(item.status))) return undefined
+    if (!campaigns.some((item) => ['scheduled', 'queued', 'sending'].includes(item.status)))
+      return undefined
     const interval = window.setInterval(async () => {
       try {
         const nextCampaigns = await invitesService.listInviteCampaigns(invite.id)
@@ -492,6 +574,8 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setPreview(selected.status !== 'draft')
     setRecipients([])
     setValidationError(null)
+    setScheduledAt(isoToLisbonDateTime(selected.scheduledAt))
+    setMetrics(null)
     if (selected.status !== 'draft') loadRecipients(selected.id)
   }
   const reset = () => {
@@ -502,6 +586,8 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setRecipients([])
     setValidationError(null)
     setPreview(false)
+    setScheduledAt('')
+    setMetrics(null)
   }
   const duplicateAsDraft = () => {
     setCampaignId(null)
@@ -630,9 +716,265 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     }
   }
 
+  const applyTemplateDraft = async (templateKey) => {
+    setBusy(true)
+    try {
+      const created = await invitesService.createInviteCampaignFromTemplate(
+        invite.id,
+        templateKey
+      )
+      await load()
+      selectCampaign(created)
+      toast.success('Template aplicado a um novo rascunho.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const saveSegment = async () => {
+    const name = window.prompt('Nome do segmento:')?.trim()
+    if (!name) return
+    setBusy(true)
+    try {
+      await invitesService.saveInviteCampaignSegment(invite.id, {
+        name,
+        audience: campaign.audience,
+      })
+      await loadTools()
+      toast.success('Segmento guardado.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const deleteSegment = async (segment) => {
+    if (!window.confirm(`Eliminar o segmento "${segment.name}"?`)) return
+    try {
+      await invitesService.deleteInviteCampaignSegment(invite.id, segment.id)
+      await loadTools()
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
+  const scheduleCampaign = async () => {
+    const iso = lisbonDateTimeToIso(scheduledAt)
+    if (!iso) return toast.error('Indique a data e hora do envio.')
+    const selectedId =
+      campaignStatus === 'scheduled' ? campaignId : (await save())?.id
+    if (!selectedId) return
+    setBusy(true)
+    try {
+      const scheduled = await invitesService.scheduleInviteCampaign(
+        invite.id,
+        selectedId,
+        iso
+      )
+      setCampaignStatus(scheduled.status)
+      setPreview(true)
+      await Promise.all([load(), loadRecipients(selectedId)])
+      toast.success(
+        campaignStatus === 'scheduled'
+          ? 'Agendamento atualizado.'
+          : 'Comunicação agendada.'
+      )
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const cancelSchedule = async () => {
+    if (!campaignId || !window.confirm('Cancelar este envio agendado?')) return
+    setBusy(true)
+    try {
+      const cancelled = await invitesService.cancelInviteCampaignSchedule(
+        invite.id,
+        campaignId
+      )
+      setCampaignStatus(cancelled.status)
+      await load()
+      toast.success('Agendamento cancelado.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const saveAutomation = async () => {
+    setBusy(true)
+    try {
+      await invitesService.saveInviteCampaignAutomation(invite.id, {
+        ...automationDraft,
+        enabled: true,
+        audience: campaign.audience,
+      })
+      await loadTools()
+      toast.success('Automatização criada.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const toggleAutomation = async (automation) => {
+    try {
+      await invitesService.saveInviteCampaignAutomation(invite.id, {
+        ...automation,
+        enabled: !automation.enabled,
+      })
+      await loadTools()
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
+  const deleteAutomation = async (automation) => {
+    if (!window.confirm('Eliminar esta automatização?')) return
+    try {
+      await invitesService.deleteInviteCampaignAutomation(invite.id, automation.id)
+      await loadTools()
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
+
   return (
     <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="rounded-lg border border-border bg-card p-3">
+        <details className="mb-2 rounded-lg border border-border p-2">
+          <summary className="cursor-pointer text-sm font-bold">Templates</summary>
+          <div className="mt-2 flex flex-col gap-1">
+            {templates.map((template) => (
+              <button
+                key={template.key}
+                type="button"
+                className={ghostBtn + ' justify-start text-left'}
+                disabled={busy}
+                onClick={() => applyTemplateDraft(template.key)}
+              >
+                {template.label}
+              </button>
+            ))}
+          </div>
+        </details>
+        <details className="mb-2 rounded-lg border border-border p-2">
+          <summary className="cursor-pointer text-sm font-bold">Segmentos guardados</summary>
+          <div className="mt-2 flex flex-col gap-1">
+            {segments.map((segment) => (
+              <div key={segment.id} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className={ghostBtn + ' min-w-0 flex-1 justify-start truncate'}
+                  disabled={readOnly}
+                  onClick={() => {
+                    setCampaign((current) => ({
+                      ...current,
+                      audience: editableCampaign({
+                        ...current,
+                        audience: segment.audience,
+                      }).audience,
+                    }))
+                    setAudienceCount(null)
+                  }}
+                >
+                  {segment.name}
+                </button>
+                <button
+                  type="button"
+                  className="p-2 text-destructive"
+                  onClick={() => deleteSegment(segment)}
+                  aria-label={`Eliminar segmento ${segment.name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            {!readOnly ? (
+              <button type="button" className={ghostBtn} onClick={saveSegment}>
+                <Save className="h-4 w-4" />
+                Guardar audiência atual
+              </button>
+            ) : null}
+          </div>
+        </details>
+        <details className="mb-3 rounded-lg border border-border p-2">
+          <summary className="cursor-pointer text-sm font-bold">Automatizações</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            {automations.map((automation) => (
+              <div key={automation.id} className="rounded border border-border p-2 text-xs">
+                <div className="font-semibold">
+                  {templates.find((item) => item.key === automation.templateKey)?.label ??
+                    automation.templateKey}
+                </div>
+                <div className="text-muted-foreground">
+                  {automation.triggerType === 'after_event' ? 'Depois' : 'Antes'} do evento ·{' '}
+                  {automation.offsetMinutes / 60} h
+                </div>
+                <div className="mt-1 flex gap-1">
+                  <button
+                    type="button"
+                    className={ghostBtn + ' px-2 py-1 text-xs'}
+                    onClick={() => toggleAutomation(automation)}
+                  >
+                    {automation.enabled ? 'Pausar' : 'Ativar'}
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1 text-destructive"
+                    onClick={() => deleteAutomation(automation)}
+                    aria-label="Eliminar automatização"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <select
+              className={inputCls}
+              value={automationDraft.templateKey}
+              onChange={(event) =>
+                setAutomationDraft({ ...automationDraft, templateKey: event.target.value })
+              }
+            >
+              {templates.map((template) => (
+                <option key={template.key} value={template.key}>
+                  {template.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={automationDraft.triggerType}
+              onChange={(event) =>
+                setAutomationDraft({ ...automationDraft, triggerType: event.target.value })
+              }
+            >
+              <option value="before_event">Antes do evento</option>
+              <option value="payment_pending">Pagamento pendente antes do evento</option>
+              <option value="after_event">Depois do evento</option>
+            </select>
+            <label className="text-xs">
+              Horas de antecedência/intervalo
+              <input
+                className={inputCls}
+                type="number"
+                min="0"
+                value={automationDraft.offsetMinutes / 60}
+                onChange={(event) =>
+                  setAutomationDraft({
+                    ...automationDraft,
+                    offsetMinutes: Math.round(Number(event.target.value) * 60),
+                  })
+                }
+              />
+            </label>
+            <button type="button" className={ghostBtn} disabled={busy} onClick={saveAutomation}>
+              <Zap className="h-4 w-4" />
+              Criar regra
+            </button>
+          </div>
+        </details>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="m-0 text-sm font-bold uppercase text-muted-foreground">Histórico</h3>
           <button
@@ -1069,6 +1411,36 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 <Copy className="h-4 w-4" />
                 Copiar para novo rascunho
               </button>
+              {campaignStatus === 'scheduled' ? (
+                <>
+                  <label className="text-xs font-medium">
+                    Nova data (hora de Lisboa)
+                    <input
+                      type="datetime-local"
+                      className={inputCls + ' mt-1'}
+                      value={scheduledAt}
+                      onChange={(event) => setScheduledAt(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    disabled={busy || !scheduledAt}
+                    onClick={scheduleCampaign}
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                    Reagendar
+                  </button>
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    disabled={busy}
+                    onClick={cancelSchedule}
+                  >
+                    Cancelar agendamento
+                  </button>
+                </>
+              ) : null}
               {recipients.some((recipient) => recipient.status === 'failed') ? (
                 <button type="button" className={ghostBtn} disabled={busy} onClick={retryFailed}>
                   <RotateCcw className="h-4 w-4" />
@@ -1090,6 +1462,26 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 <Send className="h-4 w-4" />
                 Enviar agora
               </button>
+              <label className="flex items-end gap-2 text-xs font-medium">
+                <span>
+                  Agendar (hora de Lisboa)
+                  <input
+                    type="datetime-local"
+                    className={inputCls + ' mt-1'}
+                    value={scheduledAt}
+                    onChange={(event) => setScheduledAt(event.target.value)}
+                  />
+                </span>
+                <button
+                  type="button"
+                  className={ghostBtn}
+                  disabled={busy || !scheduledAt}
+                  onClick={scheduleCampaign}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Agendar
+                </button>
+              </label>
             </>
           )}
         </div>
@@ -1099,6 +1491,34 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
           </p>
         ) : null}
         {readOnly ? (
+          <>
+          {metrics ? (
+            <div className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Fornecedor</div>
+                <strong className="text-sm">{metrics.provider.name.toUpperCase()}</strong>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Aceites</div>
+                <strong className="text-sm">{metrics.events.accepted ?? 0}</strong>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Falhas</div>
+                <strong className="text-sm">{metrics.events.failed ?? 0}</strong>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Tentativas / entregues confirmados
+                </div>
+                <strong className="text-sm">
+                  {metrics.attempts ?? 0} /{' '}
+                  {metrics.provider.capabilities.deliveryWebhooks
+                    ? metrics.events.delivered ?? 0
+                    : 'não disponível'}
+                </strong>
+              </div>
+            </div>
+          ) : null}
           <div className="rounded-lg border border-border">
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <h4 className="m-0 text-sm font-bold">Resultados por destinatário</h4>
@@ -1158,6 +1578,8 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                               ? 'Falhou'
                               : recipient.status === 'processing'
                                 ? 'A enviar'
+                                : recipient.status === 'skipped'
+                                  ? 'Ignorado'
                                 : 'Em fila'}
                         </td>
                         <td className="px-3 py-2">{recipient.attemptCount}</td>
@@ -1175,6 +1597,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
               </p>
             ) : null}
           </div>
+          </>
         ) : null}
         <p className="m-0 flex items-start gap-2 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none" />
