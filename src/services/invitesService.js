@@ -312,6 +312,17 @@ export async function getPublicInvite(slug, guestToken) {
   return page
 }
 
+export async function unsubscribeInviteCampaignEmails(slug, guestToken) {
+  const { result } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/unsubscribe`,
+    {
+      method: 'POST',
+      body: { token: guestToken },
+    }
+  )
+  return result
+}
+
 export async function submitRsvp(slug, payload) {
   return request(`/data/public/invite/${encodeURIComponent(slug)}/rsvp`, {
     method: 'POST',

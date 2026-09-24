@@ -49,6 +49,8 @@ Escopo implementado inicialmente:
   e repetição apenas dos envios falhados;
 - filtros combináveis pelas respostas do formulário do convite;
 - link pessoal do convite incluído no email de cada inscrito.
+- banner efetivo do evento no topo e opção de cancelamento de futuras
+  comunicações desse convite;
 
 Não fazem parte da Fase 1:
 
@@ -56,7 +58,7 @@ Não fazem parte da Fase 1:
 - newsletters gerais desligadas de um convite;
 - campanhas promocionais para pessoas sem inscrição;
 - tracking de abertura/clique e webhooks de entrega;
-- gestão de consentimentos de marketing e unsubscribe.
+- gestão global de consentimentos de marketing e unsubscribe entre eventos.
 
 Os emails desta fase são operacionais e relativos a uma inscrição existente. Não
 transformam automaticamente o inscrito num subscritor de marketing.
@@ -159,6 +161,12 @@ Materializa a audiência no momento do envio: inscrição, nome/email/token em
 snapshot, estado individual, erro e data de envio. Uma campanha já enviada nunca
 é recalculada a partir da lista atual de inscrições.
 
+Cada inscrição guarda `email_opted_out_at`. O cancelamento é confirmado numa
+página pública autenticada pelo token pessoal e não cancela a inscrição no
+evento. Novas audiências excluem estas inscrições e o worker volta a verificar
+a preferência imediatamente antes da entrega, cobrindo campanhas já agendadas
+ou em fila.
+
 ### `invite_campaign_segments`, `invite_campaign_automations` e eventos
 
 Os segmentos preservam filtros reutilizáveis por convite. As automatizações
@@ -174,7 +182,11 @@ transacional futuro, sem suprimir silenciosamente destinatários no SMTP atual.
 - O HTML das campanhas usa uma estrutura tabelada, estilos inline, documento
   UTF-8 completo e media query simples para manter o layout no Gmail Web,
   Gmail móvel e Outlook. A pré-visualização do editor segue a mesma hierarquia
-  visual do email entregue.
+  visual do email entregue e inclui o banner efetivo do convite/evento.
+- O rodapé inclui um link de cancelamento por inscrição e as mensagens incluem
+  os cabeçalhos `List-Unsubscribe` e `List-Unsubscribe-Post`. O `GET` abre apenas
+  a confirmação para evitar cancelamentos por scanners; a alteração exige
+  `POST`.
 - O envio é idempotente: apenas uma campanha em rascunho pode transitar para
   `sending`; reenvios acidentais são rejeitados.
 - Conteúdo livre é escapado no servidor. Vídeo é apresentado como link porque a

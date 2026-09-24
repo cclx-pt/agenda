@@ -41,6 +41,7 @@ function mapRecipient(row) {
     error: row.error ?? null,
     attemptCount: Number(row.attempt_count ?? 0),
     nextAttemptAt: row.next_attempt_at ?? null,
+    emailOptedOutAt: row.email_opted_out_at ?? null,
     lastAttemptAt: row.last_attempt_at ?? null,
     provider: row.provider ?? null,
     providerMessageId: row.provider_message_id ?? null,
@@ -174,7 +175,7 @@ export async function queueDueScheduled(limit = 20) {
        SELECT id FROM invite_campaigns
        WHERE status = 'scheduled' AND scheduled_at <= now()
        ORDER BY scheduled_at
-       FOR UPDATE SKIP LOCKED
+       FOR UPDATE OF r SKIP LOCKED
        LIMIT $1
      )
      RETURNING *`,
@@ -322,12 +323,24 @@ export async function claimRecipientBatch(campaignId, limit = 20) {
        WHERE campaign_id = $1 AND status = 'processing'`,
       [campaignId]
     )
+    await client.query(
+      `UPDATE invite_campaign_recipients r
+       SET status = 'skipped', error = 'Receção de emails cancelada nesta inscrição.'
+       FROM invite_guests g
+       WHERE r.campaign_id = $1
+         AND r.guest_id = g.id
+         AND r.status = 'pending'
+         AND g.email_opted_out_at IS NOT NULL`,
+      [campaignId]
+    )
     const { rows } = await client.query(
-      `SELECT * FROM invite_campaign_recipients
-       WHERE campaign_id = $1
-         AND status = 'pending'
-         AND next_attempt_at <= now()
-       ORDER BY next_attempt_at, created_at
+      `SELECT r.*, g.email_opted_out_at
+       FROM invite_campaign_recipients r
+       LEFT JOIN invite_guests g ON g.id = r.guest_id
+       WHERE r.campaign_id = $1
+         AND r.status = 'pending'
+         AND r.next_attempt_at <= now()
+       ORDER BY r.next_attempt_at, r.created_at
        FOR UPDATE SKIP LOCKED
        LIMIT $2`,
       [campaignId, limit]

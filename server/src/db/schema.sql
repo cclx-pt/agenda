@@ -480,6 +480,7 @@ CREATE TABLE IF NOT EXISTS invite_guests (
   payment_state TEXT NOT NULL DEFAULT 'not_applicable'
                   CHECK (payment_state IN ('not_applicable', 'pending', 'awaiting_validation', 'paid', 'expired')),
   extra         JSONB,
+  email_opted_out_at TIMESTAMPTZ,
   responded_at  TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -717,6 +718,7 @@ ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 -- inscrição: a gestão fica à-prova-de-edições — cada inscrição preserva os campos
 -- e rótulos com que foi capturada, mesmo que o formulário mude depois.
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS schema_snapshot JSONB;
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS email_opted_out_at TIMESTAMPTZ;
 
 -- Auto-gestão da inscrição pelo convidado (página /invite/<slug>/gerir): senha
 -- (hash scrypt, "salt:hash") para entrar com o código de reserva e cancelar /

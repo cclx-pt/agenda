@@ -679,7 +679,14 @@ export default function InviteSubmissionsAdmin() {
                           {g.adminNotes ? <StickyNote className="h-3.5 w-3.5 text-amber-500" aria-label="Tem notas internas" /> : null}
                         </span>
                       </td>
-                      <td className="p-2 text-muted-foreground">{g.email || ''}</td>
+                      <td className="p-2 text-muted-foreground">
+                        {g.email || ''}
+                        {g.emailOptedOutAt ? (
+                          <span className="mt-1 block text-[11px] font-semibold text-amber-700">
+                            Emails cancelados
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="p-2 text-muted-foreground">{g.phone || ''}</td>
                       <td className="p-2">
                         <span className={`rounded-full px-2 py-[3px] text-[11px] font-semibold ${SITUACAO_BADGE[inscricaoSituacao(g)]}`}>

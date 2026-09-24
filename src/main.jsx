@@ -12,6 +12,7 @@ import InvitePage from './components/invite/InvitePage'
 import InviteManage from './components/invite/InviteManage'
 import InviteCheckin from './components/invite/InviteCheckin'
 import InviteFollowup from './components/invite/InviteFollowup'
+import InviteUnsubscribe from './components/invite/InviteUnsubscribe'
 import FundingPage from './components/funding/FundingPage'
 import './index.css'
 
@@ -51,6 +52,7 @@ if (isInviteRoute) {
   else if (parts[1] === 'gerir') inviteView = 'manage'
   else if (parts[1] === 'checkin') inviteView = 'checkin'
   else if (parts[1] === 'follow-up') inviteView = 'follow-up'
+  else if (parts[1] === 'unsubscribe') inviteView = 'unsubscribe'
   invitePreviewId = new URLSearchParams(window.location.search).get('preview') || null
   inviteCheckinToken = new URLSearchParams(window.location.search).get('k') || null
 }
@@ -76,6 +78,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <InviteCheckin slug={inviteSlug} token={inviteCheckinToken} />
           ) : inviteView === 'follow-up' ? (
             <InviteFollowup slug={inviteSlug} token={inviteCheckinToken} />
+          ) : inviteView === 'unsubscribe' ? (
+            <InviteUnsubscribe slug={inviteSlug} />
           ) : (
             <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
           )}

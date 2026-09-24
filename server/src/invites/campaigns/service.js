@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { config } from '../../config.js'
 import * as invitesRepo from '../repository.js'
 import * as campaignsRepo from './repository.js'
-import { InviteError } from '../service.js'
+import { InviteError, resolveInviteBanner } from '../service.js'
 import {
   applyTemplate,
   campaignTemplates,
@@ -170,6 +170,7 @@ export function resolveAudience(guests, audience = {}) {
       .trim()
       .toLowerCase()
     if (!email || !email.includes('@')) continue
+    if (guest.emailOptedOutAt) continue
     if (rsvpStates.size && !rsvpStates.has(guest.rsvpState)) continue
     if (paymentStates.size && !paymentStates.has(guest.paymentState)) continue
     if (ticketIds.size && !ticketIds.has(guest.ticketId)) continue
@@ -353,6 +354,17 @@ function guestLink(invite, token) {
   return `${base}/invite/${encodeURIComponent(invite.slug)}?g=${encodeURIComponent(token)}`
 }
 
+function unsubscribeLinks(invite, token) {
+  if (!token) return {}
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  const encodedSlug = encodeURIComponent(invite.slug)
+  const encodedToken = encodeURIComponent(token)
+  return {
+    unsubscribeUrl: `${base}/invite/${encodedSlug}/unsubscribe?g=${encodedToken}`,
+    oneClickUnsubscribeUrl: `${base}/data/public/invite/${encodedSlug}/unsubscribe?g=${encodedToken}`,
+  }
+}
+
 export async function sendTest(user, inviteId, campaignId, input) {
   const { invite, campaign } = await getCampaign(user, inviteId, campaignId)
   if (campaign.status !== 'draft')
@@ -365,6 +377,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
     preheader: campaign.preheader,
     blocks: campaign.blocks,
     eventLink: `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`,
+    bannerUrl: await resolveInviteBanner(invite),
   })
 }
 
@@ -474,7 +487,7 @@ function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-async function deliverRecipient(invite, campaign, recipient) {
+async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
   const attemptNumber = recipient.attemptCount + 1
   let delivery
   try {
@@ -485,6 +498,8 @@ async function deliverRecipient(invite, campaign, recipient) {
       preheader: campaign.preheader,
       blocks: campaign.blocks,
       eventLink: guestLink(invite, recipient.guestToken),
+      bannerUrl,
+      ...unsubscribeLinks(invite, recipient.guestToken),
     })
     if (!delivery.accepted) {
       throw new Error('O fornecedor de email não aceitou a mensagem.')
@@ -550,6 +565,7 @@ export async function processCampaign(campaignId) {
 
   const invite = await invitesRepo.findById(claimed.inviteId)
   if (!invite) return null
+  const bannerUrl = await resolveInviteBanner(invite)
 
   try {
     while (Date.now() - startedAt < DELIVERY_WORKER_BUDGET_MS) {
@@ -565,7 +581,9 @@ export async function processCampaign(campaignId) {
       )
       if (recipients.length) {
         await Promise.all(
-          recipients.map((recipient) => deliverRecipient(invite, claimed, recipient))
+          recipients.map((recipient) =>
+            deliverRecipient(invite, claimed, recipient, bannerUrl)
+          )
         )
         continue
       }

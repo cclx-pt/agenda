@@ -482,6 +482,22 @@ publicInvitesRouter.post(
   })
 )
 
+publicInvitesRouter.post(
+  '/:slug/unsubscribe',
+  asyncHandler(async (req, res) => {
+    res.json({
+      result: await service.unsubscribeCampaignEmails(
+        req.params.slug,
+        typeof req.body?.token === 'string'
+          ? req.body.token
+          : typeof req.query.g === 'string'
+            ? req.query.g
+            : undefined
+      ),
+    })
+  })
+)
+
 // ── Auto-gestão da inscrição (código de reserva + senha) ────────
 // POST /manage — login: devolve o resumo da inscrição.
 publicInvitesRouter.post(

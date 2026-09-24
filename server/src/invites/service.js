@@ -307,7 +307,7 @@ function verifyManagePassword(pw, stored) {
 }
 
 // Banner efetivo: o do evento associado (se "usar imagem do evento") ou o próprio.
-async function resolveInviteBanner(invite) {
+export async function resolveInviteBanner(invite) {
   if (invite.useEventBanner && invite.eventId) {
     const ev = await eventsRepo.findById(invite.eventId).catch(() => null)
     if (ev?.bannerUrl) return ev.bannerUrl
@@ -966,6 +966,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   if (!invite || invite.status === 'rascunho') {
     throw new InviteError(404, 'Convite não encontrado.')
   }
+
   const [blocks, tickets, connectedEvent] = await Promise.all([
     repo.listBlocks(invite.id),
     repo.listTicketsWithSold(invite.id),
@@ -1001,6 +1002,22 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
       paymentMethodType,
       paymentMethodNumbers,
     }),
+  }
+}
+
+export async function unsubscribeCampaignEmails(slug, token) {
+  if (!token) throw new InviteError(400, 'Ligação de cancelamento inválida.')
+  const invite = await repo.findBySlug(slug)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  const guest = await repo.findGuestByToken(token)
+  if (!guest || guest.inviteId !== invite.id) {
+    throw new InviteError(404, 'Inscrição não encontrada.')
+  }
+  const updated = await repo.setGuestEmailOptOut(guest.id)
+  return {
+    unsubscribed: true,
+    unsubscribedAt: updated.emailOptedOutAt,
+    eventTitle: invite.title,
   }
 }
 

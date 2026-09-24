@@ -360,9 +360,16 @@ function BlockEditor({ block, onChange, onRemove }) {
 }
 
 function CampaignPreview({ campaign, invite }) {
+  const bannerUrl =
+    invite.useEventBanner && invite.event?.bannerUrl
+      ? invite.event.bannerUrl
+      : invite.bannerUrl
   return (
     <div className="rounded-lg bg-gray-100 p-3 sm:p-6">
       <div className="mx-auto max-w-[600px] overflow-hidden bg-white text-gray-900 shadow-sm">
+        {bannerUrl ? (
+          <img src={bannerUrl} alt={invite.title} className="block h-auto w-full" />
+        ) : null}
         <div className="bg-[#1f3864] px-5 py-6 text-white sm:px-8">
           <p className="m-0 text-xs font-bold uppercase tracking-widest text-blue-100">
             Agenda CCLX
@@ -441,6 +448,8 @@ function CampaignPreview({ campaign, invite }) {
           Comunicação operacional relativa à sua inscrição.
           <br />
           Agenda CCLX
+          <br />
+          <span className="underline">Cancelar a receção de emails deste evento</span>
         </div>
       </div>
     </div>

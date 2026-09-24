@@ -39,6 +39,17 @@ const guests = [
     extra: { comunidade: 'Porto', dias: [], donativo: null, consent: true },
   },
   {
+    id: '5',
+    token: 'e',
+    name: 'Sem comunicações',
+    email: 'optout@example.test',
+    rsvpState: 'confirmed',
+    paymentState: 'paid',
+    ticketId: 't1',
+    checkedInAt: null,
+    emailOptedOutAt: new Date(),
+  },
+  {
     id: '4',
     token: 'd',
     name: 'Sem email',
@@ -149,6 +160,10 @@ test('renderInviteCampaignEmail uses a responsive table layout for email clients
       { type: 'button', label: 'Abrir inscrição', url: 'https://example.test/register' },
     ],
     eventLink: 'https://example.test/invite',
+    bannerUrl: 'https://example.test/banner.jpg',
+    unsubscribeUrl: 'https://example.test/invite/unsubscribe?g=token',
+    oneClickUnsubscribeUrl:
+      'https://example.test/data/public/invite/unsubscribe?g=token',
   })
 
   assert.match(message.html, /^<!doctype html>/)
@@ -158,5 +173,11 @@ test('renderInviteCampaignEmail uses a responsive table layout for email clients
   assert.match(message.html, /class="email-content"/)
   assert.match(message.html, /Primeira linha<br \/>Segunda linha/)
   assert.match(message.html, /mso-table-lspace:0pt/)
+  assert.match(message.html, /https:\/\/example\.test\/banner\.jpg/)
+  assert.match(message.html, /Cancelar a receção de emails deste evento/)
+  assert.equal(
+    message.headers['List-Unsubscribe'],
+    '<https://example.test/data/public/invite/unsubscribe?g=token>'
+  )
   assert.doesNotMatch(message.html, /white-space:pre-line/)
 })

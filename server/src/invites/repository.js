@@ -84,6 +84,7 @@ function mapGuest(row) {
     checkedInAt: row.checked_in_at ?? null,
     refundRequestedAt: row.refund_requested_at ?? null,
     adminNotes: row.admin_notes ?? null,
+    emailOptedOutAt: row.email_opted_out_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -360,6 +361,17 @@ export async function findGuestById(id) {
 
 export async function findGuestByToken(token) {
   const { rows } = await pool.query('SELECT * FROM invite_guests WHERE token = $1', [token])
+  return mapGuest(rows[0])
+}
+
+export async function setGuestEmailOptOut(id) {
+  const { rows } = await pool.query(
+    `UPDATE invite_guests
+     SET email_opted_out_at = COALESCE(email_opted_out_at, now()), updated_at = now()
+     WHERE id = $1
+     RETURNING *`,
+    [id]
+  )
   return mapGuest(rows[0])
 }
 

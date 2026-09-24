@@ -117,7 +117,17 @@ function campaignBlockHtml(block) {
   return ''
 }
 
-export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, preheader, blocks, eventLink }) {
+export function renderInviteCampaignEmail({
+  recipientName,
+  eventTitle,
+  subject,
+  preheader,
+  blocks,
+  eventLink,
+  bannerUrl,
+  unsubscribeUrl,
+  oneClickUnsubscribeUrl,
+}) {
   const greeting = recipientName ? `Olá ${recipientName},` : 'Olá,'
   const content = Array.isArray(blocks) ? blocks : []
   const textBlocks = content.map((block) => {
@@ -128,7 +138,7 @@ export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, 
     if (block.type === 'workshops') return `Workshops:\n${block.items.map((item) => `- ${item.title}${item.description ? `: ${item.description}` : ''}`).join('\n')}`
     return ''
   }).filter(Boolean)
-  const text = `${greeting}\n\n${textBlocks.join('\n\n')}\n\nVer convite: ${eventLink}\n\nAgenda CCLX`
+  const text = `${greeting}\n\n${textBlocks.join('\n\n')}\n\nVer convite: ${eventLink}${unsubscribeUrl ? `\n\nCancelar a receção de emails deste evento: ${unsubscribeUrl}` : ''}\n\nAgenda CCLX`
   const html = `<!doctype html>
 <html lang="pt">
 <head>
@@ -155,6 +165,11 @@ export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, 
       <td align="center" style="padding:24px 12px">
         <!--[if mso]><table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" class="email-shell" style="width:100%;max-width:600px;background-color:#ffffff">
+          ${
+            bannerUrl
+              ? `<tr><td><img src="${escapeHtml(bannerUrl)}" width="600" alt="${escapeHtml(eventTitle || 'Evento')}" style="display:block;width:100%;max-width:600px;height:auto;border:0;line-height:100%;outline:none;text-decoration:none" /></td></tr>`
+              : ''
+          }
           <tr>
             <td bgcolor="#1f3864" class="email-header" style="padding:24px 32px;font-family:Arial,'Helvetica Neue',sans-serif;color:#ffffff">
               <div style="font-size:12px;line-height:16px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#dbeafe">Agenda CCLX</div>
@@ -184,6 +199,11 @@ export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, 
             <td bgcolor="#f9fafb" style="padding:18px 32px;border-top:1px solid #e5e7eb;font-family:Arial,'Helvetica Neue',sans-serif;font-size:12px;line-height:18px;color:#6b7280">
               Comunicação operacional relativa à sua inscrição.<br />
               Agenda CCLX
+              ${
+                unsubscribeUrl
+                  ? `<br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#4b5563;text-decoration:underline">Cancelar a receção de emails deste evento</a>`
+                  : ''
+              }
             </td>
           </tr>
         </table>
@@ -193,7 +213,19 @@ export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, 
   </table>
 </body>
 </html>`
-  return { subject, text, html }
+  return {
+    subject,
+    text,
+    html,
+    ...(oneClickUnsubscribeUrl
+      ? {
+          headers: {
+            'List-Unsubscribe': `<${oneClickUnsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
+        }
+      : {}),
+  }
 }
 
 export async function sendInviteCampaignEmail(to, data) {
