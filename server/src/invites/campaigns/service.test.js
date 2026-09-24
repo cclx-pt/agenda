@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveAudience } from './service.js'
+import { matchesFormCondition, resolveAudience } from './service.js'
 import { renderInviteCampaignEmail } from '../../auth/email.js'
 
 const guests = [
@@ -13,6 +13,7 @@ const guests = [
     paymentState: 'paid',
     ticketId: 't1',
     checkedInAt: null,
+    extra: { comunidade: 'Sede', dias: ['Sexta', 'Sábado'], donativo: 25, consent: true },
   },
   {
     id: '2',
@@ -23,6 +24,7 @@ const guests = [
     paymentState: 'paid',
     ticketId: 't1',
     checkedInAt: new Date(),
+    extra: { comunidade: 'Sede', dias: ['Domingo'], donativo: 10, consent: false },
   },
   {
     id: '3',
@@ -33,6 +35,7 @@ const guests = [
     paymentState: 'not_applicable',
     ticketId: null,
     checkedInAt: null,
+    extra: { comunidade: 'Porto', dias: [], donativo: null, consent: true },
   },
   {
     id: '4',
@@ -59,6 +62,36 @@ test('resolveAudience filters guests and deduplicates email case-insensitively',
 
 test('resolveAudience accepts all valid unique emails when filters are empty', () => {
   assert.equal(resolveAudience(guests, {}).length, 2)
+})
+
+test('resolveAudience combines form conditions with all and any matching', () => {
+  assert.deepEqual(
+    resolveAudience(guests, {
+      formMatch: 'all',
+      formConditions: [
+        { fieldKey: 'comunidade', operator: 'equals', value: 'sede' },
+        { fieldKey: 'dias', operator: 'contains', value: 'Sábado' },
+      ],
+    }).map((recipient) => recipient.guestId),
+    ['1']
+  )
+  assert.deepEqual(
+    resolveAudience(guests, {
+      formMatch: 'any',
+      formConditions: [
+        { fieldKey: 'comunidade', operator: 'equals', value: 'Porto' },
+        { fieldKey: 'donativo', operator: 'greater_than', value: 20 },
+      ],
+    }).map((recipient) => recipient.guestId),
+    ['1', '3']
+  )
+})
+
+test('matchesFormCondition supports booleans, numbers and empty answers', () => {
+  assert.equal(matchesFormCondition(true, { operator: 'equals', value: true }), true)
+  assert.equal(matchesFormCondition(25, { operator: 'greater_or_equal', value: 25 }), true)
+  assert.equal(matchesFormCondition([], { operator: 'empty' }), true)
+  assert.equal(matchesFormCondition('Lisboa', { operator: 'not_contains', value: 'porto' }), true)
 })
 
 test('renderInviteCampaignEmail escapes authored content', () => {

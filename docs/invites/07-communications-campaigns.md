@@ -43,8 +43,11 @@ Escopo implementado inicialmente:
 - filtros por estado da inscrição, pagamento, bilhete e check-in;
 - blocos email-safe: texto, imagem, vídeo/link, workshops, aviso e botão;
 - rascunho, pré-visualização, envio de teste e envio imediato;
+- consulta de campanhas enviadas e cópia do conteúdo para um novo rascunho;
 - snapshot dos destinatários e estado individual de cada envio;
-- histórico com totais enviados, falhados e ignorados;
+- histórico com totais enviados, falhados e ignorados, detalhe por destinatário
+  e repetição apenas dos envios falhados;
+- filtros combináveis pelas respostas do formulário do convite;
 - link pessoal do convite incluído no email de cada inscrito.
 
 Não fazem parte da Fase 1:
@@ -58,6 +61,15 @@ Não fazem parte da Fase 1:
 
 Os emails desta fase são operacionais e relativos a uma inscrição existente. Não
 transformam automaticamente o inscrito num subscritor de marketing.
+
+## Segmentação pelas respostas do formulário
+
+A audiência pode ser filtrada pelos campos configurados no formulário do
+próprio convite. Cada condição guarda a chave estável do
+campo e usa operadores adequados ao tipo de resposta: igualdade para escolha
+única e checkbox, inclusão para escolha múltipla, comparação para números e
+presença/ausência para texto. A campanha deve preservar estas condições no
+snapshot da audiência.
 
 ## Fases seguintes
 
@@ -75,6 +87,24 @@ transformam automaticamente o inscrito num subscritor de marketing.
 - pagamento pendente e alterações urgentes;
 - agradecimento e follow-up pós-evento;
 - módulo global de newsletters CCLX, reutilizando o mesmo motor.
+
+## Plano recomendado
+
+| Etapa | Entrega | Prioridade | Esforço estimado |
+| --- | --- | --- | --- |
+| 1 | Tornar explícita a criação e edição de rascunhos; permitir consultar uma campanha enviada e copiar o seu conteúdo e audiência para um novo rascunho, sem alterar o snapshot original | Concluída | 1–2 dias |
+| 2 | Corrigir o falso sucesso quando o SMTP não está configurado, distinguir envios parciais e melhorar o histórico em modo de leitura | Concluída | 2–4 dias |
+| 3 | Adicionar detalhes por destinatário, repetição apenas dos falhados e melhorias de validação e confirmação no editor | Concluída | 4–7 dias |
+| 4 | Filtrar a audiência pelas respostas do formulário do convite, com operadores por tipo de campo, combinação AND/OR, contagem prévia e snapshot das condições | Concluída | 4–7 dias |
+| 5 | Processar campanhas de forma assíncrona, em lotes, com tentativas, recuperação de envios interrompidos e progresso | Alta | 5–10 dias |
+| 6 | Adicionar modelos, segmentos guardados, agendamento e automatizações | Média | 5–10 dias |
+| 7 | Integrar um fornecedor transacional, webhooks, bounce, supressões e métricas de entrega | Média | Dependente do fornecedor |
+
+Para a etapa 4, a primeira versão deve disponibilizar igualdade para campos de
+escolha única e checkbox, inclusão para escolha múltipla, comparação para
+números e presença/ausência para texto. Campos removidos do formulário atual
+devem continuar legíveis através do `schema_snapshot`, mas só os campos atuais
+devem estar disponíveis para criar novos filtros.
 
 ## Modelo de dados
 

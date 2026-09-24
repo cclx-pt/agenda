@@ -120,6 +120,16 @@ export async function sendInviteCampaign(inviteId, campaignId) {
   return campaign
 }
 
+export async function listInviteCampaignRecipients(inviteId, campaignId) {
+  const { recipients } = await request(`/data/invites/${inviteId}/campaigns/${campaignId}/recipients`)
+  return recipients
+}
+
+export async function retryFailedInviteCampaign(inviteId, campaignId) {
+  const { campaign } = await request(`/data/invites/${inviteId}/campaigns/${campaignId}/retry-failed`, { method: 'POST' })
+  return campaign
+}
+
 // Gestão de uma inscrição (organizador).
 export async function updateInviteGuest(inviteId, guestId, payload) {
   const { guest } = await request(`/data/invites/${inviteId}/guests/${guestId}`, { method: 'PUT', body: payload })

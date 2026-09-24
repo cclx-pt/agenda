@@ -166,6 +166,10 @@ invitesRouter.get('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async 
   res.json({ campaign: await campaigns.find(req.user, req.params.id, req.params.campaignId) })
 }))
 
+invitesRouter.get('/:id/campaigns/:campaignId/recipients', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ recipients: await campaigns.listRecipients(req.user, req.params.id, req.params.campaignId) })
+}))
+
 invitesRouter.put('/:id/campaigns/:campaignId', manageRoles, asyncHandler(async (req, res) => {
   res.json({ campaign: await campaigns.update(req.user, req.params.id, req.params.campaignId, req.body) })
 }))
@@ -181,6 +185,10 @@ invitesRouter.post('/:id/campaigns/:campaignId/test', manageRoles, asyncHandler(
 
 invitesRouter.post('/:id/campaigns/:campaignId/send', manageRoles, asyncHandler(async (req, res) => {
   res.json({ campaign: await campaigns.send(req.user, req.params.id, req.params.campaignId) })
+}))
+
+invitesRouter.post('/:id/campaigns/:campaignId/retry-failed', manageRoles, asyncHandler(async (req, res) => {
+  res.json({ campaign: await campaigns.retryFailed(req.user, req.params.id, req.params.campaignId) })
 }))
 
 // Edita uma inscrição (nome/email/telemóvel/estado).

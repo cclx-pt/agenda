@@ -140,6 +140,9 @@ export async function sendInviteCampaignEmail(to, data) {
   const message = renderInviteCampaignEmail(data)
   const tx = getTransporter()
   if (!tx) {
+    if (config.isProd) {
+      throw new Error('O serviço de email não está configurado.')
+    }
     console.log(`\n[email:mock] Comunicação de convite para: ${to}\n[email:mock] Assunto: ${message.subject}\n`)
     return { mocked: true }
   }

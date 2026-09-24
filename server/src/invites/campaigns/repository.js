@@ -34,6 +34,7 @@ function mapRecipient(row) {
     email: row.email,
     status: row.status,
     error: row.error ?? null,
+    attemptCount: Number(row.attempt_count ?? 0),
     sentAt: row.sent_at ?? null,
   }
 }
@@ -135,20 +136,74 @@ export async function insertRecipients(campaignId, recipients) {
 export async function markRecipient(id, status, error = null) {
   await pool.query(
     `UPDATE invite_campaign_recipients SET
-       status = $2, error = $3, sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END
+       status = $2, error = $3, attempt_count = attempt_count + 1,
+       sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END
      WHERE id = $1`,
     [id, status, error]
   )
 }
 
 export async function finish(id, { recipientCount, sentCount, failedCount, skippedCount }) {
-  const status = failedCount > 0 && sentCount === 0 ? 'failed' : 'sent'
+  const status =
+    failedCount === 0 ? 'sent' : sentCount === 0 ? 'failed' : 'sent_with_errors'
   await pool.query(
     `UPDATE invite_campaigns SET
        status = $2, recipient_count = $3, sent_count = $4, failed_count = $5,
-       skipped_count = $6, sent_at = now(), updated_at = now()
+       skipped_count = $6, sent_at = COALESCE(sent_at, now()), updated_at = now()
      WHERE id = $1`,
     [id, status, recipientCount, sentCount, failedCount, skippedCount]
   )
   return findById(id)
+}
+
+export async function listRecipients(campaignId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM invite_campaign_recipients
+     WHERE campaign_id = $1
+     ORDER BY status, created_at`,
+    [campaignId]
+  )
+  return rows.map(mapRecipient)
+}
+
+export async function claimForRetry(id) {
+  const { rows } = await pool.query(
+    `UPDATE invite_campaigns SET status = 'sending', updated_at = now()
+     WHERE id = $1
+       AND status IN ('sent', 'sent_with_errors', 'failed')
+       AND failed_count > 0
+     RETURNING *`,
+    [id]
+  )
+  return mapCampaign(rows[0])
+}
+
+export async function claimFailedRecipients(campaignId) {
+  const { rows } = await pool.query(
+    `UPDATE invite_campaign_recipients
+     SET status = 'pending', error = NULL
+     WHERE campaign_id = $1 AND status = 'failed'
+     RETURNING *`,
+    [campaignId]
+  )
+  return rows.map((row) => ({ ...mapRecipient(row), guestToken: row.guest_token ?? null }))
+}
+
+export async function finishFromRecipients(id) {
+  const { rows } = await pool.query(
+    `SELECT
+       COUNT(*)::int AS recipient_count,
+       COUNT(*) FILTER (WHERE status = 'sent')::int AS sent_count,
+       COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_count,
+       COUNT(*) FILTER (WHERE status = 'skipped')::int AS skipped_count
+     FROM invite_campaign_recipients
+     WHERE campaign_id = $1`,
+    [id]
+  )
+  return finish(id, {
+    recipientCount: rows[0].recipient_count,
+    sentCount: rows[0].sent_count,
+    failedCount: rows[0].failed_count,
+    skippedCount: rows[0].skipped_count,
+  })
 }

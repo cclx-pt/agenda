@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  Copy,
   Eye,
   Image,
   Link,
   Mail,
   Plus,
+  RotateCcw,
   Save,
   Send,
   Trash2,
@@ -28,18 +30,26 @@ const TYPES = {
   reminder: 'Lembrete',
   post_event: 'Pós-evento',
 }
-const STATUS = { draft: 'Rascunho', sending: 'A enviar', sent: 'Enviada', failed: 'Falhou' }
+const STATUS = {
+  draft: 'Rascunho',
+  sending: 'A enviar',
+  sent: 'Enviada',
+  sent_with_errors: 'Enviada com falhas',
+  failed: 'Falhou',
+}
 const RSVP = [
   ['confirmed', 'Confirmada'],
   ['pending', 'Pendente'],
-  ['waitlist', 'Lista de espera'],
+  ['waitlisted', 'Lista de espera'],
   ['declined', 'Cancelada'],
+  ['cancelled', 'Cancelada pelo participante'],
 ]
 const PAYMENTS = [
+  ['not_applicable', 'Não aplicável'],
   ['pending', 'Pagamento pendente'],
   ['awaiting_validation', 'Em validação'],
   ['paid', 'Pago'],
-  ['failed', 'Falhado'],
+  ['expired', 'Expirado'],
   ['refund_requested', 'Reembolso pedido'],
   ['refunded', 'Reembolsado'],
 ]
@@ -49,11 +59,94 @@ const EMPTY = {
   subject: '',
   preheader: '',
   blocks: [{ type: 'text', text: '' }],
-  audience: { rsvpStates: [], paymentStates: [], ticketIds: [], checkedIn: null },
+  audience: {
+    rsvpStates: [],
+    paymentStates: [],
+    ticketIds: [],
+    checkedIn: null,
+    formMatch: 'all',
+    formConditions: [],
+  },
+}
+
+const FORM_OPERATORS = {
+  checkbox: [
+    ['equals', 'é'],
+    ['not_equals', 'não é'],
+  ],
+  number: [
+    ['equals', 'igual a'],
+    ['not_equals', 'diferente de'],
+    ['greater_than', 'maior que'],
+    ['greater_or_equal', 'maior ou igual a'],
+    ['less_than', 'menor que'],
+    ['less_or_equal', 'menor ou igual a'],
+    ['empty', 'sem resposta'],
+    ['not_empty', 'com resposta'],
+  ],
+  default: [
+    ['equals', 'é igual a'],
+    ['not_equals', 'é diferente de'],
+    ['contains', 'contém'],
+    ['not_contains', 'não contém'],
+    ['empty', 'sem resposta'],
+    ['not_empty', 'com resposta'],
+  ],
+}
+
+function operatorsFor(field) {
+  return FORM_OPERATORS[field?.type] ?? FORM_OPERATORS.default
+}
+
+function initialCondition(field) {
+  return {
+    fieldKey: field?.key ?? '',
+    operator: 'equals',
+    value: field?.type === 'checkbox' ? true : '',
+  }
+}
+
+function validateDraft(campaign) {
+  if (!campaign.name.trim()) return 'Indique o nome interno da comunicação.'
+  if (!campaign.subject.trim()) return 'Indique o assunto do email.'
+  if (!campaign.blocks.length) return 'Adicione pelo menos um bloco de conteúdo.'
+  const incompleteCondition = (campaign.audience.formConditions ?? []).some(
+    (condition) =>
+      !['empty', 'not_empty'].includes(condition.operator) &&
+      (condition.value === '' || condition.value === undefined)
+  )
+  if (incompleteCondition) return 'Preencha o valor de todas as condições da audiência.'
+  return null
+}
+
+function editableCampaign(source) {
+  return {
+    type: source.type,
+    name: source.name,
+    subject: source.subject,
+    preheader: source.preheader,
+    blocks: source.blocks.map((block) => ({
+      ...block,
+      ...(Array.isArray(block.items)
+        ? { items: block.items.map((item) => ({ ...item })) }
+        : {}),
+    })),
+    audience: {
+      rsvpStates: [...(source.audience?.rsvpStates ?? [])],
+      paymentStates: [...(source.audience?.paymentStates ?? [])],
+      ticketIds: [...(source.audience?.ticketIds ?? [])],
+      checkedIn: source.audience?.checkedIn ?? null,
+      formMatch: source.audience?.formMatch ?? 'all',
+      formConditions: (source.audience?.formConditions ?? []).map((condition) => ({
+        ...condition,
+      })),
+    },
+  }
 }
 
 function statusClasses(status) {
   if (status === 'sent') return 'bg-emerald-100 text-emerald-800'
+  if (status === 'sent_with_errors') return 'bg-amber-100 text-amber-800'
   if (status === 'failed') return 'bg-red-100 text-red-800'
   if (status === 'sending') return 'bg-sky-100 text-sky-800'
   return 'bg-muted text-muted-foreground'
@@ -289,11 +382,15 @@ function CampaignPreview({ campaign, invite }) {
   )
 }
 
-export default function InviteCommunications({ invite, tickets = [] }) {
+export default function InviteCommunications({ invite, tickets = [], formFields = [] }) {
   const [campaigns, setCampaigns] = useState([])
   const [campaign, setCampaign] = useState(EMPTY)
   const [campaignId, setCampaignId] = useState(null)
+  const [campaignStatus, setCampaignStatus] = useState('draft')
   const [audienceCount, setAudienceCount] = useState(null)
+  const [recipients, setRecipients] = useState([])
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [validationError, setValidationError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(false)
 
@@ -309,7 +406,16 @@ export default function InviteCommunications({ invite, tickets = [] }) {
     load()
   }, [load])
 
-  const updateAudience = (key, value, checked) =>
+  const readOnly = campaignStatus !== 'draft'
+  const audienceFields = formFields.filter(
+    (field) =>
+      field?.key &&
+      !['section', 'document', 'children'].includes(field.type) &&
+      !['name', 'email', 'phone'].includes(field.key)
+  )
+
+  const updateAudience = (key, value, checked) => {
+    setAudienceCount(null)
     setCampaign((current) => ({
       ...current,
       audience: {
@@ -321,27 +427,66 @@ export default function InviteCommunications({ invite, tickets = [] }) {
           : value,
       },
     }))
-  const selectCampaign = (selected) => {
-    if (selected.status !== 'draft') return
-    setCampaignId(selected.id)
-    setCampaign({
-      type: selected.type,
-      name: selected.name,
-      subject: selected.subject,
-      preheader: selected.preheader,
-      blocks: selected.blocks,
-      audience: selected.audience,
-    })
+  }
+  const setAudienceValue = (key, value) => {
     setAudienceCount(null)
+    setCampaign((current) => ({
+      ...current,
+      audience: { ...current.audience, [key]: value },
+    }))
+  }
+  const loadRecipients = async (selectedId) => {
+    setLoadingRecipients(true)
+    try {
+      setRecipients(await invitesService.listInviteCampaignRecipients(invite.id, selectedId))
+    } catch (error) {
+      toast.error(error.message)
+      setRecipients([])
+      setValidationError(null)
+    } finally {
+      setLoadingRecipients(false)
+    }
+  }
+  const selectCampaign = (selected) => {
+    setCampaignId(selected.id)
+    setCampaignStatus(selected.status)
+    setCampaign(editableCampaign(selected))
+    setAudienceCount(null)
+    setPreview(selected.status !== 'draft')
+    setRecipients([])
+    setValidationError(null)
+    if (selected.status !== 'draft') loadRecipients(selected.id)
   }
   const reset = () => {
     setCampaignId(null)
+    setCampaignStatus('draft')
     setCampaign(EMPTY)
     setAudienceCount(null)
+    setRecipients([])
+    setValidationError(null)
     setPreview(false)
+  }
+  const duplicateAsDraft = () => {
+    setCampaignId(null)
+    setCampaignStatus('draft')
+    setCampaign({
+      ...editableCampaign(campaign),
+      name: `${campaign.name} (cópia)`,
+    })
+    setAudienceCount(null)
+    setRecipients([])
+    setPreview(false)
+    toast.success('Cópia criada como novo rascunho. Guarde para a adicionar ao histórico.')
   }
 
   const save = async () => {
+    if (readOnly) return null
+    const errorMessage = validateDraft(campaign)
+    setValidationError(errorMessage)
+    if (errorMessage) {
+      toast.error(errorMessage)
+      return null
+    }
     setBusy(true)
     try {
       const saved = campaignId
@@ -349,6 +494,7 @@ export default function InviteCommunications({ invite, tickets = [] }) {
         : await invitesService.createInviteCampaign(invite.id, campaign)
       setCampaignId(saved.id)
       setCampaign(saved)
+      setValidationError(null)
       await load()
       toast.success('Comunicação guardada.')
       return saved
@@ -400,7 +546,12 @@ export default function InviteCommunications({ invite, tickets = [] }) {
     if (!result.count) return toast.error('A audiência não tem destinatários.')
     if (
       !window.confirm(
-        `Enviar agora para ${result.count} destinatário(s)? O envio não pode ser anulado.`
+        `Enviar agora para ${result.count} destinatário(s)?\n\n` +
+          `Filtros ativos: ${saved.audience.rsvpStates.length} de inscrição, ` +
+          `${saved.audience.paymentStates.length} de pagamento, ` +
+          `${saved.audience.ticketIds.length} de bilhete e ` +
+          `${saved.audience.formConditions.length} do formulário.\n\n` +
+          'O envio não pode ser anulado.'
       )
     )
       return
@@ -428,6 +579,22 @@ export default function InviteCommunications({ invite, tickets = [] }) {
       toast.error(error.message)
     }
   }
+  const retryFailed = async () => {
+    if (!campaignId || !window.confirm('Repetir apenas os envios falhados?')) return
+    setBusy(true)
+    try {
+      const retried = await invitesService.retryFailedInviteCampaign(invite.id, campaignId)
+      setCampaignStatus(retried.status)
+      await Promise.all([load(), loadRecipients(campaignId)])
+      toast.success(
+        `Repetição concluída: ${retried.sentCount} enviada(s), ${retried.failedCount} falhada(s).`
+      )
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -450,8 +617,9 @@ export default function InviteCommunications({ invite, tickets = [] }) {
                 key={item.id}
                 type="button"
                 onClick={() => selectCampaign(item)}
-                className="rounded-lg border border-border p-3 text-left hover:bg-accent disabled:cursor-default"
-                disabled={item.status !== 'draft'}
+                className={`rounded-lg border p-3 text-left hover:bg-accent ${
+                  campaignId === item.id ? 'border-primary bg-accent' : 'border-border'
+                }`}
               >
                 <span className="block truncate text-sm font-semibold">{item.name}</span>
                 <span className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -459,7 +627,7 @@ export default function InviteCommunications({ invite, tickets = [] }) {
                     {STATUS[item.status]}
                   </span>
                   <span>
-                    {item.status === 'sent' || item.status === 'failed'
+                    {['sent', 'sent_with_errors', 'failed'].includes(item.status)
                       ? `${item.sentCount}/${item.recipientCount}`
                       : TYPES[item.type]}
                   </span>
@@ -488,21 +656,37 @@ export default function InviteCommunications({ invite, tickets = [] }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="m-0 text-base font-bold">
-              {campaignId ? 'Editar comunicação' : 'Nova comunicação'}
+              {readOnly
+                ? 'Resultados da comunicação'
+                : campaignId
+                  ? 'Editar rascunho'
+                  : 'Novo rascunho'}
             </h3>
             <p className="m-0 text-sm text-muted-foreground">
               Emails operacionais para pessoas inscritas neste convite.
             </p>
           </div>
-          <button type="button" className={ghostBtn} onClick={() => setPreview((value) => !value)}>
-            <Eye className="h-4 w-4" />
-            {preview ? 'Editar' : 'Pré-visualizar'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {campaignId ? (
+              <button type="button" className={ghostBtn} onClick={duplicateAsDraft}>
+                <Copy className="h-4 w-4" />
+                Copiar para novo rascunho
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={ghostBtn}
+              onClick={() => setPreview((value) => !value)}
+            >
+              <Eye className="h-4 w-4" />
+              {preview ? (readOnly ? 'Ver detalhes' : 'Editar') : 'Pré-visualizar'}
+            </button>
+          </div>
         </div>
         {preview ? (
           <CampaignPreview campaign={campaign} invite={invite} />
         ) : (
-          <>
+          <fieldset disabled={readOnly} className="contents">
             <div className="grid gap-3 md:grid-cols-2">
               <label className={labelCls}>
                 Tipo
@@ -626,6 +810,167 @@ export default function InviteCommunications({ invite, tickets = [] }) {
                   ) : null}
                 </div>
               </div>
+              {audienceFields.length ? (
+                <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h5 className="m-0 text-sm font-bold">Respostas do formulário</h5>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Corresponder a</span>
+                      <select
+                        className={inputCls + ' w-auto'}
+                        value={campaign.audience.formMatch ?? 'all'}
+                        onChange={(event) => setAudienceValue('formMatch', event.target.value)}
+                      >
+                        <option value="all">todas as condições</option>
+                        <option value="any">qualquer condição</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {(campaign.audience.formConditions ?? []).map((condition, index) => {
+                      const field = audienceFields.find(
+                        (candidate) => candidate.key === condition.fieldKey
+                      )
+                      const operators = operatorsFor(field)
+                      const needsValue = !['empty', 'not_empty'].includes(condition.operator)
+                      return (
+                        <div
+                          key={`${condition.fieldKey}-${index}`}
+                          className="grid gap-2 md:grid-cols-[1.4fr_1fr_1.2fr_auto]"
+                        >
+                          <select
+                            aria-label={`Campo da condição ${index + 1}`}
+                            className={inputCls}
+                            value={condition.fieldKey}
+                            onChange={(event) => {
+                              const nextField = audienceFields.find(
+                                (candidate) => candidate.key === event.target.value
+                              )
+                              const conditions = [...campaign.audience.formConditions]
+                              conditions[index] = initialCondition(nextField)
+                              setAudienceValue('formConditions', conditions)
+                            }}
+                          >
+                            {audienceFields.map((candidate) => (
+                              <option key={candidate.key} value={candidate.key}>
+                                {candidate.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={`Operador da condição ${index + 1}`}
+                            className={inputCls}
+                            value={condition.operator}
+                            onChange={(event) => {
+                              const conditions = [...campaign.audience.formConditions]
+                              conditions[index] = {
+                                ...condition,
+                                operator: event.target.value,
+                              }
+                              setAudienceValue('formConditions', conditions)
+                            }}
+                          >
+                            {operators.map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          {needsValue ? (
+                            field?.type === 'checkbox' ? (
+                              <select
+                                aria-label={`Valor da condição ${index + 1}`}
+                                className={inputCls}
+                                value={String(condition.value)}
+                                onChange={(event) => {
+                                  const conditions = [...campaign.audience.formConditions]
+                                  conditions[index] = {
+                                    ...condition,
+                                    value: event.target.value === 'true',
+                                  }
+                                  setAudienceValue('formConditions', conditions)
+                                }}
+                              >
+                                <option value="true">Marcado</option>
+                                <option value="false">Não marcado</option>
+                              </select>
+                            ) : field?.options?.length ? (
+                              <select
+                                aria-label={`Valor da condição ${index + 1}`}
+                                className={inputCls}
+                                value={condition.value ?? ''}
+                                onChange={(event) => {
+                                  const conditions = [...campaign.audience.formConditions]
+                                  conditions[index] = {
+                                    ...condition,
+                                    value: event.target.value,
+                                  }
+                                  setAudienceValue('formConditions', conditions)
+                                }}
+                              >
+                                <option value="">Selecionar…</option>
+                                {field.options.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                aria-label={`Valor da condição ${index + 1}`}
+                                className={inputCls}
+                                type={field?.type === 'number' ? 'number' : 'text'}
+                                value={condition.value ?? ''}
+                                onChange={(event) => {
+                                  const conditions = [...campaign.audience.formConditions]
+                                  conditions[index] = {
+                                    ...condition,
+                                    value:
+                                      field?.type === 'number' && event.target.value !== ''
+                                        ? Number(event.target.value)
+                                        : event.target.value,
+                                  }
+                                  setAudienceValue('formConditions', conditions)
+                                }}
+                              />
+                            )
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            type="button"
+                            className="rounded p-2 text-destructive hover:bg-destructive/10"
+                            aria-label={`Remover condição ${index + 1}`}
+                            onClick={() =>
+                              setAudienceValue(
+                                'formConditions',
+                                campaign.audience.formConditions.filter(
+                                  (_, conditionIndex) => conditionIndex !== index
+                                )
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className={ghostBtn + ' mt-2'}
+                    onClick={() =>
+                      setAudienceValue('formConditions', [
+                        ...(campaign.audience.formConditions ?? []),
+                        initialCondition(audienceFields[0]),
+                      ])
+                    }
+                  >
+                    <Plus className="h-4 w-4" />
+                    Condição
+                  </button>
+                </div>
+              ) : null}
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="button"
@@ -681,22 +1026,93 @@ export default function InviteCommunications({ invite, tickets = [] }) {
                 ))}
               </div>
             </div>
-          </>
+          </fieldset>
         )}
         <div className="flex flex-wrap items-end gap-2 border-t border-border pt-4">
-          <button type="button" className={ghostBtn} disabled={busy} onClick={save}>
-            <Save className="h-4 w-4" />
-            Guardar
-          </button>
-          <button type="button" className={ghostBtn} disabled={busy} onClick={sendTest}>
-            <Send className="h-4 w-4" />
-            Enviar teste
-          </button>
-          <button type="button" className={primaryBtn} disabled={busy} onClick={sendCampaign}>
-            <Send className="h-4 w-4" />
-            Enviar agora
-          </button>
+          {readOnly ? (
+            <>
+              <button type="button" className={primaryBtn} onClick={duplicateAsDraft}>
+                <Copy className="h-4 w-4" />
+                Copiar para novo rascunho
+              </button>
+              {recipients.some((recipient) => recipient.status === 'failed') ? (
+                <button type="button" className={ghostBtn} disabled={busy} onClick={retryFailed}>
+                  <RotateCcw className="h-4 w-4" />
+                  Repetir falhados
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <button type="button" className={ghostBtn} disabled={busy} onClick={save}>
+                <Save className="h-4 w-4" />
+                Guardar rascunho
+              </button>
+              <button type="button" className={ghostBtn} disabled={busy} onClick={sendTest}>
+                <Send className="h-4 w-4" />
+                Enviar teste
+              </button>
+              <button type="button" className={primaryBtn} disabled={busy} onClick={sendCampaign}>
+                <Send className="h-4 w-4" />
+                Enviar agora
+              </button>
+            </>
+          )}
         </div>
+        {validationError ? (
+          <p role="alert" className="m-0 text-sm font-medium text-destructive">
+            {validationError}
+          </p>
+        ) : null}
+        {readOnly ? (
+          <div className="rounded-lg border border-border">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <h4 className="m-0 text-sm font-bold">Resultados por destinatário</h4>
+              <span className="text-xs text-muted-foreground">
+                {loadingRecipients ? 'A carregar…' : `${recipients.length} destinatário(s)`}
+              </span>
+            </div>
+            {!loadingRecipients && recipients.length ? (
+              <div className="max-h-72 overflow-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 bg-muted">
+                    <tr>
+                      <th className="px-3 py-2">Destinatário</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Tentativas</th>
+                      <th className="px-3 py-2">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recipients.map((recipient) => (
+                      <tr key={recipient.id} className="border-t border-border">
+                        <td className="px-3 py-2">
+                          <span className="block font-medium">{recipient.name || 'Sem nome'}</span>
+                          <span className="text-xs text-muted-foreground">{recipient.email}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {recipient.status === 'sent'
+                            ? 'Enviado'
+                            : recipient.status === 'failed'
+                              ? 'Falhou'
+                              : 'Pendente'}
+                        </td>
+                        <td className="px-3 py-2">{recipient.attemptCount}</td>
+                        <td className="max-w-72 px-3 py-2 text-xs text-destructive">
+                          {recipient.error || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : !loadingRecipients ? (
+              <p className="m-0 p-3 text-sm text-muted-foreground">
+                Não existem resultados individuais.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="m-0 flex items-start gap-2 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none" />
           Apenas inscritos com email são incluídos. Esta comunicação é operacional e relativa ao

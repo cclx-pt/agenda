@@ -1351,7 +1351,13 @@ function InviteEditor({ invite, onBack, onSaved }) {
 
       {activeTab === 'checkin' ? <CheckinAdmin invite={invite} /> : null}
 
-      {activeTab === 'comunicacoes' ? <InviteCommunications invite={invite} tickets={tickets} /> : null}
+      {activeTab === 'comunicacoes' ? (
+        <InviteCommunications
+          invite={invite}
+          tickets={tickets}
+          formFields={getFormFields(rsvpBlock?.content || {})}
+        />
+      ) : null}
 
       {activeTab === 'inscricoes' ? (
         <>

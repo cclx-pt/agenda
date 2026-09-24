@@ -43,6 +43,42 @@ const audienceSchema = z.object({
   paymentStates: z.array(z.string().trim().min(1).max(40)).max(20).optional().default([]),
   ticketIds: z.array(z.string().uuid()).max(100).optional().default([]),
   checkedIn: z.boolean().nullable().optional().default(null),
+  formMatch: z.enum(['all', 'any']).optional().default('all'),
+  formConditions: z
+    .array(
+      z.object({
+        fieldKey: z.string().trim().min(1).max(80),
+        operator: z.enum([
+          'equals',
+          'not_equals',
+          'contains',
+          'not_contains',
+          'greater_than',
+          'greater_or_equal',
+          'less_than',
+          'less_or_equal',
+          'empty',
+          'not_empty',
+        ]),
+        value: z.union([z.string().max(500), z.number(), z.boolean()]).optional(),
+      }).superRefine((audience, context) => {
+        for (const [index, condition] of audience.formConditions.entries()) {
+          if (
+            !['empty', 'not_empty'].includes(condition.operator) &&
+            (condition.value === undefined || condition.value === '')
+          ) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['formConditions', index, 'value'],
+              message: 'Indique o valor do filtro do formulário.',
+            })
+          }
+        }
+      })
+    )
+    .max(20)
+    .optional()
+    .default([]),
 })
 
 const campaignSchema = z.object({
@@ -91,6 +127,7 @@ export function resolveAudience(guests, audience = {}) {
   const rsvpStates = new Set(audience.rsvpStates ?? [])
   const paymentStates = new Set(audience.paymentStates ?? [])
   const ticketIds = new Set(audience.ticketIds ?? [])
+  const formConditions = audience.formConditions ?? []
   const byEmail = new Map()
 
   for (const guest of guests) {
@@ -103,6 +140,12 @@ export function resolveAudience(guests, audience = {}) {
     if (ticketIds.size && !ticketIds.has(guest.ticketId)) continue
     if (audience.checkedIn === true && !guest.checkedInAt) continue
     if (audience.checkedIn === false && guest.checkedInAt) continue
+    if (formConditions.length) {
+      const matches = formConditions.map((condition) =>
+        matchesFormCondition(guest.extra?.[condition.fieldKey], condition)
+      )
+      if (audience.formMatch === 'any' ? !matches.some(Boolean) : !matches.every(Boolean)) continue
+    }
     if (!byEmail.has(email)) {
       byEmail.set(email, {
         guestId: guest.id,
@@ -115,11 +158,70 @@ export function resolveAudience(guests, audience = {}) {
   return [...byEmail.values()]
 }
 
+function isEmptyAnswer(value) {
+  return value == null || value === '' || (Array.isArray(value) && value.length === 0)
+}
+
+export function matchesFormCondition(answer, condition) {
+  const expected = condition.value
+  if (condition.operator === 'empty') return isEmptyAnswer(answer)
+  if (condition.operator === 'not_empty') return !isEmptyAnswer(answer)
+
+  const values = Array.isArray(answer) ? answer : [answer]
+  const normalizedExpected = String(expected ?? '').trim().toLocaleLowerCase('pt-PT')
+  const normalizedValues = values.map((value) =>
+    String(value ?? '').trim().toLocaleLowerCase('pt-PT')
+  )
+
+  if (condition.operator === 'equals') return normalizedValues.includes(normalizedExpected)
+  if (condition.operator === 'not_equals') return !normalizedValues.includes(normalizedExpected)
+  if (condition.operator === 'contains') {
+    return normalizedValues.some((value) => value.includes(normalizedExpected))
+  }
+  if (condition.operator === 'not_contains') {
+    return normalizedValues.every((value) => !value.includes(normalizedExpected))
+  }
+
+  const actualNumber = Number(answer)
+  const expectedNumber = Number(expected)
+  if (!Number.isFinite(actualNumber) || !Number.isFinite(expectedNumber)) return false
+  if (condition.operator === 'greater_than') return actualNumber > expectedNumber
+  if (condition.operator === 'greater_or_equal') return actualNumber >= expectedNumber
+  if (condition.operator === 'less_than') return actualNumber < expectedNumber
+  if (condition.operator === 'less_or_equal') return actualNumber <= expectedNumber
+  return false
+}
+
 async function audienceFor(inviteId, audience) {
   return resolveAudience(
     await invitesRepo.listGuests(inviteId),
     audienceSchema.parse(audience ?? {})
   )
+}
+
+async function assertCurrentFormFields(inviteId, audience) {
+  if (!audience.formConditions.length) return
+  const blocks = await invitesRepo.listBlocks(inviteId)
+  const fields = blocks.find((block) => block.type === 'rsvp')?.content?.fields ?? []
+  const availableKeys = new Set(
+    fields
+      .filter(
+        (field) =>
+          field?.key &&
+          !['section', 'document', 'children'].includes(field.type) &&
+          !['name', 'email', 'phone'].includes(field.key)
+      )
+      .map((field) => field.key)
+  )
+  const invalid = audience.formConditions.find(
+    (condition) => !availableKeys.has(condition.fieldKey)
+  )
+  if (invalid) {
+    throw new InviteError(
+      400,
+      'Um dos campos usados para filtrar a audiência já não existe no formulário.'
+    )
+  }
 }
 
 export async function list(user, inviteId) {
@@ -131,14 +233,23 @@ export async function find(user, inviteId, campaignId) {
   return (await getCampaign(user, inviteId, campaignId)).campaign
 }
 
+export async function listRecipients(user, inviteId, campaignId) {
+  await getCampaign(user, inviteId, campaignId)
+  return campaignsRepo.listRecipients(campaignId)
+}
+
 export async function create(user, inviteId, input) {
   await getInvite(user, inviteId)
-  return campaignsRepo.insert(inviteId, campaignSchema.parse(input), user.id)
+  const campaign = campaignSchema.parse(input)
+  await assertCurrentFormFields(inviteId, campaign.audience)
+  return campaignsRepo.insert(inviteId, campaign, user.id)
 }
 
 export async function update(user, inviteId, campaignId, input) {
   await getCampaign(user, inviteId, campaignId)
-  const campaign = await campaignsRepo.updateDraft(campaignId, campaignSchema.parse(input))
+  const inputCampaign = campaignSchema.parse(input)
+  await assertCurrentFormFields(inviteId, inputCampaign.audience)
+  const campaign = await campaignsRepo.updateDraft(campaignId, inputCampaign)
   if (!campaign) throw new InviteError(409, 'Apenas rascunhos podem ser alterados.')
   return campaign
 }
@@ -152,7 +263,9 @@ export async function remove(user, inviteId, campaignId) {
 
 export async function previewAudience(user, inviteId, input) {
   await getInvite(user, inviteId)
-  const recipients = await audienceFor(inviteId, input)
+  const audience = audienceSchema.parse(input ?? {})
+  await assertCurrentFormFields(inviteId, audience)
+  const recipients = resolveAudience(await invitesRepo.listGuests(inviteId), audience)
   return { count: recipients.length }
 }
 
@@ -187,8 +300,11 @@ export async function send(user, inviteId, campaignId) {
   if (!claimed) throw new InviteError(409, 'Esta comunicação já foi ou está a ser enviada.')
 
   const recipients = await campaignsRepo.insertRecipients(campaignId, audience)
-  let sentCount = 0
-  let failedCount = 0
+  await deliverRecipients(invite, campaign, recipients)
+  return campaignsRepo.finishFromRecipients(campaignId)
+}
+
+async function deliverRecipients(invite, campaign, recipients) {
   for (const recipient of recipients) {
     try {
       await sendInviteCampaignEmail(recipient.email, {
@@ -200,20 +316,24 @@ export async function send(user, inviteId, campaignId) {
         eventLink: guestLink(invite, recipient.guestToken),
       })
       await campaignsRepo.markRecipient(recipient.id, 'sent')
-      sentCount += 1
     } catch (error) {
       await campaignsRepo.markRecipient(
         recipient.id,
         'failed',
         String(error?.message ?? error).slice(0, 1000)
       )
-      failedCount += 1
     }
   }
-  return campaignsRepo.finish(campaignId, {
-    recipientCount: recipients.length,
-    sentCount,
-    failedCount,
-    skippedCount: 0,
-  })
+}
+
+export async function retryFailed(user, inviteId, campaignId) {
+  const { invite, campaign } = await getCampaign(user, inviteId, campaignId)
+  const claimed = await campaignsRepo.claimForRetry(campaignId)
+  if (!claimed) throw new InviteError(409, 'Esta comunicação não tem envios falhados para repetir.')
+  const recipients = await campaignsRepo.claimFailedRecipients(campaignId)
+  if (recipients.length === 0) {
+    return campaignsRepo.finishFromRecipients(campaignId)
+  }
+  await deliverRecipients(invite, campaign, recipients)
+  return campaignsRepo.finishFromRecipients(campaignId)
 }
