@@ -9,6 +9,11 @@ import { RichText } from './RichText'
 
 const cardCls = 'rounded-2xl border border-border bg-card p-6 shadow-sm'
 
+function contentLinkUrl(value) {
+  const url = String(value || '').trim()
+  return /^(https?:\/\/|\/(?!\/)|mailto:|tel:)/i.test(url) ? url : ''
+}
+
 // ── Cartões ──────────────────────────────────────────────────────
 
 function BannerCard({ block, page, accent, children, showInformation = false }) {
@@ -76,6 +81,54 @@ function OverviewCard({ block }) {
           value={c.body}
           className="m-0 leading-relaxed text-foreground [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:m-0 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
         />
+      ) : null}
+    </div>
+  )
+}
+
+function OverviewPlusCard({ block, accent }) {
+  const c = block.content || {}
+  const buttons = (Array.isArray(c.buttons) ? c.buttons : [])
+    .map((button) => ({ ...button, safeUrl: contentLinkUrl(button?.url) }))
+    .filter((button) => button?.label?.trim() && button.safeUrl)
+  return (
+    <div className={`${cardCls} overflow-hidden`}>
+      {c.imageUrl ? (
+        <img
+          src={c.imageUrl}
+          alt={c.imageAlt || ''}
+          className="-mx-6 -mt-6 mb-6 aspect-[16/9] w-[calc(100%+3rem)] object-cover"
+        />
+      ) : null}
+      <h2 className="m-0 mb-3 inline-flex items-center gap-2 text-xl font-bold text-foreground">
+        {c.showIcon !== false ? <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+        {c.title || 'Sobre o evento'}
+      </h2>
+      {c.body ? (
+        <RichText
+          value={c.body}
+          className="m-0 leading-relaxed text-foreground [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:m-0 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+        />
+      ) : null}
+      {buttons.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {buttons.map((button, index) => {
+            const external = /^https?:\/\//i.test(button.safeUrl)
+            return (
+              <a
+                key={`${button.label}-${index}`}
+                href={button.safeUrl}
+                target={external ? '_blank' : undefined}
+                rel={external ? 'noreferrer' : undefined}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: accent }}
+              >
+                {button.label}
+                <LinkIcon className="h-4 w-4" aria-hidden="true" />
+              </a>
+            )
+          })}
+        </div>
       ) : null}
     </div>
   )
@@ -716,6 +769,7 @@ function FooterCard({ block, page }) {
 export {
   BannerCard,
   OverviewCard,
+  OverviewPlusCard,
   MultimediaCard,
   InfoExtraCard,
   NarrativeCard,

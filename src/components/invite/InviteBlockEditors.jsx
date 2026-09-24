@@ -214,6 +214,68 @@ function OverviewEditor({ content, onChange }) {
   )
 }
 
+function OverviewPlusEditor({ content, onChange }) {
+  const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
+  return (
+    <div className="flex flex-col gap-3">
+      <label className={labelCls}>
+        Título
+        <input className={inputCls} value={content.title ?? ''} onChange={set('title')} placeholder="Sobre o evento" />
+      </label>
+      <div className={labelCls}>
+        <span>Descrição</span>
+        <RichTextEditor
+          value={content.body ?? ''}
+          onChange={(html) => onChange({ ...content, body: html })}
+          minRows={5}
+          placeholder="Adiciona mais detalhes sobre o evento e o que os participantes podem esperar."
+        />
+      </div>
+      <ImageUploadField
+        value={content.imageUrl ?? ''}
+        onChange={(imageUrl) => onChange({ ...content, imageUrl })}
+        label="Imagem"
+        hint="Apresentada acima da descrição."
+      />
+      <label className={labelCls}>
+        Texto alternativo da imagem
+        <input
+          className={inputCls}
+          value={content.imageAlt ?? ''}
+          onChange={set('imageAlt')}
+          placeholder="Descreve a imagem para leitores de ecrã"
+        />
+      </label>
+      <div className={labelCls}>
+        <span>Botões</span>
+        <RowsEditor
+          rows={content.buttons}
+          onChange={(buttons) => onChange({ ...content, buttons })}
+          emptyRow={{ label: '', url: '' }}
+          addLabel="Adicionar botão"
+          render={(row, update) => (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                className={inputCls}
+                value={row.label ?? ''}
+                onChange={(e) => update({ label: e.target.value })}
+                placeholder="Texto do botão"
+              />
+              <input
+                className={inputCls}
+                type="text"
+                value={row.url ?? ''}
+                onChange={(e) => update({ url: e.target.value })}
+                placeholder="https://... ou /pagina"
+              />
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  )
+}
+
 function InfoExtraEditor({ content, onChange }) {
   const set = (k) => (e) => onChange({ ...content, [k]: e.target.value })
   return (
@@ -797,6 +859,7 @@ function MultimediaEditor({ content, onChange }) {
 const EDITORS = {
   banner: BannerEditor,
   overview: OverviewEditor,
+  overview_plus: OverviewPlusEditor,
   info_extra: InfoExtraEditor,
   convite_narrativo: NarrativeEditor,
   multimedia: MultimediaEditor,
@@ -813,7 +876,7 @@ const EDITORS = {
 }
 
 const ICON_TOGGLE_TYPES = new Set([
-  'overview', 'info_extra', 'convite_narrativo', 'multimedia', 'good_to_know',
+  'overview', 'overview_plus', 'info_extra', 'convite_narrativo', 'multimedia', 'good_to_know',
   'oradores', 'agenda', 'workshops', 'rsvp', 'tickets', 'pagamento', 'localizacao', 'faqs', 'partilha',
 ])
 

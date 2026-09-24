@@ -11,6 +11,7 @@ import {
   LocationCard,
   MultimediaCard,
   OverviewCard,
+  OverviewPlusCard,
   PaymentCard,
   SpeakersCard,
   WorkshopsCard,
@@ -39,6 +40,55 @@ describe('InviteBlockEditors uploads', () => {
     await waitFor(() => expect(uploadEventImage).toHaveBeenCalledWith(file))
     expect(uploadMultimediaVideo).not.toHaveBeenCalled()
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ logoUrl: 'https://storage.example/footer.png' }))
+  })
+
+  it('edits and displays description plus images and buttons', async () => {
+    uploadEventImage.mockResolvedValue('https://storage.example/description-plus.png')
+    const onChange = vi.fn()
+    const content = {
+      title: 'Sobre o encontro',
+      body: '<p>Uma experiência especial.</p>',
+      buttons: [{ label: 'Programa', url: '/programa' }],
+    }
+    const { container, unmount } = render(
+      <BlockEditor type="overview_plus" content={content} onChange={onChange} />,
+    )
+    const file = new File(['image'], 'description-plus.png', { type: 'image/png' })
+
+    await userEvent.upload(container.querySelector('input[type="file"]'), file)
+
+    await waitFor(() => expect(uploadEventImage).toHaveBeenCalledWith(file))
+    expect(onChange).toHaveBeenCalledWith({
+      ...content,
+      imageUrl: 'https://storage.example/description-plus.png',
+    })
+    unmount()
+
+    render(
+      <OverviewPlusCard
+        block={{
+          content: {
+            ...content,
+            imageUrl: 'https://storage.example/description-plus.png',
+            imageAlt: 'Pessoas reunidas',
+            buttons: [
+              { label: 'Programa', url: '/programa' },
+              { label: 'Website', url: 'https://example.com' },
+              { label: 'Link inseguro', url: 'javascript:alert(1)' },
+            ],
+          },
+        }}
+        accent="#1F3864"
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: 'Pessoas reunidas' })).toHaveAttribute(
+      'src',
+      'https://storage.example/description-plus.png',
+    )
+    expect(screen.getByRole('link', { name: /Programa/i })).not.toHaveAttribute('target')
+    expect(screen.getByRole('link', { name: /Website/i })).toHaveAttribute('target', '_blank')
+    expect(screen.queryByRole('link', { name: /Link inseguro/i })).not.toBeInTheDocument()
   })
 
   it('uses the direct video uploader for multimedia MP4 files', async () => {

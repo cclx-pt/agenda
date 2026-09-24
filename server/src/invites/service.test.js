@@ -11,3 +11,18 @@ test('landing-page blocks accept the tickets type', () => {
 
   assert.deepEqual(blocksSchema.parse(blocks), blocks)
 })
+
+test('landing-page blocks accept the overview plus type', () => {
+  const blocks = [{
+    type: 'overview_plus',
+    content: {
+      title: 'Sobre o evento',
+      body: '<p>Descrição</p>',
+      imageUrl: 'https://example.com/event.jpg',
+      buttons: [{ label: 'Saber mais', url: '/programa' }],
+    },
+    visible: true,
+  }]
+
+  assert.deepEqual(blocksSchema.parse(blocks), blocks)
+})

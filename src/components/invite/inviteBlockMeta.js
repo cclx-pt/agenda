@@ -5,6 +5,7 @@
 export const BLOCK_META = {
   banner: { label: 'Cabeçalho / Banner', addable: false },
   overview: { label: 'Descrição (Overview)', addable: true },
+  overview_plus: { label: 'Descrição + (imagem e botões)', addable: true },
   info_extra: { label: 'Informação', addable: true },
   convite_narrativo: { label: 'Convite (narrativa + vídeo)', addable: true },
   multimedia: { label: 'Multimédia', addable: true },
@@ -30,6 +31,15 @@ export function defaultContent(type) {
   switch (type) {
     case 'overview':
       return { title: 'Sobre o evento', body: '', showIcon: true }
+    case 'overview_plus':
+      return {
+        title: 'Sobre o evento',
+        body: '',
+        imageUrl: '',
+        imageAlt: '',
+        buttons: [],
+        showIcon: true,
+      }
     case 'info_extra':
       return { title: '', body: '', showIcon: true }
     case 'convite_narrativo':

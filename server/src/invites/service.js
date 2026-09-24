@@ -118,6 +118,7 @@ const BLOCK_TYPES = [
   'cabecalho',
   'banner',
   'overview',
+  'overview_plus',
   'info_extra',
   'convite_narrativo',
   'multimedia',
