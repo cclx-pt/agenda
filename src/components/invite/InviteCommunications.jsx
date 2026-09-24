@@ -314,12 +314,20 @@ function BlockEditor({ block, onChange, onRemove }) {
 
 function CampaignPreview({ campaign, invite }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-5 text-gray-900 shadow-sm">
-      <p className="mb-4">Olá,</p>
-      {campaign.blocks.map((block, index) => {
+    <div className="rounded-lg bg-gray-100 p-3 sm:p-6">
+      <div className="mx-auto max-w-[600px] overflow-hidden bg-white text-gray-900 shadow-sm">
+        <div className="bg-[#1f3864] px-5 py-6 text-white sm:px-8">
+          <p className="m-0 text-xs font-bold uppercase tracking-widest text-blue-100">
+            Agenda CCLX
+          </p>
+          <h4 className="mb-0 mt-1 text-2xl font-bold text-white">{invite.title}</h4>
+        </div>
+        <div className="p-5 sm:p-8">
+          <p className="mb-5 mt-0">Olá,</p>
+          {campaign.blocks.map((block, index) => {
         if (block.type === 'text')
           return (
-            <p key={index} className="mb-4 whitespace-pre-line leading-relaxed">
+            <p key={index} className="mb-5 whitespace-pre-line leading-relaxed">
               {block.text || 'Texto da mensagem'}
             </p>
           )
@@ -377,8 +385,17 @@ function CampaignPreview({ campaign, invite }) {
             </div>
           )
         return null
-      })}
-      <p className="mt-5 text-sm font-bold text-[#1f3864]">Ver {invite.title}</p>
+          })}
+          <p className="mb-0 mt-2 inline-block border border-[#1f3864] px-5 py-3 text-sm font-bold text-[#1f3864]">
+            Ver {invite.title}
+          </p>
+        </div>
+        <div className="border-t border-gray-200 bg-gray-50 px-5 py-4 text-xs text-gray-500 sm:px-8">
+          Comunicação operacional relativa à sua inscrição.
+          <br />
+          Agenda CCLX
+        </div>
+      </div>
     </div>
   )
 }

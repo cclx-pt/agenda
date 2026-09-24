@@ -89,26 +89,30 @@ export function renderTicketPaymentMethods(ticket) {
   }
 }
 
+function emailText(value) {
+  return escapeHtml(value).replace(/\r?\n/g, '<br />')
+}
+
 function campaignBlockHtml(block) {
   if (block.type === 'text') {
-    return `<p style="margin:0 0 16px;color:#374151;line-height:1.65;white-space:pre-line">${escapeHtml(block.text)}</p>`
+    return `<tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:26px;color:#374151">${emailText(block.text)}</td></tr>`
   }
   if (block.type === 'image') {
-    return `<img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt)}" style="display:block;width:100%;max-width:560px;height:auto;margin:0 0 18px;border-radius:8px" />`
+    return `<tr><td style="padding:0 0 22px"><img src="${escapeHtml(block.url)}" width="536" alt="${escapeHtml(block.alt)}" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px;line-height:100%;outline:none;text-decoration:none" /></td></tr>`
   }
   if (block.type === 'video') {
-    return `<p style="margin:0 0 18px"><a href="${escapeHtml(block.url)}" style="color:#1f3864;font-weight:700">Ver vídeo: ${escapeHtml(block.title || block.url)}</a></p>`
+    return `<tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:24px"><a href="${escapeHtml(block.url)}" style="color:#1f3864;font-weight:700;text-decoration:underline">Ver vídeo: ${escapeHtml(block.title || block.url)}</a></td></tr>`
   }
   if (block.type === 'button') {
-    return `<p style="margin:20px 0"><a href="${escapeHtml(block.url)}" style="display:inline-block;background:#1f3864;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700">${escapeHtml(block.label)}</a></p>`
+    return `<tr><td align="left" style="padding:2px 0 24px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td bgcolor="#1f3864" style="border-radius:6px"><a href="${escapeHtml(block.url)}" style="display:inline-block;padding:13px 22px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border:1px solid #1f3864;border-radius:6px">${escapeHtml(block.label)}</a></td></tr></table></td></tr>`
   }
   if (block.type === 'warning') {
-    return `<div style="margin:0 0 18px;padding:14px;background:#fef3c7;border-left:4px solid #d97706;color:#78350f"><strong>Aviso</strong><br />${escapeHtml(block.text)}</div>`
+    return `<tr><td style="padding:0 0 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td width="4" bgcolor="#d97706" style="width:4px;font-size:0;line-height:0">&nbsp;</td><td bgcolor="#fef3c7" style="padding:14px 16px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:15px;line-height:23px;color:#78350f"><strong style="color:#78350f">Aviso</strong><br />${emailText(block.text)}</td></tr></table></td></tr>`
   }
   if (block.type === 'workshops') {
-    return `<div style="margin:0 0 18px"><h3 style="margin:0 0 10px;color:#1f2937">Workshops</h3>${block.items
-      .map((item) => `<div style="padding:10px 0;border-top:1px solid #e5e7eb"><strong>${escapeHtml(item.title)}</strong>${item.description ? `<p style="margin:4px 0 0;color:#4b5563">${escapeHtml(item.description)}</p>` : ''}</div>`)
-      .join('')}</div>`
+    return `<tr><td style="padding:0 0 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td style="padding:0 0 8px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:20px;line-height:26px;font-weight:700;color:#1f2937">Workshops</td></tr>${block.items
+      .map((item) => `<tr><td style="padding:12px 0;border-top:1px solid #e5e7eb;font-family:Arial,'Helvetica Neue',sans-serif;font-size:15px;line-height:22px;color:#111827"><strong>${escapeHtml(item.title)}</strong>${item.description ? `<br /><span style="color:#4b5563">${emailText(item.description)}</span>` : ''}</td></tr>`)
+      .join('')}</table></td></tr>`
   }
   return ''
 }
@@ -125,14 +129,70 @@ export function renderInviteCampaignEmail({ recipientName, eventTitle, subject, 
     return ''
   }).filter(Boolean)
   const text = `${greeting}\n\n${textBlocks.join('\n\n')}\n\nVer convite: ${eventLink}\n\nAgenda CCLX`
-  const html = `
-    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
-      ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</div>` : ''}
-      <p style="margin:0 0 16px">${escapeHtml(greeting)}</p>
-      ${content.map(campaignBlockHtml).join('')}
-      <p style="margin:24px 0 8px"><a href="${escapeHtml(eventLink)}" style="color:#1f3864;font-weight:700">Ver ${escapeHtml(eventTitle || 'convite')}</a></p>
-      <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">Comunicação operacional relativa à sua inscrição · Agenda CCLX</p>
-    </div>`
+  const html = `<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <title>${escapeHtml(subject)}</title>
+  <style>
+    body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+    table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+    table { border-collapse:collapse !important; }
+    img { -ms-interpolation-mode:bicubic; }
+    @media screen and (max-width:620px) {
+      .email-shell { width:100% !important; }
+      .email-content { padding:24px 20px !important; }
+      .email-header { padding:22px 20px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6">
+  ${preheader ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all">${escapeHtml(preheader)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>` : ''}
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f3f4f6" style="width:100%;background-color:#f3f4f6">
+    <tr>
+      <td align="center" style="padding:24px 12px">
+        <!--[if mso]><table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" class="email-shell" style="width:100%;max-width:600px;background-color:#ffffff">
+          <tr>
+            <td bgcolor="#1f3864" class="email-header" style="padding:24px 32px;font-family:Arial,'Helvetica Neue',sans-serif;color:#ffffff">
+              <div style="font-size:12px;line-height:16px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#dbeafe">Agenda CCLX</div>
+              <div style="padding-top:6px;font-size:24px;line-height:30px;font-weight:700;color:#ffffff">${escapeHtml(eventTitle || 'Comunicação do evento')}</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="email-content" style="padding:32px;font-family:Arial,'Helvetica Neue',sans-serif;color:#111827">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:24px;color:#111827">${escapeHtml(greeting)}</td></tr>
+                ${content.map(campaignBlockHtml).join('')}
+                <tr>
+                  <td align="left" style="padding:4px 0 8px">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td bgcolor="#ffffff" style="border:1px solid #1f3864;border-radius:6px">
+                          <a href="${escapeHtml(eventLink)}" style="display:inline-block;padding:12px 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#1f3864;text-decoration:none;border-radius:6px">Ver ${escapeHtml(eventTitle || 'convite')}</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#f9fafb" style="padding:18px 32px;border-top:1px solid #e5e7eb;font-family:Arial,'Helvetica Neue',sans-serif;font-size:12px;line-height:18px;color:#6b7280">
+              Comunicação operacional relativa à sua inscrição.<br />
+              Agenda CCLX
+            </td>
+          </tr>
+        </table>
+        <!--[if mso]></td></tr></table><![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
   return { subject, text, html }
 }
 

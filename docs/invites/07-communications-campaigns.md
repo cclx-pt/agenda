@@ -136,6 +136,10 @@ snapshot, estado individual, erro e data de envio. Uma campanha já enviada nunc
 
 - O transporte atual por Nodemailer é suficiente para a Fase 1 e volumes baixos,
   mas não deve ser tratado como plataforma de bulk marketing.
+- O HTML das campanhas usa uma estrutura tabelada, estilos inline, documento
+  UTF-8 completo e media query simples para manter o layout no Gmail Web,
+  Gmail móvel e Outlook. A pré-visualização do editor segue a mesma hierarquia
+  visual do email entregue.
 - O envio é idempotente: apenas uma campanha em rascunho pode transitar para
   `sending`; reenvios acidentais são rejeitados.
 - Conteúdo livre é escapado no servidor. Vídeo é apresentado como link porque a

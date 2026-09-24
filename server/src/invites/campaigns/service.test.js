@@ -112,3 +112,27 @@ test('renderInviteCampaignEmail escapes authored content', () => {
   assert.match(message.html, /&lt;Admin&gt;/)
   assert.match(message.html, /&lt;img src=x onerror=alert\(1\)&gt;/)
 })
+
+test('renderInviteCampaignEmail uses a responsive table layout for email clients', () => {
+  const message = renderInviteCampaignEmail({
+    recipientName: 'Ana',
+    eventTitle: 'Conferência',
+    subject: 'Informações',
+    preheader: 'Resumo da mensagem',
+    blocks: [
+      { type: 'text', text: 'Primeira linha\nSegunda linha' },
+      { type: 'warning', text: 'Chegar cedo.' },
+      { type: 'button', label: 'Abrir inscrição', url: 'https://example.test/register' },
+    ],
+    eventLink: 'https://example.test/invite',
+  })
+
+  assert.match(message.html, /^<!doctype html>/)
+  assert.match(message.html, /<meta charset="utf-8"/)
+  assert.match(message.html, /role="presentation"/)
+  assert.match(message.html, /width="600"/)
+  assert.match(message.html, /class="email-content"/)
+  assert.match(message.html, /Primeira linha<br \/>Segunda linha/)
+  assert.match(message.html, /mso-table-lspace:0pt/)
+  assert.doesNotMatch(message.html, /white-space:pre-line/)
+})
