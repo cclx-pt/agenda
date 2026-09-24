@@ -32,6 +32,7 @@ const TYPES = {
 }
 const STATUS = {
   draft: 'Rascunho',
+  queued: 'Em fila',
   sending: 'A enviar',
   sent: 'Enviada',
   sent_with_errors: 'Enviada com falhas',
@@ -148,7 +149,7 @@ function statusClasses(status) {
   if (status === 'sent') return 'bg-emerald-100 text-emerald-800'
   if (status === 'sent_with_errors') return 'bg-amber-100 text-amber-800'
   if (status === 'failed') return 'bg-red-100 text-red-800'
-  if (status === 'sending') return 'bg-sky-100 text-sky-800'
+  if (status === 'queued' || status === 'sending') return 'bg-sky-100 text-sky-800'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -407,6 +408,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   }, [load])
 
   const readOnly = campaignStatus !== 'draft'
+  const processing = campaignStatus === 'queued' || campaignStatus === 'sending'
   const audienceFields = formFields.filter(
     (field) =>
       field?.key &&
@@ -435,7 +437,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       audience: { ...current.audience, [key]: value },
     }))
   }
-  const loadRecipients = async (selectedId) => {
+  const loadRecipients = useCallback(async (selectedId) => {
     setLoadingRecipients(true)
     try {
       setRecipients(await invitesService.listInviteCampaignRecipients(invite.id, selectedId))
@@ -446,7 +448,25 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     } finally {
       setLoadingRecipients(false)
     }
-  }
+  }, [invite.id])
+
+  useEffect(() => {
+    if (!campaigns.some((item) => ['queued', 'sending'].includes(item.status))) return undefined
+    const interval = window.setInterval(async () => {
+      try {
+        const nextCampaigns = await invitesService.listInviteCampaigns(invite.id)
+        setCampaigns(nextCampaigns)
+        const selected = nextCampaigns.find((item) => item.id === campaignId)
+        if (selected) {
+          setCampaignStatus(selected.status)
+          await loadRecipients(selected.id)
+        }
+      } catch (error) {
+        toast.error(error.message)
+      }
+    }, 2500)
+    return () => window.clearInterval(interval)
+  }, [campaignId, campaigns, invite.id, loadRecipients])
   const selectCampaign = (selected) => {
     setCampaignId(selected.id)
     setCampaignStatus(selected.status)
@@ -557,12 +577,11 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       return
     setBusy(true)
     try {
-      const sent = await invitesService.sendInviteCampaign(invite.id, saved.id)
-      toast.success(
-        `Comunicação concluída: ${sent.sentCount} enviada(s), ${sent.failedCount} falhada(s).`
-      )
-      reset()
-      await load()
+      const queued = await invitesService.sendInviteCampaign(invite.id, saved.id)
+      setCampaignStatus(queued.status)
+      setPreview(true)
+      toast.success(`Comunicação colocada em fila para ${result.count} destinatário(s).`)
+      await Promise.all([load(), loadRecipients(saved.id)])
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -586,9 +605,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       const retried = await invitesService.retryFailedInviteCampaign(invite.id, campaignId)
       setCampaignStatus(retried.status)
       await Promise.all([load(), loadRecipients(campaignId)])
-      toast.success(
-        `Repetição concluída: ${retried.sentCount} enviada(s), ${retried.failedCount} falhada(s).`
-      )
+      toast.success('Os envios falhados foram colocados novamente em fila.')
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -627,7 +644,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                     {STATUS[item.status]}
                   </span>
                   <span>
-                    {['sent', 'sent_with_errors', 'failed'].includes(item.status)
+                    {item.status !== 'draft'
                       ? `${item.sentCount}/${item.recipientCount}`
                       : TYPES[item.type]}
                   </span>
@@ -1072,6 +1089,33 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 {loadingRecipients ? 'A carregar…' : `${recipients.length} destinatário(s)`}
               </span>
             </div>
+            {processing && recipients.length ? (
+              <div className="border-b border-border px-3 py-3">
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>{campaignStatus === 'queued' ? 'A aguardar processamento' : 'A enviar'}</span>
+                  <span>
+                    {recipients.filter((recipient) =>
+                      ['sent', 'failed', 'skipped'].includes(recipient.status)
+                    ).length}
+                    /{recipients.length}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${
+                        (recipients.filter((recipient) =>
+                          ['sent', 'failed', 'skipped'].includes(recipient.status)
+                        ).length /
+                          recipients.length) *
+                        100
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
             {!loadingRecipients && recipients.length ? (
               <div className="max-h-72 overflow-auto">
                 <table className="w-full text-left text-sm">
@@ -1095,7 +1139,9 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                             ? 'Enviado'
                             : recipient.status === 'failed'
                               ? 'Falhou'
-                              : 'Pendente'}
+                              : recipient.status === 'processing'
+                                ? 'A enviar'
+                                : 'Em fila'}
                         </td>
                         <td className="px-3 py-2">{recipient.attemptCount}</td>
                         <td className="max-w-72 px-3 py-2 text-xs text-destructive">

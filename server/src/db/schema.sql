@@ -499,12 +499,16 @@ CREATE TABLE IF NOT EXISTS invite_campaigns (
   blocks          JSONB NOT NULL DEFAULT '[]'::jsonb,
   audience        JSONB NOT NULL DEFAULT '{}'::jsonb,
   status          TEXT NOT NULL DEFAULT 'draft'
-                    CHECK (status IN ('draft', 'sending', 'sent', 'sent_with_errors', 'failed')),
+                    CHECK (status IN ('draft', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed')),
   recipient_count INTEGER NOT NULL DEFAULT 0,
   sent_count      INTEGER NOT NULL DEFAULT 0,
   failed_count    INTEGER NOT NULL DEFAULT 0,
   skipped_count   INTEGER NOT NULL DEFAULT 0,
   created_by      UUID REFERENCES users (id) ON DELETE SET NULL,
+  queued_at       TIMESTAMPTZ,
+  processing_started_at TIMESTAMPTZ,
+  lease_expires_at TIMESTAMPTZ,
+  lease_token     TEXT,
   sent_at         TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -522,9 +526,11 @@ CREATE TABLE IF NOT EXISTS invite_campaign_recipients (
   email          TEXT NOT NULL,
   guest_token    TEXT,
   status         TEXT NOT NULL DEFAULT 'pending'
-                   CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+                   CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped')),
   error          TEXT,
   attempt_count  INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_attempt_at TIMESTAMPTZ,
   sent_at        TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (campaign_id, email)
@@ -669,9 +675,23 @@ ALTER TABLE invite_guests ADD CONSTRAINT invite_guests_payment_state_check
 -- Resultados parciais e número de tentativas das comunicações.
 ALTER TABLE invite_campaigns DROP CONSTRAINT IF EXISTS invite_campaigns_status_check;
 ALTER TABLE invite_campaigns ADD CONSTRAINT invite_campaigns_status_check
-  CHECK (status IN ('draft', 'sending', 'sent', 'sent_with_errors', 'failed'));
+  CHECK (status IN ('draft', 'queued', 'sending', 'sent', 'sent_with_errors', 'failed'));
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS queued_at TIMESTAMPTZ;
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE invite_campaigns ADD COLUMN IF NOT EXISTS lease_token TEXT;
 ALTER TABLE invite_campaign_recipients
   ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE invite_campaign_recipients
+  ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE invite_campaign_recipients
+  ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
+ALTER TABLE invite_campaign_recipients DROP CONSTRAINT IF EXISTS invite_campaign_recipients_status_check;
+ALTER TABLE invite_campaign_recipients ADD CONSTRAINT invite_campaign_recipients_status_check
+  CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped'));
+CREATE INDEX IF NOT EXISTS idx_invite_campaign_recipients_due
+  ON invite_campaign_recipients (campaign_id, next_attempt_at)
+  WHERE status = 'pending';
 
 -- Data limite de reembolso por bilhete (self-service): o convidado só pode pedir
 -- reembolso de um bilhete pago enquanto hoje <= refund_deadline. NULL = sem reembolso.

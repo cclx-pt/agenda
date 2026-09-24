@@ -151,4 +151,54 @@ describe('InviteCommunications', () => {
       ),
     )
   })
+
+  it('queues a campaign and keeps its progress visible', async () => {
+    invitesService.listInviteCampaigns.mockResolvedValue([])
+    invitesService.previewInviteCampaignAudience.mockResolvedValue({ count: 2 })
+    invitesService.createInviteCampaign.mockImplementation(async (_inviteId, campaign) => ({
+      ...campaign,
+      id: 'campaign-new',
+      status: 'draft',
+    }))
+    invitesService.sendInviteCampaign.mockResolvedValue({
+      ...sentCampaign,
+      id: 'campaign-new',
+      status: 'queued',
+      recipientCount: 2,
+      sentCount: 0,
+    })
+    invitesService.listInviteCampaignRecipients.mockResolvedValue([
+      {
+        id: 'recipient-1',
+        name: 'Ana',
+        email: 'ana@example.test',
+        status: 'pending',
+        attemptCount: 0,
+      },
+      {
+        id: 'recipient-2',
+        name: 'Bruno',
+        email: 'bruno@example.test',
+        status: 'pending',
+        attemptCount: 0,
+      },
+    ])
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    await userEvent.type(screen.getByLabelText('Nome interno'), 'Aviso')
+    await userEvent.type(screen.getByLabelText('Assunto'), 'Informação')
+    await userEvent.type(screen.getByPlaceholderText('Escreva a mensagem…'), 'Mensagem')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar agora' }))
+
+    await waitFor(() =>
+      expect(invitesService.sendInviteCampaign).toHaveBeenCalledWith(
+        'invite-1',
+        'campaign-new',
+      ),
+    )
+    expect(screen.getByRole('heading', { name: 'Resultados da comunicação' })).toBeInTheDocument()
+    expect(await screen.findByText('A aguardar processamento')).toBeInTheDocument()
+  })
 })

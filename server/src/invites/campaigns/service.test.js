@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { matchesFormCondition, resolveAudience } from './service.js'
+import { matchesFormCondition, resolveAudience, retryDelayMs } from './service.js'
 import { renderInviteCampaignEmail } from '../../auth/email.js'
 
 const guests = [
@@ -92,6 +92,11 @@ test('matchesFormCondition supports booleans, numbers and empty answers', () => 
   assert.equal(matchesFormCondition(25, { operator: 'greater_or_equal', value: 25 }), true)
   assert.equal(matchesFormCondition([], { operator: 'empty' }), true)
   assert.equal(matchesFormCondition('Lisboa', { operator: 'not_contains', value: 'porto' }), true)
+})
+
+test('retryDelayMs applies increasing backoff between delivery attempts', () => {
+  assert.equal(retryDelayMs(1), 2_000)
+  assert.equal(retryDelayMs(2), 10_000)
 })
 
 test('renderInviteCampaignEmail escapes authored content', () => {

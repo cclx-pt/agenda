@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireRole } from '../middleware/auth.js'
 import { config } from '../config.js'
 import { runSync, purgeExternal } from '../integrations/inchurchSync.js'
+import { processDueCampaigns } from '../invites/campaigns/service.js'
 import * as service from './service.js'
 
 export const integrationRouter = Router()
@@ -81,8 +82,11 @@ integrationRouter.get('/sync/cron', async (req, res, next) => {
       // Em produção sem CRON_SECRET, recusa por segurança (endpoint sem sessão).
       return res.status(503).json({ error: 'CRON_SECRET não configurado no servidor.' })
     }
-    const result = await runSync({ force: false })
-    res.json({ result })
+    const [result, campaignQueue] = await Promise.all([
+      runSync({ force: false }),
+      processDueCampaigns(),
+    ])
+    res.json({ result, campaignQueue })
   } catch (err) {
     next(err)
   }

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import multer from 'multer'
+import { waitUntil } from '@vercel/functions'
 import { requireAuth } from '../middleware/auth.js'
 import * as service from './service.js'
 import { InviteError } from './service.js'
@@ -32,6 +33,11 @@ const manageRoles = (req, res, next) => {
   if (req.user.role === 'admin' || req.user.canManageInvites) return next()
   return res.status(403).json({ error: 'Sem permissão para gerir convites.' })
 }
+const adminOnly = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Autenticação necessária.' })
+  if (req.user.role === 'admin') return next()
+  return res.status(403).json({ error: 'Acesso reservado a administradores.' })
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Comprovativos de pagamento: PDF/PNG/JPG até 5MB, em memória (→ Supabase Storage).
@@ -48,6 +54,13 @@ const receiptUpload = multer({
 })
 
 const guestToken = (req) => (typeof req.query.g === 'string' ? req.query.g : undefined)
+
+function scheduleCampaignWork(work) {
+  const guarded = work.catch((error) => {
+    console.error('[campaigns] Falha no processamento em segundo plano:', error)
+  })
+  waitUntil(guarded)
+}
 
 // ── Rotas de gestão (autenticadas) — /data/invites ──────────────
 export const invitesRouter = Router()
@@ -82,6 +95,14 @@ invitesRouter.get(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ events: await service.listSelectableEvents(req.user) })
+  })
+)
+
+invitesRouter.post(
+  '/campaign-worker/run',
+  adminOnly,
+  asyncHandler(async (_req, res) => {
+    res.json({ result: await campaigns.processDueCampaigns() })
   })
 )
 
@@ -151,7 +172,14 @@ invitesRouter.get(
 
 // ── Comunicações operacionais por email ────────────────────────
 invitesRouter.get('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
-  res.json({ campaigns: await campaigns.list(req.user, req.params.id) })
+  const list = await campaigns.list(req.user, req.params.id)
+  const active = list.filter((campaign) => ['queued', 'sending'].includes(campaign.status))
+  if (active.length) {
+    scheduleCampaignWork(
+      Promise.all(active.map((campaign) => campaigns.processCampaign(campaign.id)))
+    )
+  }
+  res.json({ campaigns: list })
 }))
 
 invitesRouter.post('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
@@ -184,11 +212,15 @@ invitesRouter.post('/:id/campaigns/:campaignId/test', manageRoles, asyncHandler(
 }))
 
 invitesRouter.post('/:id/campaigns/:campaignId/send', manageRoles, asyncHandler(async (req, res) => {
-  res.json({ campaign: await campaigns.send(req.user, req.params.id, req.params.campaignId) })
+  const campaign = await campaigns.send(req.user, req.params.id, req.params.campaignId)
+  scheduleCampaignWork(campaigns.processCampaign(campaign.id))
+  res.status(202).json({ campaign })
 }))
 
 invitesRouter.post('/:id/campaigns/:campaignId/retry-failed', manageRoles, asyncHandler(async (req, res) => {
-  res.json({ campaign: await campaigns.retryFailed(req.user, req.params.id, req.params.campaignId) })
+  const campaign = await campaigns.retryFailed(req.user, req.params.id, req.params.campaignId)
+  scheduleCampaignWork(campaigns.processCampaign(campaign.id))
+  res.status(202).json({ campaign })
 }))
 
 // Edita uma inscrição (nome/email/telemóvel/estado).

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { randomUUID } from 'node:crypto'
 import { config } from '../../config.js'
 import { sendInviteCampaignEmail } from '../../auth/email.js'
 import * as invitesRepo from '../repository.js'
@@ -94,6 +95,11 @@ const testSchema = z.object({
   email: z.string().trim().email('Email de teste inválido.'),
   name: z.string().trim().max(200).optional().default(''),
 })
+
+const DELIVERY_BATCH_SIZE = 20
+const DELIVERY_MAX_ATTEMPTS = 3
+const DELIVERY_LEASE_SECONDS = 90
+const DELIVERY_WORKER_BUDGET_MS = 40_000
 
 function canAccessChurch(user, community) {
   if (user?.role === 'admin' || !community) return true
@@ -290,50 +296,133 @@ export async function sendTest(user, inviteId, campaignId, input) {
 }
 
 export async function send(user, inviteId, campaignId) {
-  const { invite, campaign } = await getCampaign(user, inviteId, campaignId)
+  const { campaign } = await getCampaign(user, inviteId, campaignId)
   if (campaign.status !== 'draft')
     throw new InviteError(409, 'Esta comunicação já foi ou está a ser enviada.')
   const audience = await audienceFor(inviteId, campaign.audience)
   if (audience.length === 0)
     throw new InviteError(400, 'A audiência não tem destinatários com email.')
-  const claimed = await campaignsRepo.claimForSending(campaignId)
-  if (!claimed) throw new InviteError(409, 'Esta comunicação já foi ou está a ser enviada.')
-
-  const recipients = await campaignsRepo.insertRecipients(campaignId, audience)
-  await deliverRecipients(invite, campaign, recipients)
-  return campaignsRepo.finishFromRecipients(campaignId)
+  await campaignsRepo.insertRecipients(campaignId, audience)
+  const queued = await campaignsRepo.queueForSending(campaignId)
+  if (!queued) throw new InviteError(409, 'Esta comunicação já foi ou está a ser enviada.')
+  await campaignsRepo.initializeQueuedDelivery(campaignId)
+  return campaignsRepo.findById(campaignId)
 }
 
-async function deliverRecipients(invite, campaign, recipients) {
-  for (const recipient of recipients) {
-    try {
-      await sendInviteCampaignEmail(recipient.email, {
-        recipientName: recipient.name,
-        eventTitle: invite.title,
-        subject: campaign.subject,
-        preheader: campaign.preheader,
-        blocks: campaign.blocks,
-        eventLink: guestLink(invite, recipient.guestToken),
-      })
-      await campaignsRepo.markRecipient(recipient.id, 'sent')
-    } catch (error) {
-      await campaignsRepo.markRecipient(
-        recipient.id,
-        'failed',
-        String(error?.message ?? error).slice(0, 1000)
-      )
-    }
+export function retryDelayMs(attemptNumber) {
+  return attemptNumber <= 1 ? 2_000 : 10_000
+}
+
+function isPermanentDeliveryError(error) {
+  return String(error?.message ?? error).includes('serviço de email não está configurado')
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function deliverRecipient(invite, campaign, recipient) {
+  const attemptNumber = recipient.attemptCount + 1
+  try {
+    await sendInviteCampaignEmail(recipient.email, {
+      recipientName: recipient.name,
+      eventTitle: invite.title,
+      subject: campaign.subject,
+      preheader: campaign.preheader,
+      blocks: campaign.blocks,
+      eventLink: guestLink(invite, recipient.guestToken),
+    })
+    await campaignsRepo.markRecipientAttempt(recipient.id, { status: 'sent' })
+  } catch (error) {
+    const message = String(error?.message ?? error).slice(0, 1000)
+    const canRetry =
+      attemptNumber < DELIVERY_MAX_ATTEMPTS && !isPermanentDeliveryError(error)
+    await campaignsRepo.markRecipientAttempt(recipient.id, {
+      status: canRetry ? 'pending' : 'failed',
+      error: message,
+      nextAttemptAt: canRetry
+        ? new Date(Date.now() + retryDelayMs(attemptNumber))
+        : null,
+    })
   }
 }
 
+export async function processCampaign(campaignId) {
+  const startedAt = Date.now()
+  const leaseToken = randomUUID()
+  const claimed = await campaignsRepo.claimCampaignLease(
+    campaignId,
+    leaseToken,
+    DELIVERY_LEASE_SECONDS
+  )
+  if (!claimed) return campaignsRepo.findById(campaignId)
+
+  const invite = await invitesRepo.findById(claimed.inviteId)
+  if (!invite) return null
+
+  try {
+    while (Date.now() - startedAt < DELIVERY_WORKER_BUDGET_MS) {
+      const leaseExtended = await campaignsRepo.extendCampaignLease(
+        campaignId,
+        leaseToken,
+        DELIVERY_LEASE_SECONDS
+      )
+      if (!leaseExtended) return campaignsRepo.findById(campaignId)
+      const recipients = await campaignsRepo.claimRecipientBatch(
+        campaignId,
+        DELIVERY_BATCH_SIZE
+      )
+      if (recipients.length) {
+        await Promise.all(
+          recipients.map((recipient) => deliverRecipient(invite, claimed, recipient))
+        )
+        continue
+      }
+
+      const summary = await campaignsRepo.getDeliverySummary(campaignId)
+      if (summary.pendingCount === 0 && summary.processingCount === 0) {
+        return campaignsRepo.finishLeased(campaignId, leaseToken, summary)
+      }
+
+      const waitMs = Math.max(
+        0,
+        new Date(summary.nextAttemptAt).getTime() - Date.now()
+      )
+      const remainingMs = DELIVERY_WORKER_BUDGET_MS - (Date.now() - startedAt)
+      if (waitMs > remainingMs - 1_000) {
+        return campaignsRepo.releaseToQueue(campaignId, leaseToken, summary)
+      }
+      await sleep(waitMs)
+    }
+  } catch (error) {
+    console.error(`[campaigns] Falha no worker da campanha ${campaignId}:`, error)
+  }
+
+  const summary = await campaignsRepo.getDeliverySummary(campaignId)
+  return campaignsRepo.releaseToQueue(campaignId, leaseToken, summary)
+}
+
+export async function processDueCampaigns(limit = 5) {
+  const campaignIds = await campaignsRepo.listDueCampaignIds(limit)
+  const results = []
+  for (const campaignId of campaignIds) {
+    try {
+      results.push(await processCampaign(campaignId))
+    } catch (error) {
+      console.error(`[campaigns] Não foi possível recuperar a campanha ${campaignId}:`, error)
+    }
+  }
+  return { processed: results.length, campaigns: results }
+}
+
 export async function retryFailed(user, inviteId, campaignId) {
-  const { invite, campaign } = await getCampaign(user, inviteId, campaignId)
+  await getCampaign(user, inviteId, campaignId)
   const claimed = await campaignsRepo.claimForRetry(campaignId)
   if (!claimed) throw new InviteError(409, 'Esta comunicação não tem envios falhados para repetir.')
   const recipients = await campaignsRepo.claimFailedRecipients(campaignId)
   if (recipients.length === 0) {
     return campaignsRepo.finishFromRecipients(campaignId)
   }
-  await deliverRecipients(invite, campaign, recipients)
-  return campaignsRepo.finishFromRecipients(campaignId)
+  await campaignsRepo.initializeQueuedDelivery(campaignId)
+  return campaignsRepo.findById(campaignId)
 }

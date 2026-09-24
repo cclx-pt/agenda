@@ -96,7 +96,7 @@ snapshot da audiência.
 | 2 | Corrigir o falso sucesso quando o SMTP não está configurado, distinguir envios parciais e melhorar o histórico em modo de leitura | Concluída | 2–4 dias |
 | 3 | Adicionar detalhes por destinatário, repetição apenas dos falhados e melhorias de validação e confirmação no editor | Concluída | 4–7 dias |
 | 4 | Filtrar a audiência pelas respostas do formulário do convite, com operadores por tipo de campo, combinação AND/OR, contagem prévia e snapshot das condições | Concluída | 4–7 dias |
-| 5 | Processar campanhas de forma assíncrona, em lotes, com tentativas, recuperação de envios interrompidos e progresso | Alta | 5–10 dias |
+| 5 | Processar campanhas de forma assíncrona, em lotes, com tentativas, recuperação de envios interrompidos e progresso | Concluída | 5–10 dias |
 | 6 | Adicionar modelos, segmentos guardados, agendamento e automatizações | Média | 5–10 dias |
 | 7 | Integrar um fornecedor transacional, webhooks, bounce, supressões e métricas de entrega | Média | Dependente do fornecedor |
 
@@ -105,6 +105,19 @@ escolha única e checkbox, inclusão para escolha múltipla, comparação para
 números e presença/ausência para texto. Campos removidos do formulário atual
 devem continuar legíveis através do `schema_snapshot`, mas só os campos atuais
 devem estar disponíveis para criar novos filtros.
+
+### Processamento assíncrono
+
+O envio imediato coloca a campanha numa fila persistente no PostgreSQL e devolve
+ao editor sem esperar por todos os emails. O worker processa destinatários em
+lotes, usa um lease para impedir workers concorrentes e repete falhas transitórias
+com backoff até ao limite de tentativas. A interface consulta o progresso enquanto
+a campanha está em fila ou em envio; cada consulta também recupera trabalho cujo
+lease tenha expirado.
+
+No Vercel, o processamento iniciado pelo pedido usa `waitUntil`. O cron diário
+existente também recupera campanhas pendentes como rede de segurança compatível
+com o plano Hobby. Existe ainda uma execução administrativa manual do worker.
 
 ## Modelo de dados
 
