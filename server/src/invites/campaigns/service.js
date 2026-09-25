@@ -13,6 +13,10 @@ import {
   getCampaignProvider,
   getCampaignProviderInfo,
 } from './provider.js'
+import {
+  richTextToPlainText,
+  sanitizeCampaignRichText,
+} from './richText.js'
 
 const urlSchema = z
   .string()
@@ -20,8 +24,27 @@ const urlSchema = z
   .url()
   .refine((value) => /^https?:\/\//i.test(value), 'Link inválido.')
 
-const blockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().trim().min(1).max(10000) }),
+const blockSchema = z.union([
+  z
+    .object({
+      type: z.literal('text'),
+      text: z.string().max(10000).optional().default(''),
+      html: z.string().max(30000).optional(),
+    })
+    .transform((block, context) => {
+      const html = sanitizeCampaignRichText(
+        block.html || block.text.replace(/\r?\n/g, '<br />')
+      )
+      const text = richTextToPlainText(html)
+      if (!text) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'O bloco de texto não pode estar vazio.',
+        })
+        return z.NEVER
+      }
+      return { type: 'text', text, html }
+    }),
   z.object({
     type: z.literal('image'),
     url: urlSchema,

@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  Bold,
   CalendarClock,
   Copy,
   Eye,
   Image,
+  Italic,
   Link,
+  List,
+  ListOrdered,
   Mail,
   Plus,
   RotateCcw,
   Save,
   Send,
   Trash2,
+  Underline,
   Video,
   Zap,
 } from 'lucide-react'
@@ -200,6 +205,185 @@ function isoToLisbonDateTime(value) {
     .replace(' ', 'T')
 }
 
+function escapeEditorHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function textToEditorHtml(value) {
+  return escapeEditorHtml(value).replace(/\r?\n/g, '<br />')
+}
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+function RichTextEditor({ block, onChange }) {
+  const initialHtml = block.html || textToEditorHtml(block.text)
+
+  const sync = (editor) => {
+    if (!editor) return
+    onChange({
+      ...block,
+      html: editor.innerHTML,
+      text: String(editor.innerText ?? editor.textContent ?? '')
+        .replace(/\u00a0/g, ' ')
+        .trim(),
+    })
+  }
+
+  const editorFromToolbar = (event) =>
+    event.currentTarget
+      .closest('[data-rich-text-editor]')
+      ?.querySelector('[contenteditable="true"]')
+
+  const command = (event) => {
+    const editor = editorFromToolbar(event)
+    editor?.focus()
+    const name = event.currentTarget.dataset.command
+    document.execCommand(name, false)
+    sync(editor)
+  }
+
+  const insertHtml = (event, html) => {
+    const editor = editorFromToolbar(event)
+    editor?.focus()
+    document.execCommand('insertHTML', false, html)
+    sync(editor)
+  }
+
+  const promptUrl = (message) => {
+    const value = window.prompt(message)?.trim()
+    if (!value) return null
+    const url = safeHttpUrl(value)
+    if (!url) toast.error('Indique um endereço http ou https válido.')
+    return url
+  }
+
+  const insertLink = (event) => {
+    const url = promptUrl('Endereço do link:')
+    if (!url) return
+    const selected = window.getSelection()?.toString().trim()
+    const label = selected || window.prompt('Texto do link:')?.trim()
+    if (!label) return
+    insertHtml(
+      event,
+      `<a href="${escapeEditorHtml(url)}">${escapeEditorHtml(label)}</a>`
+    )
+  }
+
+  const insertButton = (event) => {
+    const label = window.prompt('Texto do botão:')?.trim()
+    if (!label) return
+    const url = promptUrl('Endereço do botão:')
+    if (!url) return
+    insertHtml(
+      event,
+      `<a data-email-button="" href="${escapeEditorHtml(url)}">${escapeEditorHtml(label)}</a>`
+    )
+  }
+
+  const insertImage = (event) => {
+    const url = promptUrl('Endereço público da imagem:')
+    if (!url) return
+    const alt = window.prompt('Descrição da imagem:')?.trim() || ''
+    insertHtml(
+      event,
+      `<img src="${escapeEditorHtml(url)}" alt="${escapeEditorHtml(alt)}" />`
+    )
+  }
+
+  const toolbarButton = (label, icon, action, commandName) => (
+    <button
+      type="button"
+      className="rounded border border-border bg-background p-2 hover:bg-accent"
+      aria-label={label}
+      title={label}
+      data-command={commandName}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={action}
+    >
+      {icon}
+    </button>
+  )
+
+  return (
+    <div
+      className="overflow-hidden rounded-lg border border-input"
+      data-rich-text-editor
+    >
+      <div className="flex flex-wrap gap-1 border-b border-border bg-muted/40 p-2">
+        {toolbarButton('Negrito', <Bold className="h-4 w-4" />, command, 'bold')}
+        {toolbarButton('Itálico', <Italic className="h-4 w-4" />, command, 'italic')}
+        {toolbarButton(
+          'Sublinhado',
+          <Underline className="h-4 w-4" />,
+          command,
+          'underline'
+        )}
+        {toolbarButton(
+          'Lista',
+          <List className="h-4 w-4" />,
+          command,
+          'insertUnorderedList'
+        )}
+        {toolbarButton(
+          'Lista numerada',
+          <ListOrdered className="h-4 w-4" />,
+          command,
+          'insertOrderedList'
+        )}
+        {toolbarButton('Link', <Link className="h-4 w-4" />, insertLink)}
+        {toolbarButton(
+          'Botão com link',
+          <span className="px-1 text-xs font-bold">Botão</span>,
+          insertButton
+        )}
+        {toolbarButton('Imagem no texto', <Image className="h-4 w-4" />, insertImage)}
+      </div>
+      <div
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Texto da mensagem"
+        placeholder="Escreva a mensagem…"
+        className="min-h-32 bg-background px-3 py-2 text-sm text-foreground outline-none [&_a]:text-primary [&_a]:underline [&_a[data-email-button]]:my-1 [&_a[data-email-button]]:inline-block [&_a[data-email-button]]:rounded-md [&_a[data-email-button]]:bg-primary [&_a[data-email-button]]:px-4 [&_a[data-email-button]]:py-2 [&_a[data-email-button]]:font-bold [&_a[data-email-button]]:text-primary-foreground [&_a[data-email-button]]:no-underline [&_img]:my-3 [&_img]:h-auto [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+        dangerouslySetInnerHTML={{ __html: initialHtml }}
+        onInput={(event) => sync(event.currentTarget)}
+        onBlur={(event) => sync(event.currentTarget)}
+        onPaste={(event) => {
+          event.preventDefault()
+          document.execCommand(
+            'insertText',
+            false,
+            event.clipboardData.getData('text/plain')
+          )
+          sync(event.currentTarget)
+        }}
+        onDrop={(event) => {
+          event.preventDefault()
+          document.execCommand(
+            'insertText',
+            false,
+            event.dataTransfer.getData('text/plain')
+          )
+          sync(event.currentTarget)
+        }}
+      />
+    </div>
+  )
+}
+
 function BlockEditor({ block, onChange, onRemove }) {
   const common = (
     <select
@@ -241,12 +425,15 @@ function BlockEditor({ block, onChange, onRemove }) {
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
-      {block.type === 'text' || block.type === 'warning' ? (
+      {block.type === 'text' ? (
+        <RichTextEditor block={block} onChange={onChange} />
+      ) : null}
+      {block.type === 'warning' ? (
         <textarea
           className={inputCls + ' min-h-28'}
           value={block.text}
           onChange={(event) => onChange({ ...block, text: event.target.value })}
-          placeholder={block.type === 'warning' ? 'Informação importante…' : 'Escreva a mensagem…'}
+          placeholder="Informação importante…"
         />
       ) : null}
       {block.type === 'image' ? (
@@ -380,7 +567,13 @@ function CampaignPreview({ campaign, invite }) {
           <p className="mb-5 mt-0">Olá,</p>
           {campaign.blocks.map((block, index) => {
         if (block.type === 'text')
-          return (
+          return block.html ? (
+            <div
+              key={index}
+              className="mb-5 leading-relaxed [&_a]:text-blue-800 [&_a]:underline [&_a[data-email-button]]:my-1 [&_a[data-email-button]]:inline-block [&_a[data-email-button]]:rounded-md [&_a[data-email-button]]:bg-[#1f3864] [&_a[data-email-button]]:px-5 [&_a[data-email-button]]:py-2.5 [&_a[data-email-button]]:font-bold [&_a[data-email-button]]:text-white [&_a[data-email-button]]:no-underline [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+              dangerouslySetInnerHTML={{ __html: block.html }}
+            />
+          ) : (
             <p key={index} className="mb-5 whitespace-pre-line leading-relaxed">
               {block.text || 'Texto da mensagem'}
             </p>

@@ -139,6 +139,25 @@ describe('InviteCommunications', () => {
     expect(screen.getByText('3 destinatário(s)')).toBeInTheDocument()
   })
 
+  it('shows rich formatting controls for text blocks', async () => {
+    invitesService.listInviteCampaigns.mockResolvedValue([])
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    expect(screen.getByRole('button', { name: 'Negrito' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Itálico' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sublinhado' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lista' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lista numerada' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Link' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Botão com link' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Imagem no texto' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Texto da mensagem' })).toHaveAttribute(
+      'contenteditable',
+      'true'
+    )
+  })
+
   it('shows recipient errors and retries only failed deliveries', async () => {
     const failedCampaign = { ...sentCampaign, status: 'sent_with_errors', failedCount: 1 }
     const failedRecipient = {

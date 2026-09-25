@@ -42,6 +42,8 @@ Escopo implementado inicialmente:
 - destinatários exclusivamente entre as inscrições que têm email;
 - filtros por estado da inscrição, pagamento, bilhete e check-in;
 - blocos email-safe: texto, imagem, vídeo/link, workshops, aviso e botão;
+- edição visual do bloco de texto com negrito, itálico, sublinhado, listas,
+  links, botões e imagens incorporadas;
 - rascunho, pré-visualização, envio de teste e envio imediato;
 - consulta de campanhas enviadas e cópia do conteúdo para um novo rascunho;
 - snapshot dos destinatários e estado individual de cada envio;
@@ -191,6 +193,9 @@ transacional futuro, sem suprimir silenciosamente destinatários no SMTP atual.
   `sending`; reenvios acidentais são rejeitados.
 - Conteúdo livre é escapado no servidor. Vídeo é apresentado como link porque a
   maioria dos clientes de email não suporta reprodução incorporada.
+- O HTML do editor visual é sanitizado no servidor com uma allowlist restrita;
+  scripts, handlers, estilos arbitrários e protocolos diferentes de HTTP(S) são
+  removidos. É sempre gerada uma alternativa de texto simples.
 - Para métricas de entrega, bounce/complaint e supressão automática deve ser
   escolhido e implementado um adapter transacional (por exemplo Brevo, Mailgun,
   SendGrid ou Amazon SES).

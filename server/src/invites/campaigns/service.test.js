@@ -3,6 +3,10 @@ import assert from 'node:assert/strict'
 import { matchesFormCondition, resolveAudience, retryDelayMs } from './service.js'
 import { renderInviteCampaignEmail } from '../../auth/email.js'
 import { applyTemplate, campaignTemplates } from './templates.js'
+import {
+  richTextToPlainText,
+  sanitizeCampaignRichText,
+} from './richText.js'
 
 const guests = [
   {
@@ -146,6 +150,43 @@ test('renderInviteCampaignEmail escapes authored content', () => {
   assert.doesNotMatch(message.html, /<script>|<img src=x/)
   assert.match(message.html, /&lt;Admin&gt;/)
   assert.match(message.html, /&lt;img src=x onerror=alert\(1\)&gt;/)
+})
+
+test('rich campaign text keeps safe formatting and removes active content', () => {
+  const sanitized = sanitizeCampaignRichText(
+    '<p><strong>Importante</strong> <script>alert(1)</script>' +
+      '<a href="javascript:alert(1)">mau</a>' +
+      '<a data-email-button href="https://example.test/register">Inscrever</a>' +
+      '<img src="https://example.test/image.jpg" onerror="alert(1)" alt="Evento"></p>'
+  )
+  assert.match(sanitized, /<strong>Importante<\/strong>/)
+  assert.match(sanitized, /data-email-button/)
+  assert.match(sanitized, /https:\/\/example\.test\/image\.jpg/)
+  assert.doesNotMatch(sanitized, /script|javascript|onerror/)
+  assert.match(richTextToPlainText('<p>Primeiro</p><p>Segundo</p>'), /Primeiro\nSegundo/)
+})
+
+test('renderInviteCampaignEmail renders formatted text, inline buttons and images', () => {
+  const message = renderInviteCampaignEmail({
+    recipientName: 'Ana',
+    eventTitle: 'Conferência',
+    subject: 'Informação',
+    blocks: [
+      {
+        type: 'text',
+        text: 'Importante',
+        html:
+          '<p><strong>Importante</strong> e <em>urgente</em>.</p>' +
+          '<p><a data-email-button="" href="https://example.test/open">Abrir</a></p>' +
+          '<img src="https://example.test/inline.jpg" alt="Programa" />',
+      },
+    ],
+    eventLink: 'https://example.test/invite',
+  })
+  assert.match(message.html, /<strong>Importante<\/strong>/)
+  assert.match(message.html, /display:inline-block/)
+  assert.match(message.html, /https:\/\/example\.test\/inline\.jpg/)
+  assert.match(message.text, /Importante e urgente\./)
 })
 
 test('renderInviteCampaignEmail uses a responsive table layout for email clients', () => {

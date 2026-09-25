@@ -1,5 +1,9 @@
 import nodemailer from 'nodemailer'
 import { config } from '../config.js'
+import {
+  renderCampaignRichText,
+  richTextToPlainText,
+} from '../invites/campaigns/richText.js'
 
 let transporter = null
 
@@ -95,7 +99,10 @@ function emailText(value) {
 
 function campaignBlockHtml(block) {
   if (block.type === 'text') {
-    return `<tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:26px;color:#374151">${emailText(block.text)}</td></tr>`
+    const content = block.html
+      ? renderCampaignRichText(block.html)
+      : emailText(block.text)
+    return `<tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:26px;color:#374151">${content}</td></tr>`
   }
   if (block.type === 'image') {
     return `<tr><td style="padding:0 0 22px"><img src="${escapeHtml(block.url)}" width="536" alt="${escapeHtml(block.alt)}" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px;line-height:100%;outline:none;text-decoration:none" /></td></tr>`
@@ -131,7 +138,10 @@ export function renderInviteCampaignEmail({
   const greeting = recipientName ? `Olá ${recipientName},` : 'Olá,'
   const content = Array.isArray(blocks) ? blocks : []
   const textBlocks = content.map((block) => {
-    if (block.type === 'text' || block.type === 'warning') return block.text
+    if (block.type === 'text') {
+      return block.html ? richTextToPlainText(block.html) : block.text
+    }
+    if (block.type === 'warning') return block.text
     if (block.type === 'image') return block.alt ? `${block.alt}: ${block.url}` : block.url
     if (block.type === 'video') return `${block.title || 'Ver vídeo'}: ${block.url}`
     if (block.type === 'button') return `${block.label}: ${block.url}`
