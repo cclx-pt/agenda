@@ -3,7 +3,7 @@ export const campaignTemplates = [
     key: 'access_information',
     label: 'Informações de acesso',
     type: 'update',
-    subject: 'Informações de acesso — {{eventTitle}}',
+    subject: 'Informações de acesso',
     preheader: 'Tudo o que precisa de saber para participar.',
     blocks: [
       {
@@ -18,7 +18,7 @@ export const campaignTemplates = [
     key: 'event_reminder',
     label: 'Lembrete antes do evento',
     type: 'reminder',
-    subject: 'Lembrete: {{eventTitle}}',
+    subject: 'Lembrete',
     preheader: 'O evento aproxima-se.',
     blocks: [
       {
@@ -33,7 +33,7 @@ export const campaignTemplates = [
     key: 'payment_pending',
     label: 'Pagamento pendente',
     type: 'reminder',
-    subject: 'Pagamento pendente — {{eventTitle}}',
+    subject: 'Pagamento pendente',
     preheader: 'Conclua o pagamento da sua inscrição.',
     blocks: [
       {
@@ -48,7 +48,7 @@ export const campaignTemplates = [
     key: 'urgent_change',
     label: 'Alteração urgente',
     type: 'warning',
-    subject: 'Alteração importante — {{eventTitle}}',
+    subject: 'Alteração importante',
     preheader: 'Existe uma atualização importante sobre o evento.',
     blocks: [
       {
@@ -63,7 +63,7 @@ export const campaignTemplates = [
     key: 'cancellation_or_time_change',
     label: 'Cancelamento ou mudança de horário',
     type: 'warning',
-    subject: 'Atualização de horário — {{eventTitle}}',
+    subject: 'Atualização de horário',
     preheader: 'Consulte a alteração ao evento.',
     blocks: [
       {
@@ -78,7 +78,7 @@ export const campaignTemplates = [
     key: 'post_event_thanks',
     label: 'Agradecimento pós-evento',
     type: 'post_event',
-    subject: 'Obrigado por participar em {{eventTitle}}',
+    subject: 'Obrigado por participar',
     preheader: 'Obrigado por ter estado connosco.',
     blocks: [
       {
@@ -92,7 +92,7 @@ export const campaignTemplates = [
     key: 'post_event_follow_up',
     label: 'Follow-up pós-evento',
     type: 'post_event',
-    subject: 'Como foi a sua experiência em {{eventTitle}}?',
+    subject: 'Como foi a sua experiência?',
     preheader: 'Queremos continuar a acompanhar a sua experiência.',
     blocks: [
       {

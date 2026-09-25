@@ -87,6 +87,7 @@ describe('InviteCommunications', () => {
 
     expect(screen.getByRole('heading', { name: 'Novo rascunho' })).toBeInTheDocument()
     expect(screen.getByLabelText('Nome interno')).toHaveValue('Lembrete final (cópia)')
+    expect(screen.getByText('Conferência |')).toBeInTheDocument()
     expect(screen.getByLabelText('Assunto')).toHaveValue('O evento é amanhã')
 
     await userEvent.click(screen.getByRole('button', { name: 'Guardar rascunho' }))

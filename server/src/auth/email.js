@@ -133,6 +133,7 @@ export function renderInviteCampaignEmail({
   unsubscribeUrl,
   oneClickUnsubscribeUrl,
 }) {
+  const emailSubject = `${String(eventTitle ?? '').trim()} | ${String(subject ?? '').trim()}`
   const content = Array.isArray(blocks) ? blocks : []
   const textBlocks = content.map((block) => {
     if (block.type === 'text') {
@@ -152,7 +153,7 @@ export function renderInviteCampaignEmail({
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="x-apple-disable-message-reformatting" />
-  <title>${escapeHtml(subject)}</title>
+  <title>${escapeHtml(emailSubject)}</title>
   <style>
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
@@ -209,7 +210,7 @@ export function renderInviteCampaignEmail({
 </body>
 </html>`
   return {
-    subject,
+    subject: emailSubject,
     text,
     html,
     ...(oneClickUnsubscribeUrl

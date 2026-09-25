@@ -134,7 +134,7 @@ test('campaign templates provide all reusable stage 6 messages', () => {
     { title: 'Conferência' },
     'https://example.test/invite/conferencia'
   )
-  assert.equal(draft.subject, 'Informações de acesso — Conferência')
+  assert.equal(draft.subject, 'Informações de acesso')
   assert.equal(draft.blocks[1].url, 'https://example.test/invite/conferencia')
 })
 
@@ -147,6 +147,8 @@ test('renderInviteCampaignEmail escapes authored content', () => {
     blocks: [{ type: 'text', text: '<img src=x onerror=alert(1)>' }],
     eventLink: 'https://example.test/invite/test',
   })
+  assert.equal(message.subject, 'Evento | Aviso')
+  assert.match(message.html, /<title>Evento \| Aviso<\/title>/)
   assert.doesNotMatch(message.html, /<script>|<img src=x/)
   assert.doesNotMatch(message.html, /&lt;Admin&gt;|Olá/)
   assert.match(message.html, /&lt;img src=x onerror=alert\(1\)&gt;/)

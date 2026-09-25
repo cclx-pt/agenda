@@ -1287,11 +1287,17 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
               </label>
               <label className={labelCls}>
                 Assunto
-                <input
-                  className={inputCls}
-                  value={campaign.subject}
-                  onChange={(event) => setCampaign({ ...campaign, subject: event.target.value })}
-                />
+                <div className="flex overflow-hidden rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring">
+                  <span className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
+                    {invite.title} |
+                  </span>
+                  <input
+                    aria-label="Assunto"
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+                    value={campaign.subject}
+                    onChange={(event) => setCampaign({ ...campaign, subject: event.target.value })}
+                  />
+                </div>
               </label>
               <label className={labelCls}>
                 Preheader
