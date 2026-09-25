@@ -310,7 +310,7 @@ export async function createFromTemplate(user, inviteId, templateKey) {
   return campaignsRepo.insert(
     inviteId,
     campaignSchema.parse(applyTemplate(template, invite, eventLink)),
-    user.id
+    user.sub
   )
 }
 
@@ -318,7 +318,7 @@ export async function create(user, inviteId, input) {
   await getInvite(user, inviteId)
   const campaign = campaignSchema.parse(input)
   await assertCurrentFormFields(inviteId, campaign.audience)
-  return campaignsRepo.insert(inviteId, campaign, user.id)
+  return campaignsRepo.insert(inviteId, campaign, user.sub)
 }
 
 export async function update(user, inviteId, campaignId, input) {
@@ -359,7 +359,7 @@ export async function saveSegment(user, inviteId, input) {
     segment.id,
     segment.name,
     segment.audience,
-    user.id
+    user.sub
   )
   if (!saved) throw new InviteError(404, 'Segmento não encontrado.')
   return saved
@@ -446,7 +446,7 @@ export async function saveAutomation(user, inviteId, input) {
     throw new InviteError(400, 'Defina a data do evento antes de criar automatizações.')
   }
   await assertCurrentFormFields(inviteId, automation.audience)
-  const saved = await campaignsRepo.upsertAutomation(inviteId, automation, user.id)
+  const saved = await campaignsRepo.upsertAutomation(inviteId, automation, user.sub)
   if (!saved) throw new InviteError(404, 'Automatização não encontrada.')
   return saved
 }

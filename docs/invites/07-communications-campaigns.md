@@ -25,6 +25,14 @@ Dentro do editor de cada convite é acrescentado o separador **Comunicações**:
 
 `Definições → Bilhetes → Inscrição → Página → Comunicações → Check-in`
 
+As comunicações são recursos partilhados do convite, não recursos pessoais do
+utilizador que as criou. Todos os utilizadores com permissão para gerir o
+convite, dentro do respetivo âmbito de igrejas, consultam a mesma lista completa
+de rascunhos, comunicações agendadas, envios, destinatários e resultados. Um
+utilizador autorizado pode continuar ou eliminar um rascunho criado por outro;
+comunicações já enviadas permanecem imutáveis e podem ser copiadas para um novo
+rascunho.
+
 Uma campanha segue cinco passos conceptuais:
 
 1. Tipo: atualização, aviso, lembrete ou pós-evento.

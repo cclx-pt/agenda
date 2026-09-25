@@ -78,6 +78,9 @@ describe('InviteCommunications', () => {
   it('copies a sent communication into a new draft', async () => {
     render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
 
+    expect(
+      screen.getByText(/todos os utilizadores com acesso a este convite/i),
+    ).toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: /Lembrete final/i }))
     expect(screen.getByRole('heading', { name: 'Resultados da comunicação' })).toBeInTheDocument()
 

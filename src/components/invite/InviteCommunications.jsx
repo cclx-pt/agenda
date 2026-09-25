@@ -1227,6 +1227,10 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
         </div>
       </aside>
       <section className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4">
+        <p className="m-0 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Espaço partilhado: todos os utilizadores com acesso a este convite podem consultar
+          rascunhos, agendamentos, envios e resultados.
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="m-0 text-base font-bold">
