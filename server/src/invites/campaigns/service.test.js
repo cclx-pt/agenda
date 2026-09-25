@@ -148,8 +148,10 @@ test('renderInviteCampaignEmail escapes authored content', () => {
     eventLink: 'https://example.test/invite/test',
   })
   assert.doesNotMatch(message.html, /<script>|<img src=x/)
-  assert.match(message.html, /&lt;Admin&gt;/)
+  assert.doesNotMatch(message.html, /&lt;Admin&gt;|Olá/)
   assert.match(message.html, /&lt;img src=x onerror=alert\(1\)&gt;/)
+  assert.doesNotMatch(message.html, /Ver Evento/)
+  assert.doesNotMatch(message.text, /Ver convite|Agenda CCLX/)
 })
 
 test('rich campaign text keeps safe formatting and removes active content', () => {

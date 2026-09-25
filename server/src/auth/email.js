@@ -125,17 +125,14 @@ function campaignBlockHtml(block) {
 }
 
 export function renderInviteCampaignEmail({
-  recipientName,
   eventTitle,
   subject,
   preheader,
   blocks,
-  eventLink,
   bannerUrl,
   unsubscribeUrl,
   oneClickUnsubscribeUrl,
 }) {
-  const greeting = recipientName ? `Olá ${recipientName},` : 'Olá,'
   const content = Array.isArray(blocks) ? blocks : []
   const textBlocks = content.map((block) => {
     if (block.type === 'text') {
@@ -148,7 +145,7 @@ export function renderInviteCampaignEmail({
     if (block.type === 'workshops') return `Workshops:\n${block.items.map((item) => `- ${item.title}${item.description ? `: ${item.description}` : ''}`).join('\n')}`
     return ''
   }).filter(Boolean)
-  const text = `${greeting}\n\n${textBlocks.join('\n\n')}\n\nVer convite: ${eventLink}${unsubscribeUrl ? `\n\nCancelar a receção de emails deste evento: ${unsubscribeUrl}` : ''}\n\nAgenda CCLX`
+  const text = `${textBlocks.join('\n\n')}${unsubscribeUrl ? `\n\nCancelar a receção de emails deste evento: ${unsubscribeUrl}` : ''}`
   const html = `<!doctype html>
 <html lang="pt">
 <head>
@@ -189,19 +186,7 @@ export function renderInviteCampaignEmail({
           <tr>
             <td class="email-content" style="padding:32px;font-family:Arial,'Helvetica Neue',sans-serif;color:#111827">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr><td style="padding:0 0 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:24px;color:#111827">${escapeHtml(greeting)}</td></tr>
                 ${content.map(campaignBlockHtml).join('')}
-                <tr>
-                  <td align="left" style="padding:4px 0 8px">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                      <tr>
-                        <td bgcolor="#ffffff" style="border:1px solid #1f3864;border-radius:6px">
-                          <a href="${escapeHtml(eventLink)}" style="display:inline-block;padding:12px 20px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#1f3864;text-decoration:none;border-radius:6px">Ver ${escapeHtml(eventTitle || 'convite')}</a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
               </table>
             </td>
           </tr>

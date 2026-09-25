@@ -564,7 +564,6 @@ function CampaignPreview({ campaign, invite }) {
           <h4 className="mb-0 mt-1 text-2xl font-bold text-white">{invite.title}</h4>
         </div>
         <div className="p-5 sm:p-8">
-          <p className="mb-5 mt-0">Olá,</p>
           {campaign.blocks.map((block, index) => {
         if (block.type === 'text')
           return block.html ? (
@@ -633,9 +632,6 @@ function CampaignPreview({ campaign, invite }) {
           )
         return null
           })}
-          <p className="mb-0 mt-2 inline-block border border-[#1f3864] px-5 py-3 text-sm font-bold text-[#1f3864]">
-            Ver {invite.title}
-          </p>
         </div>
         <div className="border-t border-gray-200 bg-gray-50 px-5 py-4 text-xs text-gray-500 sm:px-8">
           Comunicação operacional relativa à sua inscrição.

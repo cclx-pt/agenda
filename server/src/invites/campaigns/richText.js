@@ -59,7 +59,7 @@ export function richTextToPlainText(value) {
 export function renderCampaignRichText(value) {
   return sanitizeCampaignRichText(value)
     .replace(
-      /<a data-email-button="" href="([^"]+)">([\s\S]*?)<\/a>/g,
+      /<a data-email-button(?:="")? href="([^"]+)">([\s\S]*?)<\/a>/g,
       '<a href="$1" style="display:inline-block;margin:4px 0;padding:12px 20px;background:#1f3864;border:1px solid #1f3864;border-radius:6px;font-family:Arial,\'Helvetica Neue\',sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none">$2</a>'
     )
     .replace(

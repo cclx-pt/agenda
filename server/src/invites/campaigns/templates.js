@@ -8,7 +8,7 @@ export const campaignTemplates = [
     blocks: [
       {
         type: 'text',
-        text: 'Olá!\n\nPartilhamos as informações essenciais para a sua participação.',
+        text: 'Partilhamos as informações essenciais para a sua participação.',
       },
       { type: 'button', label: 'Consultar a minha inscrição', url: '{{eventLink}}' },
     ],
