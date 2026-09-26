@@ -1,9 +1,10 @@
 // Serviço de convites / páginas públicas de convite. Comunica com o backend via
 // /data/invites (gestão, autenticado) e /data/public/invite (público, sem sessão).
 
-async function request(url, { method = 'GET', body } = {}) {
+async function request(url, { method = 'GET', body, cache } = {}) {
   const res = await fetch(url, {
     method,
+    cache,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
@@ -87,7 +88,9 @@ export async function listInviteGuests(id) {
 
 // ── Comunicações operacionais por email ────────────────────────
 export async function listInviteCampaigns(inviteId) {
-  const { campaigns } = await request(`/data/invites/${inviteId}/campaigns`)
+  const { campaigns } = await request(`/data/invites/${inviteId}/campaigns`, {
+    cache: 'no-store',
+  })
   return campaigns
 }
 

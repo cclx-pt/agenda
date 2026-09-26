@@ -107,6 +107,9 @@ describe('InviteCommunications', () => {
       ),
     )
     expect(invitesService.updateInviteCampaign).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole('button', { name: /Lembrete final \(cópia\).*Rascunho/i }),
+    ).toBeInTheDocument()
   })
 
   it('adds form answer conditions to the audience preview', async () => {

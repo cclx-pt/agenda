@@ -892,9 +892,13 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
         ? await invitesService.updateInviteCampaign(invite.id, campaignId, campaign)
         : await invitesService.createInviteCampaign(invite.id, campaign)
       setCampaignId(saved.id)
+      setCampaignStatus(saved.status)
       setCampaign(saved)
+      setCampaigns((current) => [
+        saved,
+        ...current.filter((item) => item.id !== saved.id),
+      ])
       setValidationError(null)
-      await load()
       toast.success('Comunicação guardada.')
       return saved
     } catch (error) {
