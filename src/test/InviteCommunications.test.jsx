@@ -156,10 +156,14 @@ describe('InviteCommunications', () => {
     expect(screen.getByRole('button', { name: 'Link' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Botão com link' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Imagem no texto' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Texto da mensagem' })).toHaveAttribute(
+    const editor = screen.getByRole('textbox', { name: 'Texto da mensagem' })
+    expect(editor).toHaveAttribute(
       'contenteditable',
       'true'
     )
+    expect(editor).toHaveAttribute('dir', 'ltr')
+    await userEvent.type(editor, 'olá')
+    expect(editor).toHaveTextContent('olá')
   })
 
   it('shows recipient errors and retries only failed deliveries', async () => {

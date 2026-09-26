@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Bold,
@@ -229,6 +229,14 @@ function safeHttpUrl(value) {
 
 function RichTextEditor({ block, onChange }) {
   const initialHtml = block.html || textToEditorHtml(block.text)
+  const editorRef = useRef(null)
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (editor && editor.innerHTML !== initialHtml) {
+      editor.innerHTML = initialHtml
+    }
+  }, [initialHtml])
 
   const sync = (editor) => {
     if (!editor) return
@@ -351,14 +359,15 @@ function RichTextEditor({ block, onChange }) {
         {toolbarButton('Imagem no texto', <Image className="h-4 w-4" />, insertImage)}
       </div>
       <div
+        ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        dir="ltr"
         role="textbox"
         aria-multiline="true"
         aria-label="Texto da mensagem"
         placeholder="Escreva a mensagem…"
         className="min-h-32 bg-background px-3 py-2 text-sm text-foreground outline-none [&_a]:text-primary [&_a]:underline [&_a[data-email-button]]:my-1 [&_a[data-email-button]]:inline-block [&_a[data-email-button]]:rounded-md [&_a[data-email-button]]:bg-primary [&_a[data-email-button]]:px-4 [&_a[data-email-button]]:py-2 [&_a[data-email-button]]:font-bold [&_a[data-email-button]]:text-primary-foreground [&_a[data-email-button]]:no-underline [&_img]:my-3 [&_img]:h-auto [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
-        dangerouslySetInnerHTML={{ __html: initialHtml }}
         onInput={(event) => sync(event.currentTarget)}
         onBlur={(event) => sync(event.currentTarget)}
         onPaste={(event) => {
