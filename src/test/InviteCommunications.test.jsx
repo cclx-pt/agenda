@@ -94,7 +94,9 @@ describe('InviteCommunications', () => {
     expect(screen.getByText('Conferência |')).toBeInTheDocument()
     expect(screen.getByLabelText('Assunto')).toHaveValue('O evento é amanhã')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar rascunho' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Guardar rascunho da comunicação' }),
+    )
 
     await waitFor(() =>
       expect(invitesService.createInviteCampaign).toHaveBeenCalledWith(

@@ -1741,9 +1741,9 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
             </>
           ) : (
             <>
-              <button type="button" className={ghostBtn} disabled={busy} onClick={save}>
+              <button type="button" className={primaryBtn} disabled={busy} onClick={save}>
                 <Save className="h-4 w-4" />
-                Guardar rascunho
+                Guardar rascunho da comunicação
               </button>
               <button type="button" className={ghostBtn} disabled={busy} onClick={sendTest}>
                 <Send className="h-4 w-4" />

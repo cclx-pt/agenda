@@ -1475,19 +1475,20 @@ function InviteEditor({ invite, onBack, onSaved }) {
         </>
       ) : null}
 
-      {/* Barra de ações fixa em baixo */}
-      <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-2 border-t border-border bg-background/95 py-3 backdrop-blur">
-        {dirty ? (
-          <span className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-            <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
-            Alterações por guardar
-          </span>
-        ) : null}
-        <button type="button" onClick={save} disabled={busy} className={primaryBtn}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          {SAVE_LABEL[activeTab] || 'Guardar convite'}
-        </button>
-      </div>
+      {SAVE_LABEL[activeTab] ? (
+        <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-2 border-t border-border bg-background/95 py-3 backdrop-blur">
+          {dirty ? (
+            <span className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
+              Alterações por guardar
+            </span>
+          ) : null}
+          <button type="button" onClick={save} disabled={busy} className={primaryBtn}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+            {SAVE_LABEL[activeTab]}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
