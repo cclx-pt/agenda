@@ -52,6 +52,20 @@ const receiptUpload = multer({
   fileFilter: (_req, file, cb) =>
     RECEIPT_TYPES.has(file.mimetype) ? cb(null, true) : cb(new Error('Formato inválido. Apenas PDF, PNG ou JPG.')),
 })
+const CAMPAIGN_IMAGE_TYPES = new Map([
+  ['image/png', '.png'],
+  ['image/jpeg', '.jpg'],
+  ['image/gif', '.gif'],
+  ['image/webp', '.webp'],
+])
+const campaignImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) =>
+    CAMPAIGN_IMAGE_TYPES.has(file.mimetype)
+      ? cb(null, true)
+      : cb(new Error('Formato inválido. Apenas PNG, JPG, GIF ou WebP.')),
+})
 
 const guestToken = (req) => (typeof req.query.g === 'string' ? req.query.g : undefined)
 
@@ -201,6 +215,37 @@ invitesRouter.post('/:id/campaigns/audience-preview', manageRoles, asyncHandler(
 invitesRouter.get('/:id/campaigns/templates', manageRoles, asyncHandler(async (req, res) => {
   res.json({ templates: await campaigns.listTemplates(req.user, req.params.id) })
 }))
+
+invitesRouter.post('/:id/campaigns/images', manageRoles, (req, res) => {
+  campaignImageUpload.single('file')(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? 'Ficheiro demasiado grande (máx. 5MB).'
+          : 'Falha no upload.'
+      return res.status(400).json({ error: message })
+    }
+    if (err) return res.status(400).json({ error: err.message || 'Falha no upload.' })
+    if (!req.file) return res.status(400).json({ error: 'Nenhuma imagem recebida.' })
+    if (!isStorageConfigured()) {
+      return res.status(503).json({ error: 'Armazenamento de imagens não configurado.' })
+    }
+    try {
+      await campaigns.list(req.user, req.params.id)
+      const url = await uploadImage(req.file.buffer, {
+        ext: CAMPAIGN_IMAGE_TYPES.get(req.file.mimetype),
+        contentType: req.file.mimetype,
+      })
+      res.status(201).json({ url })
+    } catch (uploadErr) {
+      if (uploadErr instanceof InviteError) {
+        return res.status(uploadErr.status).json({ error: uploadErr.message })
+      }
+      console.error('[campaigns] Falha ao guardar imagem:', uploadErr?.message ?? uploadErr)
+      res.status(502).json({ error: 'Falha ao guardar a imagem.' })
+    }
+  })
+})
 
 invitesRouter.post('/:id/campaigns/from-template', manageRoles, asyncHandler(async (req, res) => {
   res.status(201).json({

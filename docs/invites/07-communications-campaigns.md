@@ -51,7 +51,8 @@ Escopo implementado inicialmente:
 - filtros por estado da inscrição, pagamento, bilhete e check-in;
 - blocos email-safe: texto, imagem, vídeo/link, workshops, aviso e botão;
 - edição visual do bloco de texto com negrito, itálico, sublinhado, listas,
-  links, botões e imagens incorporadas;
+  links, botões e imagens incorporadas carregadas do computador para o storage
+  público (PNG, JPG, GIF ou WebP, até 5 MB);
 - rascunho, pré-visualização, envio de teste e envio imediato;
 - consulta de campanhas enviadas e cópia do conteúdo para um novo rascunho;
 - snapshot dos destinatários e estado individual de cada envio;

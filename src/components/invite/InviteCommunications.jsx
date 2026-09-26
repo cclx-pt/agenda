@@ -227,9 +227,12 @@ function safeHttpUrl(value) {
   }
 }
 
-function RichTextEditor({ block, onChange }) {
+function RichTextEditor({ inviteId, block, onChange }) {
   const initialHtml = block.html || textToEditorHtml(block.text)
   const editorRef = useRef(null)
+  const imageInputRef = useRef(null)
+  const selectionRef = useRef(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     const editor = editorRef.current
@@ -300,14 +303,58 @@ function RichTextEditor({ block, onChange }) {
     )
   }
 
-  const insertImage = (event) => {
-    const url = promptUrl('Endereço público da imagem:')
-    if (!url) return
-    const alt = window.prompt('Descrição da imagem:')?.trim() || ''
-    insertHtml(
-      event,
-      `<img src="${escapeEditorHtml(url)}" alt="${escapeEditorHtml(alt)}" />`
-    )
+  const selectImage = () => {
+    const selection = window.getSelection()
+    const editor = editorRef.current
+    if (
+      selection?.rangeCount &&
+      editor?.contains(selection.getRangeAt(0).commonAncestorContainer)
+    ) {
+      selectionRef.current = selection.getRangeAt(0).cloneRange()
+    }
+    imageInputRef.current?.click()
+  }
+
+  const uploadImageFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
+      toast.error('Escolha uma imagem PNG, JPG, GIF ou WebP.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('A imagem não pode exceder 5MB.')
+      return
+    }
+    setUploadingImage(true)
+    try {
+      const url = await invitesService.uploadInviteCampaignImage(inviteId, file)
+      const editor = editorRef.current
+      editor?.focus()
+      if (editor) {
+        const selection = window.getSelection()
+        const range = selectionRef.current ?? document.createRange()
+        if (!selectionRef.current) {
+          range.selectNodeContents(editor)
+          range.collapse(false)
+        }
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+      }
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<img src="${escapeEditorHtml(url)}" alt="${escapeEditorHtml(file.name)}" />`
+      )
+      sync(editor)
+      toast.success('Imagem carregada.')
+    } catch (error) {
+      toast.error(error.message || 'Falha ao carregar a imagem.')
+    } finally {
+      selectionRef.current = null
+      setUploadingImage(false)
+    }
   }
 
   const toolbarButton = (label, icon, action, commandName) => (
@@ -356,7 +403,29 @@ function RichTextEditor({ block, onChange }) {
           <span className="px-1 text-xs font-bold">Botão</span>,
           insertButton
         )}
-        {toolbarButton('Imagem no texto', <Image className="h-4 w-4" />, insertImage)}
+        <button
+          type="button"
+          className="rounded border border-border bg-background p-2 hover:bg-accent disabled:opacity-50"
+          aria-label={uploadingImage ? 'A carregar imagem' : 'Imagem no texto'}
+          title="Carregar imagem do computador"
+          disabled={uploadingImage}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={selectImage}
+        >
+          {uploadingImage ? (
+            <RotateCcw className="h-4 w-4 animate-spin" />
+          ) : (
+            <Image className="h-4 w-4" />
+          )}
+        </button>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          className="hidden"
+          aria-label="Carregar imagem do computador"
+          onChange={uploadImageFile}
+        />
       </div>
       <div
         ref={editorRef}
@@ -393,7 +462,7 @@ function RichTextEditor({ block, onChange }) {
   )
 }
 
-function BlockEditor({ block, onChange, onRemove }) {
+function BlockEditor({ inviteId, block, onChange, onRemove }) {
   const common = (
     <select
       className={inputCls}
@@ -435,7 +504,7 @@ function BlockEditor({ block, onChange, onRemove }) {
         </button>
       </div>
       {block.type === 'text' ? (
-        <RichTextEditor block={block} onChange={onChange} />
+        <RichTextEditor inviteId={inviteId} block={block} onChange={onChange} />
       ) : null}
       {block.type === 'warning' ? (
         <textarea
@@ -1600,6 +1669,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 {campaign.blocks.map((block, index) => (
                   <BlockEditor
                     key={index}
+                    inviteId={invite.id}
                     block={block}
                     onChange={(updated) =>
                       setCampaign({

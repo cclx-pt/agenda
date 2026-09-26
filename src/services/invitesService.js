@@ -135,6 +135,21 @@ export async function listInviteCampaignTemplates(inviteId) {
   return templates
 }
 
+export async function uploadInviteCampaignImage(inviteId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/data/invites/${inviteId}/campaigns/images`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || 'Falha ao carregar a imagem.')
+  }
+  return data.url
+}
+
 export async function createInviteCampaignFromTemplate(inviteId, templateKey) {
   const { campaign } = await request(`/data/invites/${inviteId}/campaigns/from-template`, {
     method: 'POST',

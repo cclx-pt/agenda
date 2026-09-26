@@ -25,6 +25,7 @@ vi.mock('../services/invitesService', () => ({
   saveInviteCampaignAutomation: vi.fn(),
   deleteInviteCampaignAutomation: vi.fn(),
   getInviteCampaignMetrics: vi.fn(),
+  uploadInviteCampaignImage: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -164,6 +165,38 @@ describe('InviteCommunications', () => {
     expect(editor).toHaveAttribute('dir', 'ltr')
     await userEvent.type(editor, 'olá')
     expect(editor).toHaveTextContent('olá')
+  })
+
+  it('uploads an inline image from the local computer', async () => {
+    invitesService.listInviteCampaigns.mockResolvedValue([])
+    invitesService.uploadInviteCampaignImage.mockResolvedValue(
+      'https://storage.example/message.png',
+    )
+    const execCommand = vi.fn().mockReturnValue(true)
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    })
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    const file = new File(['image'], 'mensagem.png', { type: 'image/png' })
+    await userEvent.upload(
+      screen.getByLabelText('Carregar imagem do computador'),
+      file,
+    )
+
+    await waitFor(() =>
+      expect(invitesService.uploadInviteCampaignImage).toHaveBeenCalledWith(
+        'invite-1',
+        file,
+      ),
+    )
+    expect(execCommand).toHaveBeenCalledWith(
+      'insertHTML',
+      false,
+      '<img src="https://storage.example/message.png" alt="mensagem.png" />',
+    )
   })
 
   it('shows recipient errors and retries only failed deliveries', async () => {
