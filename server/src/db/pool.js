@@ -35,8 +35,10 @@ export async function query(text, params) {
   return pgPool.query(text, params)
 }
 
-// Fachada compatível com o código existente (pool.query / pool.end).
+// Fachada compatível com o código existente. As operações que precisam de uma
+// transação usam connect() para reservar a mesma ligação até COMMIT/ROLLBACK.
 export const pool = {
   query,
+  connect: () => pgPool.connect(),
   end: () => pgPool.end(),
 }
