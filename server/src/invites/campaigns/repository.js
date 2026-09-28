@@ -549,6 +549,67 @@ export async function removeSegment(inviteId, id) {
   return rowCount > 0
 }
 
+function mapTemplate(row) {
+  return {
+    key: `custom:${row.id}`,
+    id: row.id,
+    label: row.name,
+    type: row.type,
+    subject: row.subject,
+    preheader: row.preheader ?? '',
+    blocks: row.blocks ?? [],
+    audience: row.audience ?? {},
+    custom: true,
+    automationCompatible: false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function listTemplates(inviteId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_campaign_templates WHERE invite_id = $1 ORDER BY name',
+    [inviteId]
+  )
+  return rows.map(mapTemplate)
+}
+
+export async function findTemplate(inviteId, id) {
+  const { rows } = await pool.query(
+    'SELECT * FROM invite_campaign_templates WHERE id = $1 AND invite_id = $2',
+    [id, inviteId]
+  )
+  return mapTemplate(rows[0])
+}
+
+export async function saveTemplateFromCampaign(inviteId, name, campaign, actorId) {
+  const { rows } = await pool.query(
+    `INSERT INTO invite_campaign_templates
+       (id, invite_id, name, type, subject, preheader, blocks, audience, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (invite_id, name) DO UPDATE SET
+       type = EXCLUDED.type,
+       subject = EXCLUDED.subject,
+       preheader = EXCLUDED.preheader,
+       blocks = EXCLUDED.blocks,
+       audience = EXCLUDED.audience,
+       updated_at = now()
+     RETURNING *`,
+    [
+      randomUUID(),
+      inviteId,
+      name,
+      campaign.type,
+      campaign.subject,
+      campaign.preheader || null,
+      JSON.stringify(campaign.blocks),
+      JSON.stringify(campaign.audience),
+      actorId ?? null,
+    ]
+  )
+  return mapTemplate(rows[0])
+}
+
 function mapAutomation(row) {
   return {
     id: row.id,

@@ -4,6 +4,7 @@ import {
   Bold,
   CalendarClock,
   Copy,
+  Download,
   Eye,
   Image,
   Italic,
@@ -216,6 +217,22 @@ function escapeEditorHtml(value) {
 
 function textToEditorHtml(value) {
   return escapeEditorHtml(value).replace(/\r?\n/g, '<br />')
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function recipientStatusLabel(status) {
+  return status === 'sent'
+    ? 'Enviado'
+    : status === 'failed'
+      ? 'Falhou'
+      : status === 'processing'
+        ? 'A enviar'
+        : status === 'skipped'
+          ? 'Ignorado'
+          : 'Em fila'
 }
 
 function normalizeEditorHtml(value) {
@@ -983,9 +1000,28 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     try {
       const queued = await invitesService.sendInviteCampaign(invite.id, saved.id)
       setCampaignStatus(queued.status)
+      setCampaign(queued)
       setPreview(true)
       toast.success(`Comunicação colocada em fila para ${result.count} destinatário(s).`)
       await Promise.all([load(), loadRecipients(saved.id)])
+      if (window.confirm('Quer guardar esta comunicação como template?')) {
+        const templateName = window.prompt('Nome do template:', saved.name)?.trim()
+        if (templateName) {
+          try {
+            const template = await invitesService.saveInviteCampaignTemplate(
+              invite.id,
+              { campaignId: saved.id, name: templateName }
+            )
+            setTemplates((current) => [
+              ...current.filter((item) => item.key !== template.key),
+              template,
+            ])
+            toast.success('Template guardado.')
+          } catch (error) {
+            toast.error(error.message)
+          }
+        }
+      }
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -1033,6 +1069,33 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       setBusy(false)
     }
   }
+
+  const downloadAudienceCsv = () => {
+    const rows = [
+      ['Nome', 'Email', 'Estado'],
+      ...recipients.map((recipient) => [
+        recipient.name || '',
+        recipient.email,
+        recipientStatusLabel(recipient.status),
+      ]),
+    ]
+    const csv = rows.map((row) => row.map(csvCell).join(';')).join('\r\n')
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    )
+    const link = document.createElement('a')
+    const safeName = (campaign.name || 'comunicacao')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase()
+    link.href = url
+    link.download = `${safeName || 'comunicacao'}-audiencia.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const saveSegment = async () => {
     const name = window.prompt('Nome do segmento:')?.trim()
     if (!name) return
@@ -1238,11 +1301,13 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 setAutomationDraft({ ...automationDraft, templateKey: event.target.value })
               }
             >
-              {templates.map((template) => (
+              {templates
+                .filter((template) => template.automationCompatible !== false)
+                .map((template) => (
                 <option key={template.key} value={template.key}>
                   {template.label}
                 </option>
-              ))}
+                ))}
             </select>
             <select
               className={inputCls}
@@ -1834,9 +1899,21 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
           <div className="rounded-lg border border-border">
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <h4 className="m-0 text-sm font-bold">Resultados por destinatário</h4>
-              <span className="text-xs text-muted-foreground">
-                {loadingRecipients ? 'A carregar…' : `${recipients.length} destinatário(s)`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {loadingRecipients ? 'A carregar…' : `${recipients.length} destinatário(s)`}
+                </span>
+                {!loadingRecipients && recipients.length ? (
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={downloadAudienceCsv}
+                  >
+                    <Download className="h-4 w-4" />
+                    Descarregar audiência CSV
+                  </button>
+                ) : null}
+              </div>
             </div>
             {processing && recipients.length ? (
               <div className="border-b border-border px-3 py-3">
@@ -1884,15 +1961,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                           <span className="text-xs text-muted-foreground">{recipient.email}</span>
                         </td>
                         <td className="px-3 py-2">
-                          {recipient.status === 'sent'
-                            ? 'Enviado'
-                            : recipient.status === 'failed'
-                              ? 'Falhou'
-                              : recipient.status === 'processing'
-                                ? 'A enviar'
-                                : recipient.status === 'skipped'
-                                  ? 'Ignorado'
-                                : 'Em fila'}
+                          {recipientStatusLabel(recipient.status)}
                         </td>
                         <td className="px-3 py-2">{recipient.attemptCount}</td>
                         <td className="max-w-72 px-3 py-2 text-xs text-destructive">

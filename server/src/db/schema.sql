@@ -554,6 +554,24 @@ CREATE TABLE IF NOT EXISTS invite_campaign_segments (
   UNIQUE (invite_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS invite_campaign_templates (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id   UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  type        TEXT NOT NULL
+                CHECK (type IN ('update', 'warning', 'reminder', 'post_event')),
+  subject     TEXT NOT NULL,
+  preheader   TEXT,
+  blocks      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  audience    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by  UUID REFERENCES users (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (invite_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_invite_campaign_templates_invite
+  ON invite_campaign_templates (invite_id, name);
+
 CREATE TABLE IF NOT EXISTS invite_campaign_automations (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invite_id      UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,

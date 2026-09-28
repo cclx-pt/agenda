@@ -216,6 +216,12 @@ invitesRouter.get('/:id/campaigns/templates', manageRoles, asyncHandler(async (r
   res.json({ templates: await campaigns.listTemplates(req.user, req.params.id) })
 }))
 
+invitesRouter.post('/:id/campaigns/templates', manageRoles, asyncHandler(async (req, res) => {
+  res.status(201).json({
+    template: await campaigns.saveTemplate(req.user, req.params.id, req.body),
+  })
+}))
+
 invitesRouter.post('/:id/campaigns/images', manageRoles, (req, res) => {
   campaignImageUpload.single('file')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {

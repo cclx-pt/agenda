@@ -138,6 +138,14 @@ export async function listInviteCampaignTemplates(inviteId) {
   return templates
 }
 
+export async function saveInviteCampaignTemplate(inviteId, payload) {
+  const { template } = await request(`/data/invites/${inviteId}/campaigns/templates`, {
+    method: 'POST',
+    body: payload,
+  })
+  return template
+}
+
 export async function uploadInviteCampaignImage(inviteId, file) {
   const form = new FormData()
   form.append('file', file)

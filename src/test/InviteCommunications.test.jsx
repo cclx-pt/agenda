@@ -15,6 +15,7 @@ vi.mock('../services/invitesService', () => ({
   listInviteCampaignRecipients: vi.fn(),
   retryFailedInviteCampaign: vi.fn(),
   listInviteCampaignTemplates: vi.fn(),
+  saveInviteCampaignTemplate: vi.fn(),
   createInviteCampaignFromTemplate: vi.fn(),
   listInviteCampaignSegments: vi.fn(),
   saveInviteCampaignSegment: vi.fn(),
@@ -56,6 +57,7 @@ const sentCampaign = {
 
 describe('InviteCommunications', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
     vi.clearAllMocks()
     invitesService.listInviteCampaigns.mockResolvedValue([sentCampaign])
     invitesService.listInviteCampaignRecipients.mockResolvedValue([])
@@ -254,11 +256,31 @@ describe('InviteCommunications', () => {
       failedCount: 0,
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const createObjectURL = vi.fn().mockReturnValue('blob:audience')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperties(URL, {
+      createObjectURL: { configurable: true, value: createObjectURL },
+      revokeObjectURL: { configurable: true, value: revokeObjectURL },
+    })
+    const clickDownload = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
 
     render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
 
     await userEvent.click(await screen.findByRole('button', { name: /Lembrete final/i }))
     expect(await screen.findByText('SMTP indisponível')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Descarregar audiência CSV' }),
+    ).toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Descarregar audiência CSV' }),
+    )
+    expect(createObjectURL).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'text/csv;charset=utf-8' }),
+    )
+    expect(clickDownload).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:audience')
     await userEvent.click(screen.getByRole('button', { name: 'Repetir falhados' }))
 
     await waitFor(() =>
@@ -300,7 +322,16 @@ describe('InviteCommunications', () => {
         attemptCount: 0,
       },
     ])
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'confirm')
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+    vi.spyOn(window, 'prompt').mockReturnValue('Template do aviso')
+    invitesService.saveInviteCampaignTemplate.mockResolvedValue({
+      key: 'custom:template-1',
+      label: 'Template do aviso',
+      custom: true,
+      automationCompatible: false,
+    })
 
     render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
 
@@ -317,6 +348,13 @@ describe('InviteCommunications', () => {
     )
     expect(screen.getByRole('heading', { name: 'Resultados da comunicação' })).toBeInTheDocument()
     expect(await screen.findByText('A aguardar processamento')).toBeInTheDocument()
+    expect(invitesService.saveInviteCampaignTemplate).toHaveBeenCalledWith(
+      'invite-1',
+      { campaignId: 'campaign-new', name: 'Template do aviso' },
+    )
+    expect(
+      screen.getByRole('button', { name: 'Template do aviso' }),
+    ).toBeInTheDocument()
   })
 
   it('creates a draft from a reusable template', async () => {

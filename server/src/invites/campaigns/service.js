@@ -148,6 +148,11 @@ const automationSchema = z.object({
   audience: audienceSchema.optional().default({}),
 })
 
+const savedTemplateSchema = z.object({
+  campaignId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+})
+
 const DELIVERY_BATCH_SIZE = 20
 const DELIVERY_MAX_ATTEMPTS = 3
 const DELIVERY_LEASE_SECONDS = 90
@@ -299,17 +304,47 @@ export async function listRecipients(user, inviteId, campaignId) {
 
 export async function listTemplates(user, inviteId) {
   await getInvite(user, inviteId)
-  return campaignTemplates
+  return [
+    ...campaignTemplates.map((template) => ({
+      ...template,
+      custom: false,
+      automationCompatible: true,
+    })),
+    ...(await campaignsRepo.listTemplates(inviteId)),
+  ]
 }
 
 export async function createFromTemplate(user, inviteId, templateKey) {
   const invite = await getInvite(user, inviteId)
-  const template = findCampaignTemplate(templateKey)
+  const customId = String(templateKey ?? '').startsWith('custom:')
+    ? String(templateKey).slice('custom:'.length)
+    : null
+  const template = customId
+    ? await campaignsRepo.findTemplate(inviteId, customId)
+    : findCampaignTemplate(templateKey)
   if (!template) throw new InviteError(404, 'Template não encontrado.')
   const eventLink = `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`
   return campaignsRepo.insert(
     inviteId,
     campaignSchema.parse(applyTemplate(template, invite, eventLink)),
+    user.sub
+  )
+}
+
+export async function saveTemplate(user, inviteId, input) {
+  await getInvite(user, inviteId)
+  const data = savedTemplateSchema.parse(input)
+  const { campaign } = await getCampaign(user, inviteId, data.campaignId)
+  if (campaign.status === 'draft') {
+    throw new InviteError(
+      409,
+      'Envie a comunicação antes de a guardar como template.'
+    )
+  }
+  return campaignsRepo.saveTemplateFromCampaign(
+    inviteId,
+    data.name,
+    campaign,
     user.sub
   )
 }

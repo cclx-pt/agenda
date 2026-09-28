@@ -58,6 +58,10 @@ Escopo implementado inicialmente:
 - snapshot dos destinatários e estado individual de cada envio;
 - histórico com totais enviados, falhados e ignorados, detalhe por destinatário
   e repetição apenas dos envios falhados;
+- snapshot da audiência de cada envio com nome, email e estado, consultável no
+  detalhe da comunicação e exportável em CSV;
+- possibilidade de guardar uma comunicação enviada como template personalizado
+  do convite, partilhado entre todos os utilizadores autorizados;
 - filtros combináveis pelas respostas do formulário do convite;
 - link pessoal do convite incluído no email de cada inscrito.
 - banner efetivo do evento no topo e opção de cancelamento de futuras
@@ -133,12 +137,18 @@ com o plano Hobby. Existe ainda uma execução administrativa manual do worker.
 
 ### Templates, segmentos e automatizações
 
-O editor inclui sete templates operacionais, segmentos de audiência guardados
-por convite e envio agendado em hora de Lisboa, persistido em UTC. Enquanto uma
-campanha estiver agendada pode ser reagendada ou cancelada. As automatizações
-suportam lembretes antes/depois do evento e pagamentos pendentes, reutilizam
-templates e audiências, e guardam uma chave de execução para não duplicarem uma
-campanha relativa à mesma data do evento.
+O editor inclui sete templates operacionais e templates personalizados criados
+a partir de comunicações enviadas. No fim do envio definitivo, o utilizador pode
+dar um nome ao conteúdo e audiência atuais e guardá-los como template partilhado
+do convite. Os templates personalizados podem criar novos rascunhos; os sete
+templates de sistema continuam a ser os disponíveis para automatizações.
+
+O módulo inclui ainda segmentos de audiência guardados por convite e envio
+agendado em hora de Lisboa, persistido em UTC. Enquanto uma campanha estiver
+agendada pode ser reagendada ou cancelada. As automatizações suportam lembretes
+antes/depois do evento e pagamentos pendentes, reutilizam templates de sistema e
+audiências, e guardam uma chave de execução para não duplicarem uma campanha
+relativa à mesma data do evento.
 
 O browser aberto consulta agendamentos e ativa trabalho vencido. O cron também
 processa agendamentos e automatizações; no plano Vercel Hobby, em que o cron é
