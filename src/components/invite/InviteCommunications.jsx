@@ -19,6 +19,7 @@ import {
   Trash2,
   Underline,
   Video,
+  X,
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -867,8 +868,8 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       audience: { ...current.audience, [key]: value },
     }))
   }
-  const loadRecipients = useCallback(async (selectedId) => {
-    setLoadingRecipients(true)
+  const loadRecipients = useCallback(async (selectedId, { silent = false } = {}) => {
+    if (!silent) setLoadingRecipients(true)
     try {
       setRecipients(
         await invitesService.listInviteCampaignRecipients(invite.id, selectedId)
@@ -882,28 +883,33 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       setMetrics(null)
       setValidationError(null)
     } finally {
-      setLoadingRecipients(false)
+      if (!silent) setLoadingRecipients(false)
     }
   }, [invite.id])
 
+  const hasActiveCampaigns = campaigns.some((item) =>
+    ['scheduled', 'queued', 'sending'].includes(item.status)
+  )
   useEffect(() => {
-    if (!campaigns.some((item) => ['scheduled', 'queued', 'sending'].includes(item.status)))
-      return undefined
+    if (!hasActiveCampaigns) return undefined
     const interval = window.setInterval(async () => {
       try {
         const nextCampaigns = await invitesService.listInviteCampaigns(invite.id)
         setCampaigns(nextCampaigns)
         const selected = nextCampaigns.find((item) => item.id === campaignId)
-        if (selected) {
+        if (
+          selected &&
+          ['scheduled', 'queued', 'sending'].includes(selected.status)
+        ) {
           setCampaignStatus(selected.status)
-          await loadRecipients(selected.id)
+          await loadRecipients(selected.id, { silent: true })
         }
       } catch (error) {
         toast.error(error.message)
       }
     }, 2500)
     return () => window.clearInterval(interval)
-  }, [campaignId, campaigns, invite.id, loadRecipients])
+  }, [campaignId, hasActiveCampaigns, invite.id, loadRecipients])
   const selectCampaign = (selected) => {
     setCampaignId(selected.id)
     setCampaignStatus(selected.status)
@@ -917,7 +923,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setMetrics(null)
     if (selected.status !== 'draft') loadRecipients(selected.id)
   }
-  const reset = () => {
+  const reset = useCallback(() => {
     setCampaignId(null)
     setCampaignStatus('draft')
     setCampaign(EMPTY)
@@ -928,7 +934,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setPreview(false)
     setScheduledAt('')
     setMetrics(null)
-  }
+  }, [])
   const duplicateAsDraft = () => {
     setCampaignId(null)
     setCampaignStatus('draft')
@@ -1252,6 +1258,20 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     }
   }
 
+  useEffect(() => {
+    if (!readOnly) return undefined
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') reset()
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [readOnly, reset])
+
   return (
     <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="rounded-lg border border-border bg-card p-3">
@@ -1443,7 +1463,26 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
           )}
         </div>
       </aside>
-      <section className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4">
+      <div
+        className={
+          readOnly
+            ? 'fixed inset-0 z-[400] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 max-[640px]:p-0'
+            : 'contents'
+        }
+        role={readOnly ? 'dialog' : undefined}
+        aria-modal={readOnly ? 'true' : undefined}
+        aria-label={readOnly ? `Gerir comunicação: ${campaign.name}` : undefined}
+        onClick={(event) => {
+          if (readOnly && event.target === event.currentTarget) reset()
+        }}
+      >
+      <section
+        className={
+          readOnly
+            ? 'flex max-h-[calc(100vh-4rem)] w-full max-w-6xl min-w-0 flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-2xl max-[640px]:min-h-full max-[640px]:max-h-none max-[640px]:rounded-none'
+            : 'flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4'
+        }
+      >
         <p className="m-0 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Espaço partilhado: todos os utilizadores com acesso a este convite podem consultar
           rascunhos, agendamentos, envios e resultados.
@@ -1462,6 +1501,17 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {readOnly ? (
+              <button
+                type="button"
+                className={ghostBtn}
+                onClick={reset}
+                aria-label="Fechar gestão da comunicação"
+              >
+                <X className="h-4 w-4" />
+                Fechar
+              </button>
+            ) : null}
             {campaignId ? (
               <button type="button" className={ghostBtn} onClick={duplicateAsDraft}>
                 <Copy className="h-4 w-4" />
@@ -2084,6 +2134,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
           evento.
         </p>
       </section>
+      </div>
     </div>
   )
 }

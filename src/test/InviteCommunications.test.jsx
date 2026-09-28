@@ -86,12 +86,16 @@ describe('InviteCommunications', () => {
       screen.getByText(/todos os utilizadores com acesso a este convite/i),
     ).toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: /Lembrete final/i }))
+    expect(
+      screen.getByRole('dialog', { name: 'Gerir comunicação: Lembrete final' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Resultados da comunicação' })).toBeInTheDocument()
 
     await userEvent.click(
       screen.getAllByRole('button', { name: 'Copiar para novo rascunho' })[0],
     )
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Novo rascunho' })).toBeInTheDocument()
     expect(screen.getByLabelText('Nome interno')).toHaveValue('Lembrete final (cópia)')
     expect(screen.getByText('Conferência |')).toBeInTheDocument()
