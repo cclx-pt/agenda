@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { matchesFormCondition, resolveAudience, retryDelayMs } from './service.js'
+import {
+  isRateLimitError,
+  matchesFormCondition,
+  resolveAudience,
+  retryDelayMs,
+} from './service.js'
 import { renderInviteCampaignEmail } from '../../auth/email.js'
 import { applyTemplate, campaignTemplates } from './templates.js'
 import {
@@ -113,6 +118,13 @@ test('matchesFormCondition supports booleans, numbers and empty answers', () => 
 test('retryDelayMs applies increasing backoff between delivery attempts', () => {
   assert.equal(retryDelayMs(1), 2_000)
   assert.equal(retryDelayMs(2), 10_000)
+  assert.equal(
+    isRateLimitError(
+      new Error('Message failed: 451 4.7.1 Ratelimit hostinger_out_ratelimit exceeded')
+    ),
+    true
+  )
+  assert.equal(isRateLimitError(new Error('Mailbox unavailable')), false)
 })
 
 test('campaign templates provide all reusable stage 6 messages', () => {

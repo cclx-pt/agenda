@@ -157,6 +157,8 @@ const DELIVERY_BATCH_SIZE = 5
 const DELIVERY_MAX_ATTEMPTS = 3
 const DELIVERY_LEASE_SECONDS = 90
 const DELIVERY_WORKER_BUDGET_MS = 40_000
+const DELIVERY_SEND_DELAY_MS = 1_000
+const DELIVERY_RATE_LIMIT_DELAY_MS = 30 * 60_000
 
 function canAccessChurch(user, community) {
   if (user?.role === 'admin' || !community) return true
@@ -540,6 +542,11 @@ export function retryDelayMs(attemptNumber) {
   return attemptNumber <= 1 ? 2_000 : 10_000
 }
 
+export function isRateLimitError(error) {
+  const message = String(error?.message ?? error).toLowerCase()
+  return message.includes('451 4.7.1') || message.includes('ratelimit')
+}
+
 function isPermanentDeliveryError(error) {
   return String(error?.message ?? error).includes('serviço de email não está configurado')
 }
@@ -568,13 +575,20 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
     }
   } catch (error) {
     const message = String(error?.message ?? error).slice(0, 1000)
+    const rateLimited = isRateLimitError(error)
     const canRetry =
-      attemptNumber < DELIVERY_MAX_ATTEMPTS && !isPermanentDeliveryError(error)
+      (rateLimited || attemptNumber < DELIVERY_MAX_ATTEMPTS) &&
+      !isPermanentDeliveryError(error)
     await campaignsRepo.markRecipientAttempt(recipient.id, {
       status: canRetry ? 'pending' : 'failed',
       error: message,
       nextAttemptAt: canRetry
-        ? new Date(Date.now() + retryDelayMs(attemptNumber))
+        ? new Date(
+            Date.now() +
+              (rateLimited
+                ? DELIVERY_RATE_LIMIT_DELAY_MS
+                : retryDelayMs(attemptNumber))
+          )
         : null,
     })
     try {
@@ -643,11 +657,10 @@ export async function processCampaign(campaignId) {
         DELIVERY_BATCH_SIZE
       )
       if (recipients.length) {
-        await Promise.all(
-          recipients.map((recipient) =>
-            deliverRecipient(invite, claimed, recipient, bannerUrl)
-          )
-        )
+        for (const recipient of recipients) {
+          await deliverRecipient(invite, claimed, recipient, bannerUrl)
+          await sleep(DELIVERY_SEND_DELAY_MS)
+        }
         continue
       }
 
