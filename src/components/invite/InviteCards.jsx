@@ -497,6 +497,8 @@ function PaymentCard({ block, page, accent }) {
   const amount = c.fixedAmount ?? inv.costAmount
   const currency = inv.costCurrency || 'EUR'
   const mode = inv.registrationMode || 'internal'
+  const registrationClosed = mode === 'internal' && inv.rsvpEnabled === false && !page.preview
+  if (registrationClosed) return null
   // Métodos aceites: a união dos métodos de todos os bilhetes (vários por bilhete).
   const ticketMethodSet = [
     ...new Set(tickets.flatMap((t) => t.paymentMethods || (t.paymentMethod ? [t.paymentMethod] : []))),
@@ -519,7 +521,7 @@ function PaymentCard({ block, page, accent }) {
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {tickets.map((t) => {
             const registerHref =
-              t.soldOut || mode === 'none'
+              t.soldOut || mode === 'none' || registrationClosed
                 ? null
                 : mode === 'external'
                   ? inv.registrationUrl || null
@@ -578,6 +580,8 @@ function TicketsCard({ block, page, accent }) {
   const content = block.content || {}
   const invite = page.invite
   const mode = invite.registrationMode || 'internal'
+  const registrationClosed = mode === 'internal' && invite.rsvpEnabled === false && !page.preview
+  if (registrationClosed) return null
   const tickets = (page.tickets || []).filter((ticket) => ticket.active !== false)
 
   return (
@@ -595,7 +599,7 @@ function TicketsCard({ block, page, accent }) {
       {tickets.length ? (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {tickets.map((ticket) => {
-            const href = ticket.soldOut || mode === 'none'
+            const href = ticket.soldOut || mode === 'none' || registrationClosed
               ? null
               : mode === 'external'
                 ? invite.registrationUrl || null

@@ -185,6 +185,7 @@ export function BannerRegistrationAction({ block, invite, tickets, slug, accent,
   const content = block.content || {}
   const mode = invite.registrationMode || 'internal'
   if (mode === 'none') return null
+  const registrationClosed = !preview && mode === 'internal' && invite.rsvpEnabled === false
 
   const activeTickets = (tickets || []).filter((ticket) => ticket.active !== false)
   const hasTickets = mode === 'internal' && activeTickets.length > 0
@@ -204,10 +205,14 @@ export function BannerRegistrationAction({ block, invite, tickets, slug, accent,
     </>
   )
 
-  if (mode === 'internal' && !guestStatus && (deadlinePassed || notOpenYet)) {
+  if (mode === 'internal' && !guestStatus && (registrationClosed || deadlinePassed || notOpenYet)) {
     return (
       <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-        {deadlinePassed ? 'O prazo de inscrição terminou.' : 'As inscrições ainda não abriram.'}
+        {registrationClosed
+          ? 'As inscrições estão fechadas.'
+          : deadlinePassed
+            ? 'O prazo de inscrição terminou.'
+            : 'As inscrições ainda não abriram.'}
       </p>
     )
   }
@@ -297,6 +302,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const c = block.content || {}
   const inv = page.invite
   const fields = getFormFields(c)
+  const registrationClosed = !preview && inv.rsvpEnabled === false
   // Em pré-visualização (organizador) o formulário mostra-se sempre, mesmo que o
   // prazo tenha terminado ou as inscrições ainda não tenham aberto.
   const [deadlinePassed] = useState(
@@ -744,7 +750,9 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     <div id="inscricoes" className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 className="m-0 mb-1 text-xl font-bold text-foreground">Inscrição</h2>
       {c.infoText ? <p className="m-0 mb-4 text-sm text-muted-foreground">{c.infoText}</p> : null}
-      {deadlinePassed ? (
+      {registrationClosed ? (
+        <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições estão fechadas.</p>
+      ) : deadlinePassed ? (
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">O prazo de inscrição terminou.</p>
       ) : notOpenYet ? (
         <p className="m-0 rounded-lg bg-muted p-3 text-sm text-muted-foreground">As inscrições ainda não abriram.</p>
