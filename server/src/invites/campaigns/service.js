@@ -544,11 +544,21 @@ export function retryDelayMs(attemptNumber) {
 
 export function isRateLimitError(error) {
   const message = String(error?.message ?? error).toLowerCase()
-  return message.includes('451 4.7.1') || message.includes('ratelimit')
+  return (
+    error?.status === 429 ||
+    error?.code === 'daily_quota' ||
+    message.includes('451 4.7.1') ||
+    message.includes('ratelimit')
+  )
 }
 
 function isPermanentDeliveryError(error) {
-  return String(error?.message ?? error).includes('serviço de email não está configurado')
+  return (
+    error?.permanent === true ||
+    String(error?.message ?? error).includes(
+      'serviço de email não está configurado'
+    )
+  )
 }
 
 function sleep(milliseconds) {
@@ -576,6 +586,10 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
   } catch (error) {
     const message = String(error?.message ?? error).slice(0, 1000)
     const rateLimited = isRateLimitError(error)
+    const retryAt =
+      error?.retryAt instanceof Date
+        ? error.retryAt
+        : new Date(Date.now() + DELIVERY_RATE_LIMIT_DELAY_MS)
     const canRetry =
       (rateLimited || attemptNumber < DELIVERY_MAX_ATTEMPTS) &&
       !isPermanentDeliveryError(error)
@@ -583,12 +597,9 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
       status: canRetry ? 'pending' : 'failed',
       error: message,
       nextAttemptAt: canRetry
-        ? new Date(
-            Date.now() +
-              (rateLimited
-                ? DELIVERY_RATE_LIMIT_DELAY_MS
-                : retryDelayMs(attemptNumber))
-          )
+        ? rateLimited
+          ? retryAt
+          : new Date(Date.now() + retryDelayMs(attemptNumber))
         : null,
     })
     try {
@@ -605,7 +616,7 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
         eventError
       )
     }
-    return
+    return { pauseUntil: rateLimited ? retryAt : null, error: message }
   }
 
   await campaignsRepo.markRecipientAttempt(recipient.id, {
@@ -627,6 +638,7 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
       eventError
     )
   }
+  return { pauseUntil: null }
 }
 
 export async function processCampaign(campaignId) {
@@ -657,9 +669,28 @@ export async function processCampaign(campaignId) {
         DELIVERY_BATCH_SIZE
       )
       if (recipients.length) {
-        for (const recipient of recipients) {
-          await deliverRecipient(invite, claimed, recipient, bannerUrl)
+        let providerPause = null
+        for (const [index, recipient] of recipients.entries()) {
+          const outcome = await deliverRecipient(
+            invite,
+            claimed,
+            recipient,
+            bannerUrl
+          )
+          if (outcome.pauseUntil) {
+            providerPause = outcome
+            await campaignsRepo.deferProcessingRecipients(
+              recipients.slice(index + 1).map((item) => item.id),
+              outcome.pauseUntil,
+              'Adiado devido ao limite temporário do fornecedor.'
+            )
+            break
+          }
           await sleep(DELIVERY_SEND_DELAY_MS)
+        }
+        if (providerPause) {
+          const summary = await campaignsRepo.getDeliverySummary(campaignId)
+          return campaignsRepo.releaseToQueue(campaignId, leaseToken, summary)
         }
         continue
       }

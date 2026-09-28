@@ -135,6 +135,12 @@ com backoff até ao limite de tentativas. A interface consulta o progresso enqua
 a campanha está em fila ou em envio; cada consulta também recupera trabalho cujo
 lease tenha expirado.
 
+Ao primeiro limite temporário do fornecedor, o worker devolve imediatamente à
+fila os restantes destinatários já reservados no lote, sem lhes gastar
+tentativas. No SMTP, o lote fica adiado durante 30 minutos. Na Brevo, o erro de
+quota diária adia os destinatários para o início do dia seguinte, permitindo ao
+cron diário retomar automaticamente a campanha.
+
 No Vercel, o processamento iniciado pelo pedido usa `waitUntil`. O cron diário
 existente também recupera campanhas pendentes como rede de segurança compatível
 com o plano Hobby. Existe ainda uma execução administrativa manual do worker.
@@ -162,9 +168,11 @@ permitida pelo plano.
 ### Fornecedor e métricas
 
 O envio passa por uma interface de fornecedor configurada por
-`CAMPAIGN_EMAIL_PROVIDER`; `smtp` é o adapter ativo e o valor por omissão. O
-remetente pode ser configurado por `CAMPAIGN_MAIL_FROM`, mas tem de ser uma conta
-ou alias autorizado pelo SMTP; sem configuração própria reutiliza `MAIL_FROM`.
+`CAMPAIGN_EMAIL_PROVIDER`; `smtp` é o valor por omissão e `brevo` usa a API
+transacional da Brevo apenas para campanhas, mantendo OTP e restantes emails no
+SMTP. O remetente pode ser configurado por `CAMPAIGN_MAIL_FROM`, mas tem de estar
+autenticado no fornecedor; sem configuração própria reutiliza `MAIL_FROM`. O
+adapter Brevo requer `BREVO_API_KEY`.
 Cada destinatário guarda fornecedor e identificador da mensagem, e cada
 tentativa gera um evento normalizado. O painel mostra aceites, falhas e
 tentativas.

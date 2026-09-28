@@ -422,6 +422,21 @@ export async function markRecipientAttempt(
   )
 }
 
+export async function deferProcessingRecipients(
+  recipientIds,
+  nextAttemptAt,
+  error
+) {
+  if (!recipientIds.length) return 0
+  const { rowCount } = await pool.query(
+    `UPDATE invite_campaign_recipients
+     SET status = 'pending', error = $3, next_attempt_at = $2
+     WHERE id = ANY($1::uuid[]) AND status = 'processing'`,
+    [recipientIds, nextAttemptAt, error]
+  )
+  return rowCount
+}
+
 export async function getDeliverySummary(campaignId) {
   const { rows } = await pool.query(
     `SELECT

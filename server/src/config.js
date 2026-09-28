@@ -71,6 +71,7 @@ export const config = {
     provider: (process.env.CAMPAIGN_EMAIL_PROVIDER ?? 'smtp').trim().toLowerCase(),
     from: process.env.CAMPAIGN_MAIL_FROM ?? process.env.MAIL_FROM ??
       'Agenda CCLX <agenda@cclx.pt>',
+    brevoApiKey: process.env.BREVO_API_KEY,
   },
 
   seed: {

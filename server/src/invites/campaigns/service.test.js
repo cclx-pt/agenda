@@ -124,6 +124,15 @@ test('retryDelayMs applies increasing backoff between delivery attempts', () => 
     ),
     true
   )
+  assert.equal(
+    isRateLimitError(
+      Object.assign(new Error('Not enough credits'), {
+        status: 402,
+        code: 'daily_quota',
+      })
+    ),
+    true
+  )
   assert.equal(isRateLimitError(new Error('Mailbox unavailable')), false)
 })
 
