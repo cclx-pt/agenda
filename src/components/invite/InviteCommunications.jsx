@@ -775,6 +775,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   const [campaignStatus, setCampaignStatus] = useState('draft')
   const [audienceCount, setAudienceCount] = useState(null)
   const [recipients, setRecipients] = useState([])
+  const [recipientFilter, setRecipientFilter] = useState('all')
   const [loadingRecipients, setLoadingRecipients] = useState(false)
   const [validationError, setValidationError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -822,6 +823,22 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
 
   const readOnly = campaignStatus !== 'draft'
   const processing = campaignStatus === 'queued' || campaignStatus === 'sending'
+  const recipientCounts = {
+    all: recipients.length,
+    sent: recipients.filter((recipient) => recipient.status === 'sent').length,
+    pending: recipients.filter((recipient) =>
+      ['pending', 'processing'].includes(recipient.status)
+    ).length,
+    error: recipients.filter((recipient) => recipient.error).length,
+  }
+  const filteredRecipients = recipients.filter((recipient) => {
+    if (recipientFilter === 'sent') return recipient.status === 'sent'
+    if (recipientFilter === 'pending') {
+      return ['pending', 'processing'].includes(recipient.status)
+    }
+    if (recipientFilter === 'error') return Boolean(recipient.error)
+    return true
+  })
   const audienceFields = formFields.filter(
     (field) =>
       field?.key &&
@@ -894,6 +911,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setAudienceCount(null)
     setPreview(selected.status !== 'draft')
     setRecipients([])
+    setRecipientFilter('all')
     setValidationError(null)
     setScheduledAt(isoToLisbonDateTime(selected.scheduledAt))
     setMetrics(null)
@@ -905,6 +923,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
     setCampaign(EMPTY)
     setAudienceCount(null)
     setRecipients([])
+    setRecipientFilter('all')
     setValidationError(null)
     setPreview(false)
     setScheduledAt('')
@@ -1053,6 +1072,29 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
       setCampaignStatus(retried.status)
       await Promise.all([load(), loadRecipients(campaignId)])
       toast.success('Os envios falhados foram colocados novamente em fila.')
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const retryRecipient = async (recipient) => {
+    if (
+      !campaignId ||
+      !window.confirm(`Reenviar apenas para ${recipient.email}?`)
+    )
+      return
+    setBusy(true)
+    try {
+      const retried = await invitesService.retryInviteCampaignRecipient(
+        invite.id,
+        campaignId,
+        recipient.id
+      )
+      setCampaignStatus(retried.status)
+      await Promise.all([load(), loadRecipients(campaignId)])
+      toast.success(`O envio para ${recipient.email} foi colocado em fila.`)
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -1922,6 +1964,27 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 ) : null}
               </div>
             </div>
+            {!loadingRecipients && recipients.length ? (
+              <div className="flex flex-wrap gap-2 border-b border-border p-3">
+                {[
+                  ['all', 'Todos'],
+                  ['sent', 'Enviados'],
+                  ['pending', 'Por enviar'],
+                  ['error', 'Erros'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={
+                      recipientFilter === value ? primaryBtn : ghostBtn
+                    }
+                    onClick={() => setRecipientFilter(value)}
+                  >
+                    {label} ({recipientCounts[value]})
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {processing && recipients.length ? (
               <div className="border-b border-border px-3 py-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
@@ -1958,10 +2021,11 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                       <th className="px-3 py-2">Estado</th>
                       <th className="px-3 py-2">Tentativas</th>
                       <th className="px-3 py-2">Erro</th>
+                      <th className="px-3 py-2">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recipients.map((recipient) => (
+                    {filteredRecipients.map((recipient) => (
                       <tr key={recipient.id} className="border-t border-border">
                         <td className="px-3 py-2">
                           <span className="block font-medium">{recipient.name || 'Sem nome'}</span>
@@ -1974,10 +2038,37 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                         <td className="max-w-72 px-3 py-2 text-xs text-destructive">
                           {recipient.error || '—'}
                         </td>
+                        <td className="px-3 py-2">
+                          {recipient.status === 'failed' ? (
+                            <button
+                              type="button"
+                              className={ghostBtn}
+                              disabled={busy}
+                              onClick={() => retryRecipient(recipient)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Reenviar
+                            </button>
+                          ) : recipient.error &&
+                            ['pending', 'processing'].includes(
+                              recipient.status
+                            ) ? (
+                            <span className="text-xs text-muted-foreground">
+                              Retentativa automática
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {!filteredRecipients.length ? (
+                  <p className="m-0 border-t border-border p-3 text-sm text-muted-foreground">
+                    Não existem destinatários neste filtro.
+                  </p>
+                ) : null}
               </div>
             ) : !loadingRecipients ? (
               <p className="m-0 p-3 text-sm text-muted-foreground">

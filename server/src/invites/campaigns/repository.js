@@ -257,6 +257,32 @@ export async function claimFailedRecipients(campaignId) {
   return rows.map((row) => ({ ...mapRecipient(row), guestToken: row.guest_token ?? null }))
 }
 
+export async function claimFailedRecipient(campaignId, recipientId) {
+  const { rows } = await pool.query(
+    `UPDATE invite_campaign_recipients
+     SET status = 'pending', error = NULL, next_attempt_at = now()
+     WHERE id = $1 AND campaign_id = $2 AND status = 'failed'
+     RETURNING *`,
+    [recipientId, campaignId]
+  )
+  return rows[0]
+    ? { ...mapRecipient(rows[0]), guestToken: rows[0].guest_token ?? null }
+    : null
+}
+
+export async function queueForRecipientRetry(id) {
+  await pool.query(
+    `UPDATE invite_campaigns SET
+       status = 'queued', queued_at = now(), sent_at = NULL,
+       processing_started_at = NULL, lease_expires_at = NULL,
+       lease_token = NULL, updated_at = now()
+     WHERE id = $1
+       AND status IN ('sent', 'sent_with_errors', 'failed')`,
+    [id]
+  )
+  return findById(id)
+}
+
 export async function initializeQueuedDelivery(campaignId) {
   const { rowCount } = await pool.query(
     `UPDATE invite_campaigns SET

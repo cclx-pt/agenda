@@ -763,3 +763,25 @@ export async function retryFailed(user, inviteId, campaignId) {
   await campaignsRepo.initializeQueuedDelivery(campaignId)
   return campaignsRepo.findById(campaignId)
 }
+
+export async function retryRecipient(
+  user,
+  inviteId,
+  campaignId,
+  recipientId
+) {
+  await getCampaign(user, inviteId, campaignId)
+  const recipient = await campaignsRepo.claimFailedRecipient(
+    campaignId,
+    recipientId
+  )
+  if (!recipient) {
+    throw new InviteError(
+      409,
+      'Este destinatário não tem um envio falhado para repetir.'
+    )
+  }
+  const campaign = await campaignsRepo.queueForRecipientRetry(campaignId)
+  await campaignsRepo.initializeQueuedDelivery(campaignId)
+  return campaign
+}

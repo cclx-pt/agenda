@@ -355,6 +355,21 @@ invitesRouter.post('/:id/campaigns/:campaignId/retry-failed', manageRoles, async
   res.status(202).json({ campaign })
 }))
 
+invitesRouter.post(
+  '/:id/campaigns/:campaignId/recipients/:recipientId/retry',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    const campaign = await campaigns.retryRecipient(
+      req.user,
+      req.params.id,
+      req.params.campaignId,
+      req.params.recipientId
+    )
+    scheduleCampaignWork(campaigns.processCampaign(campaign.id))
+    res.status(202).json({ campaign })
+  })
+)
+
 // Edita uma inscrição (nome/email/telemóvel/estado).
 invitesRouter.put(
   '/:id/guests/:guestId',

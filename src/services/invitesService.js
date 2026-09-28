@@ -133,6 +133,18 @@ export async function retryFailedInviteCampaign(inviteId, campaignId) {
   return campaign
 }
 
+export async function retryInviteCampaignRecipient(
+  inviteId,
+  campaignId,
+  recipientId
+) {
+  const { campaign } = await request(
+    `/data/invites/${inviteId}/campaigns/${campaignId}/recipients/${recipientId}/retry`,
+    { method: 'POST' }
+  )
+  return campaign
+}
+
 export async function listInviteCampaignTemplates(inviteId) {
   const { templates } = await request(`/data/invites/${inviteId}/campaigns/templates`)
   return templates

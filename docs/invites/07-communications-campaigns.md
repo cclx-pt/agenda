@@ -57,7 +57,8 @@ Escopo implementado inicialmente:
 - consulta de campanhas enviadas e cópia do conteúdo para um novo rascunho;
 - snapshot dos destinatários e estado individual de cada envio;
 - histórico com totais enviados, falhados e ignorados, detalhe por destinatário
-  e repetição apenas dos envios falhados;
+  e filtros por enviados, por enviar e erros; os falhados podem ser repetidos em
+  conjunto ou individualmente sem reenviar aos destinatários já concluídos;
 - snapshot da audiência de cada envio com nome, email e estado, consultável no
   detalhe da comunicação e exportável em CSV;
 - possibilidade de guardar uma comunicação enviada como template personalizado

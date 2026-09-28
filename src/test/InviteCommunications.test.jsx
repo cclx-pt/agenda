@@ -14,6 +14,7 @@ vi.mock('../services/invitesService', () => ({
   sendInviteCampaign: vi.fn(),
   listInviteCampaignRecipients: vi.fn(),
   retryFailedInviteCampaign: vi.fn(),
+  retryInviteCampaignRecipient: vi.fn(),
   listInviteCampaignTemplates: vi.fn(),
   saveInviteCampaignTemplate: vi.fn(),
   createInviteCampaignFromTemplate: vi.fn(),
@@ -248,12 +249,50 @@ describe('InviteCommunications', () => {
       error: 'SMTP indisponível',
     }
     invitesService.listInviteCampaigns.mockResolvedValue([failedCampaign])
-    invitesService.listInviteCampaignRecipients.mockResolvedValue([failedRecipient])
+    invitesService.listInviteCampaignRecipients.mockResolvedValue([
+      failedRecipient,
+      {
+        id: 'recipient-2',
+        name: 'Bruno',
+        email: 'bruno@example.test',
+        status: 'sent',
+        attemptCount: 1,
+        error: null,
+      },
+      {
+        id: 'recipient-3',
+        name: 'Carla',
+        email: 'carla@example.test',
+        status: 'pending',
+        attemptCount: 0,
+        error: null,
+      },
+      {
+        id: 'recipient-4',
+        name: 'Diogo',
+        email: 'diogo@example.test',
+        status: 'processing',
+        attemptCount: 1,
+        error: null,
+      },
+      {
+        id: 'recipient-5',
+        name: 'Eva',
+        email: 'eva@example.test',
+        status: 'skipped',
+        attemptCount: 0,
+        error: null,
+      },
+    ])
     invitesService.retryFailedInviteCampaign.mockResolvedValue({
       ...failedCampaign,
       status: 'sent',
       sentCount: 10,
       failedCount: 0,
+    })
+    invitesService.retryInviteCampaignRecipient.mockResolvedValue({
+      ...failedCampaign,
+      status: 'queued',
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const createObjectURL = vi.fn().mockReturnValue('blob:audience')
@@ -270,6 +309,26 @@ describe('InviteCommunications', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Lembrete final/i }))
     expect(await screen.findByText('SMTP indisponível')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Todos (5)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enviados (1)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Por enviar (2)' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Por enviar (2)' }))
+    expect(screen.getByText('carla@example.test')).toBeInTheDocument()
+    expect(screen.getByText('diogo@example.test')).toBeInTheDocument()
+    expect(screen.queryByText('bruno@example.test')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Reenviar' }),
+    ).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Erros (1)' }))
+    expect(screen.getByRole('button', { name: 'Reenviar' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Reenviar' }))
+    await waitFor(() =>
+      expect(invitesService.retryInviteCampaignRecipient).toHaveBeenCalledWith(
+        'invite-1',
+        'campaign-1',
+        'recipient-1',
+      ),
+    )
     expect(
       screen.getByRole('button', { name: 'Descarregar audiência CSV' }),
     ).toBeInTheDocument()
