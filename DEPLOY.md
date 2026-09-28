@@ -81,7 +81,8 @@ Depois de alterar variáveis é preciso **re-deploy** para terem efeito.
 | `SUPABASE_STORAGE_BUCKET` | nome do bucket público (ex.: `event-images`) |
 | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `OTP_PEPPER` | outra string longa e aleatória |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | credenciais de email para envio dos códigos OTP |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | credenciais de email e remetente dos emails transacionais |
+| `CAMPAIGN_EMAIL_PROVIDER` / `CAMPAIGN_MAIL_FROM` | fornecedor e remetente das comunicações dos convites (omissão: `smtp` e `Agenda CCLX <no-reply@cclx.pt>`) |
 | `INCHURCH_API_KEY` / `INCHURCH_API_SECRET` | credenciais da API inRadar (eventos externos) |
 | `CRON_SECRET` | segredo que protege a sincronização agendada — string longa e aleatória; o Vercel Cron envia-a automaticamente |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_NAME` | (opcional) admin inicial (omissão: `admin@cclx.pt`) |

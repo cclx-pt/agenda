@@ -69,6 +69,9 @@ export const config = {
 
   campaignEmail: {
     provider: (process.env.CAMPAIGN_EMAIL_PROVIDER ?? 'smtp').trim().toLowerCase(),
+    from:
+      process.env.CAMPAIGN_MAIL_FROM ??
+      'Agenda CCLX <no-reply@cclx.pt>',
   },
 
   seed: {

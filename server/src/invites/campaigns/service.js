@@ -428,6 +428,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
   if (campaign.status !== 'draft')
     throw new InviteError(409, 'Apenas rascunhos podem ser testados.')
   const recipient = testSchema.parse(input)
+  const guest = await invitesRepo.findGuestByEmail(inviteId, recipient.email)
   return getCampaignProvider().send(recipient.email, {
     recipientName: recipient.name,
     recipientEmail: recipient.email,
@@ -437,6 +438,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
     blocks: campaign.blocks,
     eventLink: `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`,
     bannerUrl: await resolveInviteBanner(invite),
+    ...unsubscribeLinks(invite, guest?.token),
   })
 }
 

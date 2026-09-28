@@ -258,8 +258,8 @@ test('renderInviteCampaignEmail uses a responsive table layout for email clients
   assert.match(message.html, /https:\/\/example\.test\/banner\.jpg/)
   assert.match(message.html, /Este email foi enviado para/)
   assert.match(message.html, /mailto:ana@example\.test/)
-  assert.match(message.html, /Cancelar futuras comunicações apenas deste evento/)
-  assert.match(message.html, /não afeta inscrições ou comunicações de outros eventos/)
+  assert.match(message.html, /Cancelar comunicações deste evento/)
+  assert.match(message.html, /não cancela a inscrição nem afeta outros eventos/)
   assert.match(message.text, /Este email foi enviado para ana@example\.test\./)
   assert.match(message.text, /Cancelar futuras comunicações apenas deste evento:/)
   assert.equal(

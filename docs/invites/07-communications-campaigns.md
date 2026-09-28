@@ -161,9 +161,12 @@ permitida pelo plano.
 ### Fornecedor e métricas
 
 O envio passa por uma interface de fornecedor configurada por
-`CAMPAIGN_EMAIL_PROVIDER`; `smtp` é o adapter ativo e o valor por omissão. Cada
-destinatário guarda fornecedor e identificador da mensagem, e cada tentativa
-gera um evento normalizado. O painel mostra aceites, falhas e tentativas.
+`CAMPAIGN_EMAIL_PROVIDER`; `smtp` é o adapter ativo e o valor por omissão. As
+comunicações usam `Agenda CCLX <no-reply@cclx.pt>` por omissão, configurável por
+`CAMPAIGN_MAIL_FROM`, sem alterar o remetente dos restantes emails transacionais.
+Cada destinatário guarda fornecedor e identificador da mensagem, e cada
+tentativa gera um evento normalizado. O painel mostra aceites, falhas e
+tentativas.
 
 “Aceite pelo SMTP” não significa “entregue”. Como SMTP não disponibiliza
 webhooks neste adapter, a interface mostra entrega confirmada como indisponível.

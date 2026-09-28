@@ -756,10 +756,12 @@ function CampaignPreview({ campaign, invite }) {
           <br />
           Este email será enviado para o endereço de cada destinatário.
           <br />
-          <span className="underline">
-            Cancelar futuras comunicações apenas deste evento
+          <span className="mt-2 inline-block rounded border border-gray-400 bg-white px-3 py-2 font-bold text-gray-700">
+            Cancelar comunicações deste evento
           </span>
-          . Esta ação não afeta inscrições ou comunicações de outros eventos.
+          <br />
+          Deixará de receber futuras comunicações apenas deste evento. Esta ação não
+          cancela a inscrição nem afeta outros eventos.
         </div>
       </div>
     </div>

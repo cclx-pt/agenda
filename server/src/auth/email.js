@@ -210,7 +210,7 @@ export function renderInviteCampaignEmail({
               }
               ${
                 unsubscribeUrl
-                  ? `<br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#4b5563;text-decoration:underline">Cancelar futuras comunicações apenas deste evento</a>. Esta ação não afeta inscrições ou comunicações de outros eventos.`
+                  ? `<br /><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:12px"><tr><td bgcolor="#ffffff" style="border:1px solid #9ca3af;border-radius:5px"><a href="${escapeHtml(unsubscribeUrl)}" style="display:inline-block;padding:8px 12px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:12px;line-height:16px;font-weight:700;color:#374151;text-decoration:none">Cancelar comunicações deste evento</a></td></tr></table><div style="padding-top:8px">Deixará de receber futuras comunicações apenas deste evento. Esta ação não cancela a inscrição nem afeta outros eventos.</div>`
                   : ''
               }
             </td>
@@ -247,7 +247,11 @@ export async function sendInviteCampaignEmail(to, data) {
     console.log(`\n[email:mock] Comunicação de convite para: ${to}\n[email:mock] Assunto: ${message.subject}\n`)
     return { mocked: true }
   }
-  const result = await tx.sendMail({ from: config.smtp.from, to, ...message })
+  const result = await tx.sendMail({
+    from: config.campaignEmail.from,
+    to,
+    ...message,
+  })
   return { mocked: false, messageId: result.messageId ?? null }
 }
 
