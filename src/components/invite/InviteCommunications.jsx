@@ -218,6 +218,12 @@ function textToEditorHtml(value) {
   return escapeEditorHtml(value).replace(/\r?\n/g, '<br />')
 }
 
+function normalizeEditorHtml(value) {
+  return String(value ?? '')
+    .replace(/<div(?:\s[^>]*)?>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+}
+
 function safeHttpUrl(value) {
   try {
     const url = new URL(value)
@@ -228,7 +234,9 @@ function safeHttpUrl(value) {
 }
 
 function RichTextEditor({ inviteId, block, onChange }) {
-  const initialHtml = block.html || textToEditorHtml(block.text)
+  const initialHtml = normalizeEditorHtml(
+    block.html || textToEditorHtml(block.text)
+  )
   const editorRef = useRef(null)
   const imageInputRef = useRef(null)
   const selectionRef = useRef(null)
@@ -236,16 +244,21 @@ function RichTextEditor({ inviteId, block, onChange }) {
 
   useEffect(() => {
     const editor = editorRef.current
-    if (editor && editor.innerHTML !== initialHtml) {
+    if (
+      editor &&
+      document.activeElement !== editor &&
+      editor.innerHTML !== initialHtml
+    ) {
       editor.innerHTML = initialHtml
     }
   }, [initialHtml])
 
   const sync = (editor) => {
     if (!editor) return
+    const html = normalizeEditorHtml(editor.innerHTML)
     onChange({
       ...block,
-      html: editor.innerHTML,
+      html,
       text: String(editor.innerText ?? editor.textContent ?? '')
         .replace(/\u00a0/g, ' ')
         .trim(),
@@ -436,9 +449,17 @@ function RichTextEditor({ inviteId, block, onChange }) {
         aria-multiline="true"
         aria-label="Texto da mensagem"
         placeholder="Escreva a mensagem…"
-        className="min-h-32 bg-background px-3 py-2 text-sm text-foreground outline-none [&_a]:text-primary [&_a]:underline [&_a[data-email-button]]:my-1 [&_a[data-email-button]]:inline-block [&_a[data-email-button]]:rounded-md [&_a[data-email-button]]:bg-primary [&_a[data-email-button]]:px-4 [&_a[data-email-button]]:py-2 [&_a[data-email-button]]:font-bold [&_a[data-email-button]]:text-primary-foreground [&_a[data-email-button]]:no-underline [&_img]:my-3 [&_img]:h-auto [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+        className="min-h-32 bg-background px-3 py-2 text-sm text-foreground outline-none [&_a]:text-primary [&_a]:underline [&_a[data-email-button]]:my-1 [&_a[data-email-button]]:inline-block [&_a[data-email-button]]:rounded-md [&_a[data-email-button]]:bg-primary [&_a[data-email-button]]:px-4 [&_a[data-email-button]]:py-2 [&_a[data-email-button]]:font-bold [&_a[data-email-button]]:text-primary-foreground [&_a[data-email-button]]:no-underline [&_img]:my-3 [&_img]:h-auto [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-3 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-6"
+        onFocus={() =>
+          document.execCommand?.('defaultParagraphSeparator', false, 'p')
+        }
         onInput={(event) => sync(event.currentTarget)}
-        onBlur={(event) => sync(event.currentTarget)}
+        onBlur={(event) => {
+          sync(event.currentTarget)
+          event.currentTarget.innerHTML = normalizeEditorHtml(
+            event.currentTarget.innerHTML
+          )
+        }}
         onPaste={(event) => {
           event.preventDefault()
           document.execCommand(

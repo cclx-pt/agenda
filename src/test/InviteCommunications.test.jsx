@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InviteCommunications from '../components/invite/InviteCommunications'
 import * as invitesService from '../services/invitesService'
@@ -170,6 +170,37 @@ describe('InviteCommunications', () => {
     expect(editor).toHaveAttribute('dir', 'ltr')
     await userEvent.type(editor, 'olá')
     expect(editor).toHaveTextContent('olá')
+  })
+
+  it('normalizes browser text blocks to paragraphs before saving', async () => {
+    invitesService.listInviteCampaigns.mockResolvedValue([])
+
+    render(<InviteCommunications invite={{ id: 'invite-1', title: 'Conferência' }} />)
+
+    const editor = screen.getByRole('textbox', { name: 'Texto da mensagem' })
+    editor.innerHTML =
+      '<div>Primeiro parágrafo</div><div><br></div><div>Segundo parágrafo</div>'
+    fireEvent.input(editor)
+    await userEvent.type(screen.getByLabelText('Nome interno'), 'Mensagem')
+    await userEvent.type(screen.getByLabelText('Assunto'), 'Informação')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Guardar rascunho da comunicação' }),
+    )
+
+    await waitFor(() =>
+      expect(invitesService.createInviteCampaign).toHaveBeenCalledWith(
+        'invite-1',
+        expect.objectContaining({
+          blocks: [
+            expect.objectContaining({
+              type: 'text',
+              html:
+                '<p>Primeiro parágrafo</p><p><br></p><p>Segundo parágrafo</p>',
+            }),
+          ],
+        }),
+      ),
+    )
   })
 
   it('uploads an inline image from the local computer', async () => {

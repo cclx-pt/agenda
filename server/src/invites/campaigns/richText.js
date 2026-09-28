@@ -30,6 +30,7 @@ export function sanitizeCampaignRichText(value) {
     transformTags: {
       b: 'strong',
       i: 'em',
+      div: 'p',
     },
     exclusiveFilter(frame) {
       return frame.tag === 'a' && !frame.attribs.href

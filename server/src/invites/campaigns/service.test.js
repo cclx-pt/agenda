@@ -170,6 +170,21 @@ test('rich campaign text keeps safe formatting and removes active content', () =
   assert.match(richTextToPlainText('<p>Primeiro</p><p>Segundo</p>'), /Primeiro\nSegundo/)
 })
 
+test('rich campaign text preserves paragraphs created by contenteditable', () => {
+  const sanitized = sanitizeCampaignRichText(
+    '<div>Primeiro parágrafo</div><div><br></div><div>Segundo parágrafo</div>'
+  )
+
+  assert.equal(
+    sanitized,
+    '<p>Primeiro parágrafo</p><p><br /></p><p>Segundo parágrafo</p>'
+  )
+  assert.equal(
+    richTextToPlainText(sanitized),
+    'Primeiro parágrafo\nSegundo parágrafo'
+  )
+})
+
 test('renderInviteCampaignEmail renders formatted text, inline buttons and images', () => {
   const message = renderInviteCampaignEmail({
     recipientName: 'Ana',
@@ -191,6 +206,26 @@ test('renderInviteCampaignEmail renders formatted text, inline buttons and image
   assert.match(message.html, /display:inline-block/)
   assert.match(message.html, /https:\/\/example\.test\/inline\.jpg/)
   assert.match(message.text, /Importante e urgente\./)
+})
+
+test('renderInviteCampaignEmail keeps contenteditable paragraphs separated', () => {
+  const message = renderInviteCampaignEmail({
+    eventTitle: 'Conferência',
+    subject: 'Informação',
+    blocks: [
+      {
+        type: 'text',
+        text: 'Primeiro parágrafo\nSegundo parágrafo',
+        html: '<div>Primeiro parágrafo</div><div>Segundo parágrafo</div>',
+      },
+    ],
+  })
+
+  assert.match(
+    message.html,
+    /<p style="margin:0 0 16px">Primeiro parágrafo<\/p><p style="margin:0 0 16px">Segundo parágrafo<\/p>/
+  )
+  assert.match(message.text, /Primeiro parágrafo\nSegundo parágrafo/)
 })
 
 test('renderInviteCampaignEmail uses a responsive table layout for email clients', () => {
