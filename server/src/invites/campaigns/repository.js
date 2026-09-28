@@ -175,7 +175,7 @@ export async function queueDueScheduled(limit = 20) {
        SELECT id FROM invite_campaigns
        WHERE status = 'scheduled' AND scheduled_at <= now()
        ORDER BY scheduled_at
-       FOR UPDATE OF r SKIP LOCKED
+       FOR UPDATE SKIP LOCKED
        LIMIT $1
      )
      RETURNING *`,
