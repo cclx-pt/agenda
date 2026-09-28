@@ -430,6 +430,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
   const recipient = testSchema.parse(input)
   return getCampaignProvider().send(recipient.email, {
     recipientName: recipient.name,
+    recipientEmail: recipient.email,
     eventTitle: invite.title,
     subject: campaign.subject,
     preheader: campaign.preheader,
@@ -551,6 +552,7 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
   try {
     delivery = await getCampaignProvider().send(recipient.email, {
       recipientName: recipient.name,
+      recipientEmail: recipient.email,
       eventTitle: invite.title,
       subject: campaign.subject,
       preheader: campaign.preheader,

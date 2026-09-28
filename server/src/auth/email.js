@@ -125,6 +125,7 @@ function campaignBlockHtml(block) {
 }
 
 export function renderInviteCampaignEmail({
+  recipientEmail,
   eventTitle,
   subject,
   preheader,
@@ -146,7 +147,14 @@ export function renderInviteCampaignEmail({
     if (block.type === 'workshops') return `Workshops:\n${block.items.map((item) => `- ${item.title}${item.description ? `: ${item.description}` : ''}`).join('\n')}`
     return ''
   }).filter(Boolean)
-  const text = `${textBlocks.join('\n\n')}${unsubscribeUrl ? `\n\nCancelar a receção de emails deste evento: ${unsubscribeUrl}` : ''}`
+  const recipientNotice = recipientEmail
+    ? `Este email foi enviado para ${recipientEmail}.`
+    : ''
+  const unsubscribeNotice = unsubscribeUrl
+    ? `Cancelar futuras comunicações apenas deste evento: ${unsubscribeUrl}`
+    : ''
+  const footerText = [recipientNotice, unsubscribeNotice].filter(Boolean).join('\n')
+  const text = `${textBlocks.join('\n\n')}${footerText ? `\n\n${footerText}` : ''}`
   const html = `<!doctype html>
 <html lang="pt">
 <head>
@@ -196,8 +204,13 @@ export function renderInviteCampaignEmail({
               Comunicação operacional relativa à sua inscrição.<br />
               Agenda CCLX
               ${
+                recipientEmail
+                  ? `<br />Este email foi enviado para <a href="mailto:${escapeHtml(recipientEmail)}" style="color:#4b5563;text-decoration:underline">${escapeHtml(recipientEmail)}</a>.`
+                  : ''
+              }
+              ${
                 unsubscribeUrl
-                  ? `<br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#4b5563;text-decoration:underline">Cancelar a receção de emails deste evento</a>`
+                  ? `<br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#4b5563;text-decoration:underline">Cancelar futuras comunicações apenas deste evento</a>. Esta ação não afeta inscrições ou comunicações de outros eventos.`
                   : ''
               }
             </td>

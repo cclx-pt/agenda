@@ -754,7 +754,12 @@ function CampaignPreview({ campaign, invite }) {
           <br />
           Agenda CCLX
           <br />
-          <span className="underline">Cancelar a receção de emails deste evento</span>
+          Este email será enviado para o endereço de cada destinatário.
+          <br />
+          <span className="underline">
+            Cancelar futuras comunicações apenas deste evento
+          </span>
+          . Esta ação não afeta inscrições ou comunicações de outros eventos.
         </div>
       </div>
     </div>

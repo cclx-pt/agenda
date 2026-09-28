@@ -66,6 +66,9 @@ Escopo implementado inicialmente:
 - link pessoal do convite incluído no email de cada inscrito.
 - banner efetivo do evento no topo e opção de cancelamento de futuras
   comunicações desse convite;
+- rodapé individualizado com o email do destinatário e indicação explícita de
+  que o cancelamento remove a inscrição apenas das comunicações futuras desse
+  evento, sem afetar outros eventos;
 
 Não fazem parte da Fase 1:
 
