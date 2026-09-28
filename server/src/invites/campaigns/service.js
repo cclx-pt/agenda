@@ -153,7 +153,7 @@ const savedTemplateSchema = z.object({
   name: z.string().trim().min(1).max(120),
 })
 
-const DELIVERY_BATCH_SIZE = 20
+const DELIVERY_BATCH_SIZE = 5
 const DELIVERY_MAX_ATTEMPTS = 3
 const DELIVERY_LEASE_SECONDS = 90
 const DELIVERY_WORKER_BUDGET_MS = 40_000
@@ -624,6 +624,7 @@ export async function processCampaign(campaignId) {
     DELIVERY_LEASE_SECONDS
   )
   if (!claimed) return campaignsRepo.findById(campaignId)
+  await campaignsRepo.recoverProcessingRecipients(campaignId)
 
   const invite = await invitesRepo.findById(claimed.inviteId)
   if (!invite) return null

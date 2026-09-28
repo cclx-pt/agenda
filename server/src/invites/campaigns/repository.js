@@ -313,16 +313,20 @@ export async function extendCampaignLease(id, leaseToken, leaseSeconds = 90) {
   return rowCount > 0
 }
 
+export async function recoverProcessingRecipients(campaignId) {
+  const { rowCount } = await pool.query(
+    `UPDATE invite_campaign_recipients
+     SET status = 'pending'
+     WHERE campaign_id = $1 AND status = 'processing'`,
+    [campaignId]
+  )
+  return rowCount
+}
+
 export async function claimRecipientBatch(campaignId, limit = 20) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    await client.query(
-      `UPDATE invite_campaign_recipients
-       SET status = 'pending'
-       WHERE campaign_id = $1 AND status = 'processing'`,
-      [campaignId]
-    )
     await client.query(
       `UPDATE invite_campaign_recipients r
        SET status = 'skipped', error = 'Receção de emails cancelada nesta inscrição.'
