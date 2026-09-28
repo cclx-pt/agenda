@@ -341,7 +341,7 @@ export async function claimRecipientBatch(campaignId, limit = 20) {
          AND r.status = 'pending'
          AND r.next_attempt_at <= now()
        ORDER BY r.next_attempt_at, r.created_at
-       FOR UPDATE SKIP LOCKED
+       FOR UPDATE OF r SKIP LOCKED
        LIMIT $2`,
       [campaignId, limit]
     )
