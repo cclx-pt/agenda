@@ -86,6 +86,27 @@ export async function listInviteGuests(id) {
   return guests
 }
 
+export async function listRegistrationLinks(inviteId) {
+  const { links } = await request(`/data/invites/${inviteId}/registration-links`)
+  return links
+}
+
+export async function createRegistrationLink(inviteId, payload) {
+  const { link } = await request(`/data/invites/${inviteId}/registration-links`, {
+    method: 'POST',
+    body: payload,
+  })
+  return link
+}
+
+export async function updateRegistrationLink(inviteId, linkId, payload) {
+  const { link } = await request(`/data/invites/${inviteId}/registration-links/${linkId}`, {
+    method: 'PUT',
+    body: payload,
+  })
+  return link
+}
+
 export async function rotateRegistrationsApiKey(inviteId) {
   const { credential } = await request(`/data/invites/${inviteId}/registrations-api/key`, {
     method: 'POST',

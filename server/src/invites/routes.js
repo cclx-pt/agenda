@@ -90,6 +90,11 @@ invitesRouter.param('guestId', (req, res, next, id) => {
   next()
 })
 
+invitesRouter.param('registrationLinkId', (req, res, next, id) => {
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Link privado não encontrado.' })
+  next()
+})
+
 invitesRouter.param('campaignId', (req, res, next, id) => {
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Comunicação não encontrada.' })
   next()
@@ -188,6 +193,37 @@ invitesRouter.get(
   manageRoles,
   asyncHandler(async (req, res) => {
     res.json({ guests: await service.listGuests(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.get(
+  '/:id/registration-links',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ links: await service.listRegistrationLinks(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.post(
+  '/:id/registration-links',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.status(201).json({ link: await service.createRegistrationLink(req.user, req.params.id, req.body) })
+  })
+)
+
+invitesRouter.put(
+  '/:id/registration-links/:registrationLinkId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({
+      link: await service.updateRegistrationLink(
+        req.user,
+        req.params.id,
+        req.params.registrationLinkId,
+        req.body
+      ),
+    })
   })
 )
 

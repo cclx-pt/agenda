@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 process.env.JWT_SECRET ||= 'test-secret'
 process.env.OTP_PEPPER ||= 'test-pepper'
+process.env.DATABASE_URL ||= 'postgresql://test:test@localhost:5432/test'
 
 const {
   blocksSchema,
@@ -66,6 +67,8 @@ test('registration API payload excludes private guest access tokens', () => {
       rsvpState: 'confirmed',
       paymentState: 'paid',
       ticketId: 'ticket-1',
+      isPrivateRegistration: true,
+      registrationLinkLabel: 'Convidados especiais',
     }],
     [{ id: 'ticket-1', name: 'General' }],
     '2026-09-29T22:00:00.000Z'
@@ -73,5 +76,7 @@ test('registration API payload excludes private guest access tokens', () => {
 
   assert.equal(payload.total, 1)
   assert.equal(payload.registrations[0].ticket.name, 'General')
+  assert.equal(payload.registrations[0].isPrivateRegistration, true)
+  assert.equal(payload.registrations[0].registrationLinkLabel, 'Convidados especiais')
   assert.equal('token' in payload.registrations[0], false)
 })

@@ -88,7 +88,25 @@ function mapGuest(row) {
     checkedInAt: row.checked_in_at ?? null,
     refundRequestedAt: row.refund_requested_at ?? null,
     adminNotes: row.admin_notes ?? null,
+    registrationLinkId: row.registration_link_id ?? null,
+    registrationLinkLabel: row.registration_link_label ?? null,
+    isPrivateRegistration: !!row.registration_link_id,
     emailOptedOutAt: row.email_opted_out_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function mapRegistrationLink(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    inviteId: row.invite_id,
+    token: row.token,
+    label: row.label,
+    maxRegistrations: row.max_registrations,
+    registrationsCount: row.registrations_count ?? 0,
+    isActive: !!row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -380,14 +398,58 @@ export async function replaceBlocks(inviteId, blocks) {
   return listBlocks(inviteId)
 }
 
+// ── Links privados de inscrição ─────────────────────────────────
+
+export async function listRegistrationLinks(inviteId) {
+  const { rows } = await pool.query(
+    `SELECT link.*,
+            (COUNT(guest.id) FILTER (WHERE guest.rsvp_state IN ('pending', 'confirmed', 'waitlisted')))::int AS registrations_count
+     FROM invite_registration_links link
+     LEFT JOIN invite_guests guest ON guest.registration_link_id = link.id
+     WHERE link.invite_id = $1
+     GROUP BY link.id
+     ORDER BY link.created_at DESC`,
+    [inviteId]
+  )
+  return rows.map(mapRegistrationLink)
+}
+
+export async function insertRegistrationLink(inviteId, data) {
+  const id = randomUUID()
+  const { rows } = await pool.query(
+    `INSERT INTO invite_registration_links
+       (id, invite_id, token, label, max_registrations)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *, 0::int AS registrations_count`,
+    [id, inviteId, data.token, data.label, data.maxRegistrations]
+  )
+  return mapRegistrationLink(rows[0])
+}
+
+export async function updateRegistrationLink(inviteId, linkId, data) {
+  const { rows } = await pool.query(
+    `UPDATE invite_registration_links
+     SET label = COALESCE($3, label),
+         max_registrations = COALESCE($4, max_registrations),
+         is_active = COALESCE($5, is_active),
+         updated_at = now()
+     WHERE id = $1 AND invite_id = $2
+     RETURNING *`,
+    [linkId, inviteId, data.label ?? null, data.maxRegistrations ?? null, data.isActive ?? null]
+  )
+  if (!rows[0]) return null
+  const links = await listRegistrationLinks(inviteId)
+  return links.find((link) => link.id === linkId) ?? null
+}
+
 // ── Convidados / RSVP ────────────────────────────────────────────
 
 async function insertGuestWithDb(db, inviteId, data) {
   const id = randomUUID()
   await db.query(
     `INSERT INTO invite_guests
-      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, schema_snapshot, responded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())`,
+      (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, schema_snapshot, registration_link_id, responded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())`,
     [
       id,
       inviteId,
@@ -403,6 +465,7 @@ async function insertGuestWithDb(db, inviteId, data) {
       data.ticketId ?? null,
       data.managePasswordHash ?? null,
       data.schemaSnapshot ? JSON.stringify(data.schemaSnapshot) : null,
+      data.registrationLinkId ?? null,
     ]
   )
   const { rows } = await db.query('SELECT * FROM invite_guests WHERE id = $1', [id])
@@ -415,7 +478,11 @@ export async function insertGuest(inviteId, data) {
 
 // Verifica a capacidade e cria a inscrição na mesma transação. O bloqueio da
 // linha do convite serializa inscrições concorrentes sem alterar registos atuais.
-export async function insertGuestWithCapacity(inviteId, data, { acceptWaitlist = false } = {}) {
+export async function insertGuestWithCapacity(
+  inviteId,
+  data,
+  { acceptWaitlist = false, registrationLinkToken = null } = {}
+) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -427,6 +494,36 @@ export async function insertGuestWithCapacity(inviteId, data, { acceptWaitlist =
     if (!invite) {
       await client.query('ROLLBACK')
       return { reason: 'invite_not_found', guest: null }
+    }
+
+    let registrationLinkId = null
+    if (registrationLinkToken) {
+      const { rows: linkRows } = await client.query(
+        `SELECT id, max_registrations, is_active
+         FROM invite_registration_links
+         WHERE invite_id = $1 AND token = $2
+         FOR UPDATE`,
+        [inviteId, registrationLinkToken]
+      )
+      const link = linkRows[0]
+      if (!link || !link.is_active) {
+        await client.query('ROLLBACK')
+        return { reason: 'invalid_registration_link', guest: null }
+      }
+      if (['pending', 'confirmed', 'waitlisted'].includes(data.rsvpState)) {
+        const { rows: countRows } = await client.query(
+          `SELECT COUNT(*)::int AS registrations_count
+           FROM invite_guests
+           WHERE registration_link_id = $1
+             AND rsvp_state IN ('pending', 'confirmed', 'waitlisted')`,
+          [link.id]
+        )
+        if ((countRows[0]?.registrations_count ?? 0) >= link.max_registrations) {
+          await client.query('ROLLBACK')
+          return { reason: 'registration_link_full', guest: null }
+        }
+      }
+      registrationLinkId = link.id
     }
 
     let capacity = invite.capacity
@@ -483,6 +580,7 @@ export async function insertGuestWithCapacity(inviteId, data, { acceptWaitlist =
 
     const guest = await insertGuestWithDb(client, inviteId, {
       ...data,
+      registrationLinkId,
       rsvpState: wouldExceed ? 'waitlisted' : data.rsvpState,
     })
     await client.query('COMMIT')
@@ -555,7 +653,11 @@ export async function setCheckedIn(id, on = true) {
 
 export async function listGuests(inviteId) {
   const { rows } = await pool.query(
-    'SELECT * FROM invite_guests WHERE invite_id = $1 ORDER BY created_at DESC',
+    `SELECT g.*, registration_link.label AS registration_link_label
+     FROM invite_guests g
+     LEFT JOIN invite_registration_links registration_link ON registration_link.id = g.registration_link_id
+     WHERE g.invite_id = $1
+     ORDER BY g.created_at DESC`,
     [inviteId]
   )
   return rows.map(mapGuest)
