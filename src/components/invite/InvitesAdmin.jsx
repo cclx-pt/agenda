@@ -20,6 +20,7 @@ import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS, mergeFormSchemas } from './inviteFormFields'
 import { inscricaoSituacao, SITUACAO_LABEL, classifyGuestPeople } from './inviteUtils'
+import { DEFAULT_INVITE_STATUS_FILTERS, filterAdminInvites } from './inviteAdminFilters'
 import { Switch } from '@/components/ui/switch'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
@@ -35,6 +36,11 @@ const STATUS_BADGE = {
   fechado: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
 }
 const STATUS_LABEL = { rascunho: 'Rascunho', publicado: 'Publicado', fechado: 'Fechado' }
+const STATUS_FILTER_OPTIONS = [
+  { value: 'publicado', label: 'Ativos' },
+  { value: 'rascunho', label: 'Draft' },
+  { value: 'fechado', label: 'Fechados' },
+]
 
 const PAY_METHOD_LABEL = { mbway: 'MB WAY', transferencia: 'Transferência', referencia: 'Referência' }
 const PAY_LABEL = {
@@ -1503,6 +1509,9 @@ export default function InvitesAdmin() {
   const [editing, setEditing] = useState(null)
   const [adminTab, setAdminTab] = useState('convites')
   const [busy, setBusy] = useState(false)
+  const [statusFilters, setStatusFilters] = useState(DEFAULT_INVITE_STATUS_FILTERS)
+  const [registrationFilter, setRegistrationFilter] = useState('all')
+  const [communityFilter, setCommunityFilter] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1597,6 +1606,20 @@ export default function InvitesAdmin() {
       : []),
   ]
   const activeTab = tabs.some((t) => t.id === adminTab) ? adminTab : 'convites'
+  const communities = [...new Set(invites.map((invite) => invite.community).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pt')
+  )
+  const hasInvitesWithoutCommunity = invites.some((invite) => !invite.community)
+  const filteredInvites = filterAdminInvites(invites, {
+    statuses: statusFilters,
+    registration: registrationFilter,
+    community: communityFilter,
+  })
+  const toggleStatusFilter = (status) => {
+    setStatusFilters((current) =>
+      current.includes(status) ? current.filter((value) => value !== status) : [...current, status]
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -1636,13 +1659,94 @@ export default function InvitesAdmin() {
             </button>
           </div>
 
+          <div className="flex flex-col gap-4 border-y border-border bg-muted/30 px-3 py-4">
+            <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0">
+              <legend className="mb-2 text-xs font-bold uppercase text-muted-foreground">Estado</legend>
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <label key={option.value} className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={statusFilters.includes(option.value)}
+                    onChange={() => toggleStatusFilter(option.value)}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </fieldset>
+
+            <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0">
+              <legend className="mb-2 text-xs font-bold uppercase text-muted-foreground">Inscrições</legend>
+              {[
+                { value: 'all', label: 'Todas' },
+                { value: 'open', label: 'Abertas' },
+                { value: 'closed', label: 'Fechadas' },
+              ].map((option) => (
+                <label key={option.value} className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="radio"
+                    name="invite-registration-filter"
+                    value={option.value}
+                    checked={registrationFilter === option.value}
+                    onChange={(event) => setRegistrationFilter(event.target.value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </fieldset>
+
+            <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0">
+              <legend className="mb-2 text-xs font-bold uppercase text-muted-foreground">Comunidade</legend>
+              <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="invite-community-filter"
+                  value="all"
+                  checked={communityFilter === 'all'}
+                  onChange={(event) => setCommunityFilter(event.target.value)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Todas
+              </label>
+              {communities.map((community) => (
+                <label key={community} className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="radio"
+                    name="invite-community-filter"
+                    value={community}
+                    checked={communityFilter === community}
+                    onChange={(event) => setCommunityFilter(event.target.value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {community}
+                </label>
+              ))}
+              {hasInvitesWithoutCommunity ? (
+                <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="radio"
+                    name="invite-community-filter"
+                    value="none"
+                    checked={communityFilter === 'none'}
+                    onChange={(event) => setCommunityFilter(event.target.value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Sem comunidade
+                </label>
+              ) : null}
+            </fieldset>
+          </div>
+
           {loading ? (
         <p className="py-8 text-center text-sm text-muted-foreground">A carregar…</p>
       ) : invites.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">Ainda não há convites. Crie o primeiro.</p>
+      ) : filteredInvites.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">Nenhum convite corresponde aos filtros selecionados.</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {invites.map((inv) => (
+          {filteredInvites.map((inv) => (
             <li key={inv.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-border bg-muted/40 p-3">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2">
