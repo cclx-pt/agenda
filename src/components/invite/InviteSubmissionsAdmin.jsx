@@ -19,7 +19,7 @@ import {
   registrationChurch,
 } from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
-import { buildRegistrationKit } from './registrationExport'
+import { buildRegistrationKit, buildRegistrationKitArchive } from './registrationExport'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -410,16 +410,24 @@ export default function InviteSubmissionsAdmin() {
       return
     }
     const kit = buildRegistrationKit(selectedInvite, eventRows)
+    if (which === 'all') {
+      try {
+        const archive = buildRegistrationKitArchive(kit)
+        downloadText(kit.zipFile, archive, 'application/zip')
+        toast.success('Kit completo descarregado.')
+      } catch (error) {
+        console.error('Não foi possível gerar o kit para dashboard IA.', error)
+        toast.error('Não foi possível gerar o kit completo. Tenta novamente.')
+      }
+      return
+    }
     const files = []
-    if (which === 'data' || which === 'all') files.push([kit.dataFile, JSON.stringify(kit.data, null, 2), 'application/json'])
-    if (which === 'schema' || which === 'all') files.push([kit.schemaFile, JSON.stringify(kit.schema, null, 2), 'application/json'])
-    if (which === 'md' || which === 'all') files.push([kit.mdFile, kit.markdown, 'text/markdown;charset=utf-8'])
-    // 1.º download síncrono (preserva o gesto do clique); restantes escalonados.
-    files.forEach(([name, content, mime], i) => {
-      if (i === 0) downloadText(name, content, mime)
-      else setTimeout(() => downloadText(name, content, mime), i * 250)
-    })
-    toast.success(files.length > 1 ? `${files.length} ficheiros descarregados.` : 'Ficheiro descarregado.')
+    if (which === 'data') files.push([kit.dataFile, JSON.stringify(kit.data, null, 2), 'application/json'])
+    if (which === 'schema') files.push([kit.schemaFile, JSON.stringify(kit.schema, null, 2), 'application/json'])
+    if (which === 'md') files.push([kit.mdFile, kit.markdown, 'text/markdown;charset=utf-8'])
+    const [name, content, mime] = files[0]
+    downloadText(name, content, mime)
+    toast.success('Ficheiro descarregado.')
   }
 
   if (loading) {

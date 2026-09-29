@@ -7,6 +7,7 @@
 
 import { mergeFormSchemas, SYSTEM_KEYS } from './inviteFormFields'
 import { inscricaoSituacao, SITUACAO_LABEL, classifyGuestPeople, registrationChurch } from './inviteUtils'
+import { strToU8, zipSync } from 'fflate'
 
 const bt = String.fromCharCode(96) // crase, para blocos de código no Markdown
 const fence = bt + bt + bt
@@ -312,5 +313,17 @@ export function buildRegistrationKit(invite, guests) {
     dataFile: `${slug}-inscricoes.json`,
     schemaFile: `${slug}-schema.json`,
     mdFile: `${slug}-dashboard-instrucoes.md`,
+    zipFile: `${slug}-kit-dashboard-ia.zip`,
   }
+}
+
+export function buildRegistrationKitArchive(kit) {
+  return zipSync(
+    {
+      [kit.dataFile]: strToU8(JSON.stringify(kit.data, null, 2)),
+      [kit.schemaFile]: strToU8(JSON.stringify(kit.schema, null, 2)),
+      [kit.mdFile]: strToU8(kit.markdown),
+    },
+    { level: 6 },
+  )
 }

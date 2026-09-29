@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildRegistrationKit, inviteFormColumns, inviteExportSlug } from '../components/invite/registrationExport'
+import { strFromU8, unzipSync } from 'fflate'
+import {
+  buildRegistrationKit,
+  buildRegistrationKitArchive,
+  inviteFormColumns,
+  inviteExportSlug,
+} from '../components/invite/registrationExport'
 
 const invite = { id: 'inv1', slug: 'conf-2026', title: 'Conferência CCLX 2026', community: 'Porto', status: 'publicado' }
 const guests = [
@@ -36,6 +42,17 @@ describe('registration export kit', () => {
     expect(kit.dataFile).toBe('conf-2026-inscricoes.json')
     expect(kit.schemaFile).toBe('conf-2026-schema.json')
     expect(kit.mdFile).toBe('conf-2026-dashboard-instrucoes.md')
+    expect(kit.zipFile).toBe('conf-2026-kit-dashboard-ia.zip')
+  })
+
+  it('packages data, schema and instructions in one archive', () => {
+    const kit = buildRegistrationKit(invite, guests)
+    const archive = unzipSync(buildRegistrationKitArchive(kit))
+
+    expect(Object.keys(archive).sort()).toEqual([kit.dataFile, kit.mdFile, kit.schemaFile].sort())
+    expect(strFromU8(archive[kit.dataFile])).toContain('"nome": "Maria"')
+    expect(strFromU8(archive[kit.schemaFile])).toContain('"$schema"')
+    expect(strFromU8(archive[kit.mdFile])).toContain('# Dashboard de gestão de inscrições')
   })
 
   it('builds a dataset with standard columns and the invite-specific answers', () => {
