@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   DropdownMenu,
@@ -150,6 +150,7 @@ export default function InviteSubmissionsAdmin() {
   const [busy, setBusy] = useState(false)
   const [expanded, setExpanded] = useState(null) // { id, mode: 'details' | 'edit' }
   const [editForm, setEditForm] = useState(null) // { name, email, phone, rsvpState }
+  const [apiCredential, setApiCredential] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -404,6 +405,73 @@ export default function InviteSubmissionsAdmin() {
   // Kit para construir um dashboard num motor de IA (por convite): dados + JSON
   // Schema + instruções .md, todos a respeitar o esquema do convite selecionado.
   const selectedInvite = invites.find((i) => i.id === filterInvite) || null
+  const registrationsApiUrl = selectedInvite
+    ? `${window.location.origin}/data/public/invite/${encodeURIComponent(selectedInvite.slug)}/registrations`
+    : ''
+  const copyApiValue = async (value, label) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`${label} copiada.`)
+    } catch {
+      toast.error(`Não foi possível copiar ${label.toLowerCase()}.`)
+    }
+  }
+  const rotateApiKey = async () => {
+    if (!selectedInvite) return
+    if (
+      selectedInvite.registrationsApiKeyConfigured &&
+      !window.confirm('Gerar uma nova chave? A chave anterior deixa imediatamente de funcionar.')
+    ) {
+      return
+    }
+    setBusy(true)
+    try {
+      const credential = await invitesService.rotateRegistrationsApiKey(selectedInvite.id)
+      setApiCredential({ inviteId: selectedInvite.id, apiKey: credential.apiKey })
+      setInvites((current) =>
+        current.map((invite) =>
+          invite.id === selectedInvite.id
+            ? {
+                ...invite,
+                registrationsApiKeyConfigured: true,
+                registrationsApiKeyLastFour: credential.lastFour,
+                registrationsApiKeyCreatedAt: credential.createdAt,
+              }
+            : invite
+        )
+      )
+      toast.success('Chave API gerada. Copia-a agora; não voltará a ser mostrada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const revokeApiKey = async () => {
+    if (!selectedInvite || !window.confirm('Desativar esta integração e revogar a chave API atual?')) return
+    setBusy(true)
+    try {
+      await invitesService.revokeRegistrationsApiKey(selectedInvite.id)
+      setApiCredential(null)
+      setInvites((current) =>
+        current.map((invite) =>
+          invite.id === selectedInvite.id
+            ? {
+                ...invite,
+                registrationsApiKeyConfigured: false,
+                registrationsApiKeyLastFour: null,
+                registrationsApiKeyCreatedAt: null,
+              }
+            : invite
+        )
+      )
+      toast.success('Integração API desativada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
   const downloadKit = (which) => {
     if (!selectedInvite) {
       toast.error('Seleciona primeiro um convite no filtro “Convite” para gerar o kit.')
@@ -559,6 +627,73 @@ export default function InviteSubmissionsAdmin() {
           </DropdownMenu>
         </div>
       </div>
+
+      {selectedInvite ? (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <KeyRound className="h-4 w-4" aria-hidden="true" />
+                API de inscrições — {selectedInvite.title}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Configura estes dados no dashboard externo e envia a chave no cabeçalho <code>X-API-Key</code>.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={primaryBtn} onClick={rotateApiKey} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <KeyRound className="h-4 w-4" aria-hidden="true" />}
+                {selectedInvite.registrationsApiKeyConfigured ? 'Gerar nova chave' : 'Gerar chave API'}
+              </button>
+              {selectedInvite.registrationsApiKeyConfigured ? (
+                <button type="button" className={ghostBtn} onClick={revokeApiKey} disabled={busy}>
+                  <Unplug className="h-4 w-4" aria-hidden="true" />
+                  Desativar
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <label className={labelCls}>
+              URL da API
+              <span className="flex gap-2">
+                <input className={inputCls} readOnly value={registrationsApiUrl} />
+                <button type="button" className={iconBtn} onClick={() => copyApiValue(registrationsApiUrl, 'URL')}>
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only">Copiar URL</span>
+                </button>
+              </span>
+            </label>
+            <label className={labelCls}>
+              Chave API
+              <span className="flex gap-2">
+                <input
+                  className={inputCls}
+                  readOnly
+                  value={
+                    apiCredential?.inviteId === selectedInvite.id
+                      ? apiCredential.apiKey
+                      : selectedInvite.registrationsApiKeyConfigured
+                        ? `Chave configurada ••••${selectedInvite.registrationsApiKeyLastFour || ''}`
+                        : 'Ainda não configurada'
+                  }
+                />
+                {apiCredential?.inviteId === selectedInvite.id ? (
+                  <button type="button" className={iconBtn} onClick={() => copyApiValue(apiCredential.apiKey, 'Chave API')}>
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Copiar chave API</span>
+                  </button>
+                ) : null}
+              </span>
+            </label>
+          </div>
+          {apiCredential?.inviteId === selectedInvite.id ? (
+            <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+              Guarda esta chave agora. Por segurança, só é apresentada uma vez.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {filterInvite ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-9">

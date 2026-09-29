@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { waitUntil } from '@vercel/functions'
 import * as repo from './repository.js'
 import * as eventsRepo from '../events/repository.js'
@@ -35,6 +35,16 @@ function canAccessChurch(user, community) {
 }
 function ensureCanManage(user) {
   if (!canManage(user)) throw new InviteError(403, 'Sem permissão para gerir convites.')
+}
+
+async function getManagedInvite(user, id) {
+  ensureCanManage(user)
+  const invite = await repo.findById(id)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  if (!canAccessChurch(user, invite.community)) {
+    throw new InviteError(403, 'Sem acesso a este convite.')
+  }
+  return invite
 }
 
 // ── Slug ─────────────────────────────────────────────────────────
@@ -460,6 +470,93 @@ export async function listGuests(user, id) {
     ...g,
     ticket: g.ticketId ? byTicket.get(g.ticketId) ?? null : null,
   }))
+}
+
+function hashRegistrationsApiKey(apiKey) {
+  return createHash('sha256').update(String(apiKey)).digest()
+}
+
+export function createRegistrationsApiKey() {
+  return `cclx_${randomBytes(32).toString('base64url')}`
+}
+
+export function verifyRegistrationsApiKey(apiKey, storedHash) {
+  if (!apiKey || !storedHash) return false
+  try {
+    const expected = Buffer.from(storedHash, 'hex')
+    const actual = hashRegistrationsApiKey(apiKey)
+    return expected.length === actual.length && timingSafeEqual(expected, actual)
+  } catch {
+    return false
+  }
+}
+
+export async function rotateRegistrationsApiKey(user, id) {
+  const invite = await getManagedInvite(user, id)
+  const apiKey = createRegistrationsApiKey()
+  await repo.setRegistrationsApiKey(
+    invite.id,
+    hashRegistrationsApiKey(apiKey).toString('hex'),
+    apiKey.slice(-4)
+  )
+  return {
+    apiKey,
+    lastFour: apiKey.slice(-4),
+    createdAt: new Date().toISOString(),
+  }
+}
+
+export async function revokeRegistrationsApiKey(user, id) {
+  const invite = await getManagedInvite(user, id)
+  await repo.clearRegistrationsApiKey(invite.id)
+}
+
+export function registrationsApiPayload(invite, guests, tickets, generatedAt = new Date().toISOString()) {
+  const byTicket = new Map((tickets || []).map((ticket) => [ticket.id, ticket]))
+  const registrations = (guests || []).map((guest) => ({
+    id: guest.id,
+    code: guest.code,
+    name: guest.name,
+    email: guest.email,
+    phone: guest.phone,
+    guestsCount: guest.guestsCount,
+    rsvpState: guest.rsvpState,
+    paymentState: guest.paymentState,
+    ticket: guest.ticketId ? byTicket.get(guest.ticketId) ?? null : null,
+    extra: guest.extra,
+    schemaSnapshot: guest.schemaSnapshot,
+    respondedAt: guest.respondedAt,
+    checkedInAt: guest.checkedInAt,
+    refundRequestedAt: guest.refundRequestedAt,
+    adminNotes: guest.adminNotes,
+    createdAt: guest.createdAt,
+    updatedAt: guest.updatedAt,
+  }))
+  return {
+    invite: {
+      id: invite.id,
+      slug: invite.slug,
+      title: invite.title,
+      community: invite.community ?? null,
+      startDatetime: invite.start_datetime ?? invite.startDatetime ?? null,
+      endDatetime: invite.end_datetime ?? invite.endDatetime ?? null,
+    },
+    generatedAt,
+    total: registrations.length,
+    registrations,
+  }
+}
+
+export async function getRegistrationsForApi(slug, apiKey) {
+  const invite = await repo.getRegistrationsApiCredentialsBySlug(slug)
+  if (!invite || !verifyRegistrationsApiKey(apiKey, invite.registrations_api_key_hash)) {
+    throw new InviteError(401, 'Chave API inválida.')
+  }
+  const [guests, tickets] = await Promise.all([
+    repo.listGuests(invite.id),
+    repo.listTickets(invite.id),
+  ])
+  return registrationsApiPayload(invite, guests, tickets)
 }
 
 // Estados possíveis de uma inscrição (CHECK invite_guests.rsvp_state).

@@ -86,6 +86,17 @@ export async function listInviteGuests(id) {
   return guests
 }
 
+export async function rotateRegistrationsApiKey(inviteId) {
+  const { credential } = await request(`/data/invites/${inviteId}/registrations-api/key`, {
+    method: 'POST',
+  })
+  return credential
+}
+
+export async function revokeRegistrationsApiKey(inviteId) {
+  await request(`/data/invites/${inviteId}/registrations-api/key`, { method: 'DELETE' })
+}
+
 // ── Comunicações operacionais por email ────────────────────────
 export async function listInviteCampaigns(inviteId) {
   const { campaigns } = await request(`/data/invites/${inviteId}/campaigns`, {
