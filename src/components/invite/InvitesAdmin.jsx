@@ -20,7 +20,7 @@ import { RsvpCard } from './InvitePage'
 import { BLOCK_META, ADDABLE_TYPES, defaultContent } from './inviteBlockMeta'
 import { getFormFields, SYSTEM_KEYS, mergeFormSchemas } from './inviteFormFields'
 import { inscricaoSituacao, SITUACAO_LABEL, classifyGuestPeople } from './inviteUtils'
-import { DEFAULT_INVITE_STATUS_FILTERS, filterAdminInvites } from './inviteAdminFilters'
+import { DEFAULT_INVITE_STATUS_FILTERS, filterAdminInvites, inviteHasOpenRegistration } from './inviteAdminFilters'
 import { Switch } from '@/components/ui/switch'
 
 const inputCls = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground'
@@ -1770,12 +1770,12 @@ export default function InvitesAdmin() {
                     <span
                       className={
                         'rounded-full px-2 py-[3px] text-[11px] font-semibold ' +
-                        (inv.status === 'publicado' && inv.rsvpEnabled
+                        (inviteHasOpenRegistration(inv)
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400'
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400')
                       }
                     >
-                      {inv.status === 'publicado' && inv.rsvpEnabled ? 'Inscrições abertas' : 'Inscrições fechadas'}
+                      {inviteHasOpenRegistration(inv) ? 'Inscrições abertas' : 'Inscrições fechadas'}
                     </span>
                   ) : null}
                 </div>

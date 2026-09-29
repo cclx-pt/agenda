@@ -35,6 +35,7 @@ function mapInvite(row) {
     rsvpDeadline: row.rsvp_deadline ?? null,
     useEventBanner: !!row.use_event_banner,
     capacity: row.capacity ?? null,
+    spotsLeft: row.spots_left == null ? null : Number(row.spots_left),
     waitlistEnabled: !!row.waitlist_enabled,
     spotsOnLanding: !!row.spots_on_landing,
     spotsOnRegistration: !!row.spots_on_registration,
@@ -242,7 +243,20 @@ export async function list({ status, community, createdBy } = {}) {
     where.push(`created_by = $${params.length}`)
   }
   const { rows } = await pool.query(
-    `SELECT * FROM invites ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`,
+    `SELECT i.*,
+            CASE WHEN i.capacity IS NULL THEN NULL
+                 ELSE GREATEST(
+                   0,
+                   i.capacity - COALESCE((
+                     SELECT SUM(g.guests_count)
+                     FROM invite_guests g
+                     WHERE g.invite_id = i.id AND g.rsvp_state = 'confirmed'
+                   ), 0)
+                 )::int
+            END AS spots_left
+     FROM invites i
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY i.created_at DESC`,
     params
   )
   return rows.map(mapInvite)
