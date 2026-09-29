@@ -545,6 +545,10 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       ticketId: ticketId || null,
       acceptWaitlist,
       extra: Object.keys(finalExtra).length ? finalExtra : null,
+      registrationLinkToken:
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('private') || undefined
+          : undefined,
     }
     try {
       let res

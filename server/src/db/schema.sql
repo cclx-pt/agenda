@@ -490,6 +490,26 @@ CREATE TABLE IF NOT EXISTS invite_guests (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_guests_invite ON invite_guests (invite_id);
 
+-- Links privados de inscrição. O limite conta inscrições confirmadas, enquanto
+-- guests_count continua a contar para a lotação geral do convite.
+CREATE TABLE IF NOT EXISTS invite_registration_links (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id         UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  token             TEXT NOT NULL UNIQUE,
+  label             TEXT NOT NULL,
+  max_registrations INTEGER NOT NULL CHECK (max_registrations > 0),
+  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_registration_links_invite
+  ON invite_registration_links (invite_id, created_at DESC);
+
+ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS registration_link_id UUID
+  REFERENCES invite_registration_links (id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_invite_guests_registration_link
+  ON invite_guests (registration_link_id);
+
 -- Campanhas operacionais de email associadas a um convite. O conteúdo e o filtro
 -- de audiência ficam em JSONB; depois do envio funcionam como snapshot imutável.
 CREATE TABLE IF NOT EXISTS invite_campaigns (

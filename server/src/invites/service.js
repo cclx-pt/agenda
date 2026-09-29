@@ -251,6 +251,16 @@ const rsvpSchema = z.object({
   extra: z.record(z.any()).optional().nullable(),
   // Confirma a entrada em lista de espera quando a lotação está esgotada.
   acceptWaitlist: z.boolean().optional(),
+  registrationLinkToken: z.string().trim().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
+})
+
+const registrationLinkCreateSchema = z.object({
+  label: z.string().trim().min(1, 'Indique um nome para o link.').max(120),
+  maxRegistrations: z.number().int().min(1).max(100000),
+})
+
+const registrationLinkUpdateSchema = registrationLinkCreateSchema.partial().extend({
+  isActive: z.boolean().optional(),
 })
 
 // ── Auxiliares de evento associado e pagamento ───────────────────
@@ -472,6 +482,39 @@ export async function listGuests(user, id) {
   }))
 }
 
+function withRegistrationLinkUrl(invite, link) {
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  return {
+    ...link,
+    url: `${base}/invite/${encodeURIComponent(invite.slug)}/inscricao?private=${encodeURIComponent(link.token)}`,
+  }
+}
+
+export async function listRegistrationLinks(user, id) {
+  const invite = await getManagedInvite(user, id)
+  const links = await repo.listRegistrationLinks(id)
+  return links.map((link) => withRegistrationLinkUrl(invite, link))
+}
+
+export async function createRegistrationLink(user, id, input) {
+  const invite = await getManagedInvite(user, id)
+  const data = registrationLinkCreateSchema.parse(input)
+  const link = await repo.insertRegistrationLink(id, {
+    ...data,
+    token: randomBytes(24).toString('base64url'),
+  })
+  return withRegistrationLinkUrl(invite, link)
+}
+
+export async function updateRegistrationLink(user, inviteId, linkId, input) {
+  const invite = await getManagedInvite(user, inviteId)
+  const data = registrationLinkUpdateSchema.parse(input)
+  if (Object.keys(data).length === 0) throw new InviteError(400, 'Indique uma alteração para o link.')
+  const link = await repo.updateRegistrationLink(inviteId, linkId, data)
+  if (!link) throw new InviteError(404, 'Link privado não encontrado.')
+  return withRegistrationLinkUrl(invite, link)
+}
+
 function hashRegistrationsApiKey(apiKey) {
   return createHash('sha256').update(String(apiKey)).digest()
 }
@@ -529,6 +572,8 @@ export function registrationsApiPayload(invite, guests, tickets, generatedAt = n
     checkedInAt: guest.checkedInAt,
     refundRequestedAt: guest.refundRequestedAt,
     adminNotes: guest.adminNotes,
+    isPrivateRegistration: guest.isPrivateRegistration,
+    registrationLinkLabel: guest.registrationLinkLabel,
     createdAt: guest.createdAt,
     updatedAt: guest.updatedAt,
   }))
@@ -1377,6 +1422,7 @@ export async function submitRsvp(slug, input) {
     managePasswordHash: hashManagePassword(managePassword),
   }, {
     acceptWaitlist: data.acceptWaitlist === true,
+    registrationLinkToken: data.registrationLinkToken ?? null,
   })
   if (inserted.reason === 'full') {
     throw new InviteError(409, 'A lotação está esgotada. As inscrições estão completas.')
@@ -1385,6 +1431,12 @@ export async function submitRsvp(slug, input) {
     throw new InviteError(409, 'Confirma que pretendes entrar na lista de espera.')
   }
   if (inserted.reason === 'invalid_ticket') throw new InviteError(400, 'Bilhete inválido.')
+  if (inserted.reason === 'invalid_registration_link') {
+    throw new InviteError(404, 'O link privado de inscrição é inválido ou foi desativado.')
+  }
+  if (inserted.reason === 'registration_link_full') {
+    throw new InviteError(409, 'Este link privado atingiu o limite de inscrições.')
+  }
   if (inserted.reason === 'invite_not_found') throw new InviteError(404, 'Convite não encontrado.')
   const guest = inserted.guest
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)
@@ -1407,7 +1459,7 @@ export async function submitRsvp(slug, input) {
     const taken = await repo.countConfirmedSeats(invite.id)
     spotsLeft = Math.max(0, invite.capacity - taken)
   }
-  return { token: guest.token, status, spotsLeft }
+  return { token: guest.token, status, spotsLeft, isPrivateRegistration: guest.isPrivateRegistration }
 }
 
 // ── Auto-gestão da inscrição (convidado, sem sessão: código + senha) ──────

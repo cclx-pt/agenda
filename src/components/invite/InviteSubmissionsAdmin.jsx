@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug, ChevronDown } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug, ChevronDown, Link2, Plus, Power } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   DropdownMenu,
@@ -151,6 +151,8 @@ export default function InviteSubmissionsAdmin() {
   const [expanded, setExpanded] = useState(null) // { id, mode: 'details' | 'edit' }
   const [editForm, setEditForm] = useState(null) // { name, email, phone, rsvpState }
   const [apiCredential, setApiCredential] = useState(null)
+  const [registrationLinksState, setRegistrationLinksState] = useState({ inviteId: null, links: [] })
+  const [newLink, setNewLink] = useState({ label: '', maxRegistrations: 1 })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -371,6 +373,8 @@ export default function InviteSubmissionsAdmin() {
       ['Telemóvel', (g) => g.phone || ''],
       ['Estado', (g) => SITUACAO_LABEL[inscricaoSituacao(g)] || ''],
       ['Pagamento', (g) => payLabel(g.paymentState)],
+      ['Inscrição privada', (g) => (g.isPrivateRegistration ? 'Sim' : 'Não')],
+      ['Link privado', (g) => g.registrationLinkLabel || ''],
       ['Tipo de inscrição', (g) => g.extra?.tipoInscricao || ''],
       ['Adultos', (g) => classifyGuestPeople(g, g.ticket).adultos],
       ['Jovens', (g) => classifyGuestPeople(g, g.ticket).jovens],
@@ -405,15 +409,87 @@ export default function InviteSubmissionsAdmin() {
   // Kit para construir um dashboard num motor de IA (por convite): dados + JSON
   // Schema + instruções .md, todos a respeitar o esquema do convite selecionado.
   const selectedInvite = invites.find((i) => i.id === filterInvite) || null
+  const selectedInviteId = selectedInvite?.id ?? null
+  const registrationLinks = registrationLinksState.inviteId === selectedInviteId ? registrationLinksState.links : []
+  const registrationLinksLoading = !!selectedInviteId && registrationLinksState.inviteId !== selectedInviteId
+
+  useEffect(() => {
+    if (!selectedInviteId) return undefined
+    let ignore = false
+    invitesService
+      .listRegistrationLinks(selectedInviteId)
+      .then((links) => {
+        if (!ignore) setRegistrationLinksState({ inviteId: selectedInviteId, links })
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setRegistrationLinksState({ inviteId: selectedInviteId, links: [] })
+          toast.error(err.message)
+        }
+      })
+    return () => {
+      ignore = true
+    }
+  }, [selectedInviteId])
+
   const registrationsApiUrl = selectedInvite
     ? `${window.location.origin}/data/public/invite/${encodeURIComponent(selectedInvite.slug)}/registrations`
     : ''
+  const refreshAll = async () => {
+    await load()
+    if (!selectedInviteId) return
+    try {
+      const links = await invitesService.listRegistrationLinks(selectedInviteId)
+      setRegistrationLinksState({ inviteId: selectedInviteId, links })
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
   const copyApiValue = async (value, label) => {
     try {
       await navigator.clipboard.writeText(value)
       toast.success(`${label} copiada.`)
     } catch {
       toast.error(`Não foi possível copiar ${label.toLowerCase()}.`)
+    }
+  }
+  const createPrivateLink = async (event) => {
+    event.preventDefault()
+    if (!selectedInvite) return
+    setBusy(true)
+    try {
+      const link = await invitesService.createRegistrationLink(selectedInvite.id, {
+        label: newLink.label,
+        maxRegistrations: Number(newLink.maxRegistrations),
+      })
+      setRegistrationLinksState((current) => ({
+        inviteId: selectedInvite.id,
+        links: current.inviteId === selectedInvite.id ? [link, ...current.links] : [link],
+      }))
+      setNewLink({ label: '', maxRegistrations: 1 })
+      toast.success('Link privado criado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const togglePrivateLink = async (link) => {
+    if (!selectedInvite) return
+    setBusy(true)
+    try {
+      const updated = await invitesService.updateRegistrationLink(selectedInvite.id, link.id, {
+        isActive: !link.isActive,
+      })
+      setRegistrationLinksState((current) => ({
+        ...current,
+        links: current.links.map((item) => (item.id === updated.id ? updated : item)),
+      }))
+      toast.success(updated.isActive ? 'Link privado ativado.' : 'Link privado desativado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
     }
   }
   const rotateApiKey = async () => {
@@ -580,30 +656,30 @@ export default function InviteSubmissionsAdmin() {
               Limpar filtros
             </button>
           ) : null}
-          <button type="button" onClick={load} className={ghostBtn}>
+          <button type="button" onClick={refreshAll} className={ghostBtn}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Atualizar
           </button>
-          <button type="button" onClick={exportRows} disabled={!filtered.length} className={ghostBtn}>
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Exportar Excel
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={ghostBtn}
-                title="Descarregar dados, schema e instruções para construir um dashboard com IA"
-              >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Kit dashboard IA
+          {selectedInvite ? (
+            <>
+              <button type="button" onClick={exportRows} disabled={!filtered.length} className={ghostBtn}>
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Exportar Excel
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[400] w-64">
-              <DropdownMenuLabel className="truncate">{selectedInvite ? selectedInvite.title : 'Kit para dashboard IA'}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {selectedInvite ? (
-                <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    title="Descarregar dados, schema e instruções para construir um dashboard com IA"
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Kit dashboard IA
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="z-[400] w-64">
+                  <DropdownMenuLabel className="truncate">{selectedInvite.title}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => downloadKit('data')}>
                     <Database className="mr-2 h-4 w-4" aria-hidden="true" /> Dados (JSON)
                   </DropdownMenuItem>
@@ -617,16 +693,93 @@ export default function InviteSubmissionsAdmin() {
                   <DropdownMenuItem onClick={() => downloadKit('all')}>
                     <FileDown className="mr-2 h-4 w-4" aria-hidden="true" /> Descarregar tudo
                   </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem disabled className="whitespace-normal text-xs">
-                  Seleciona primeiro um convite no filtro “Convite”.
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null}
         </div>
       </div>
+
+      {selectedInvite ? (
+        <details className="group rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Link2 className="h-4 w-4" aria-hidden="true" />
+                Links privados — {selectedInvite.title}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {registrationLinksLoading
+                  ? 'A carregar links…'
+                  : `${registrationLinks.length} link${registrationLinks.length === 1 ? '' : 's'} configurado${registrationLinks.length === 1 ? '' : 's'}`}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 flex-none text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-border p-4">
+            <form className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto]" onSubmit={createPrivateLink}>
+              <label className={labelCls}>
+                Nome do link
+                <input
+                  className={inputCls}
+                  value={newLink.label}
+                  onChange={(event) => setNewLink((current) => ({ ...current, label: event.target.value }))}
+                  placeholder="Ex.: Convidados do Pastor João"
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label className={labelCls}>
+                Máximo de inscrições
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="1"
+                  max="100000"
+                  value={newLink.maxRegistrations}
+                  onChange={(event) => setNewLink((current) => ({ ...current, maxRegistrations: event.target.value }))}
+                  required
+                />
+              </label>
+              <button type="submit" className={primaryBtn} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                Gerar link
+              </button>
+            </form>
+
+            {!registrationLinksLoading && registrationLinks.length ? (
+              <div className="mt-4 divide-y divide-border border-y border-border">
+                {registrationLinks.map((link) => (
+                  <div key={link.id} className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-foreground">{link.label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${link.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-muted text-muted-foreground'}`}>
+                          {link.isActive ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {link.registrationsCount}/{link.maxRegistrations} inscrições
+                        </span>
+                      </div>
+                      <p className="m-0 mt-1 truncate text-xs text-muted-foreground">{link.url}</p>
+                    </div>
+                    <div className="flex flex-none items-center gap-2">
+                      <button type="button" className={ghostBtn} onClick={() => copyApiValue(link.url, 'Ligação')}>
+                        <Copy className="h-4 w-4" aria-hidden="true" />
+                        Copiar
+                      </button>
+                      <button type="button" className={iconBtn} onClick={() => togglePrivateLink(link)} disabled={busy} title={link.isActive ? 'Desativar link' : 'Ativar link'}>
+                        <Power className="h-4 w-4" aria-hidden="true" />
+                        <span className="sr-only">{link.isActive ? 'Desativar link' : 'Ativar link'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
 
       {selectedInvite ? (
         <details className="group rounded-xl border border-border bg-card">
@@ -829,6 +982,11 @@ export default function InviteSubmissionsAdmin() {
                       <td className="p-2 font-medium text-foreground">
                         <span className="inline-flex items-center gap-1">
                           {g.name || '—'}
+                          {g.isPrivateRegistration ? (
+                            <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800" title={g.registrationLinkLabel || 'Inscrição privada'}>
+                              Privada
+                            </span>
+                          ) : null}
                           {g.adminNotes ? <StickyNote className="h-3.5 w-3.5 text-amber-500" aria-label="Tem notas internas" /> : null}
                         </span>
                       </td>
@@ -936,6 +1094,12 @@ export default function InviteSubmissionsAdmin() {
                               <div className="flex gap-2">
                                 <dt className="font-medium text-muted-foreground">Data de inscrição:</dt>
                                 <dd className="text-foreground">{fmtDateTime(g.respondedAt || g.createdAt)}</dd>
+                              </div>
+                              <div className="flex gap-2">
+                                <dt className="font-medium text-muted-foreground">Origem:</dt>
+                                <dd className="text-foreground">
+                                  {g.isPrivateRegistration ? `Inscrição privada — ${g.registrationLinkLabel || 'Link privado'}` : 'Inscrição pública'}
+                                </dd>
                               </div>
                               {answers.length === 0 ? (
                                 <div className="text-muted-foreground">Sem respostas adicionais no formulário.</div>
