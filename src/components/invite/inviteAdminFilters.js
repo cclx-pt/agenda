@@ -1,7 +1,10 @@
 export const DEFAULT_INVITE_STATUS_FILTERS = ['publicado', 'rascunho']
 
 export function inviteHasOpenRegistration(invite) {
-  return invite?.status === 'publicado' && invite?.registrationMode === 'internal' && invite?.rsvpEnabled === true
+  return invite?.status === 'publicado' &&
+    invite?.registrationMode === 'internal' &&
+    invite?.rsvpEnabled === true &&
+    (invite?.spotsLeft == null || invite.spotsLeft > 0)
 }
 
 export function filterAdminInvites(invites, { statuses, registration = 'all', community = 'all' }) {

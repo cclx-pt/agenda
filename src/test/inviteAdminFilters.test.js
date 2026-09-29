@@ -29,6 +29,12 @@ describe('invite admin filters', () => {
     expect(inviteHasOpenRegistration(invites[3])).toBe(false)
   })
 
+  it('treats an invite at capacity as closed for registration', () => {
+    expect(inviteHasOpenRegistration({ ...invites[0], spotsLeft: 0 })).toBe(false)
+    expect(inviteHasOpenRegistration({ ...invites[0], spotsLeft: 1 })).toBe(true)
+    expect(inviteHasOpenRegistration({ ...invites[0], spotsLeft: null })).toBe(true)
+  })
+
   it('combines registration and community filters', () => {
     const result = filterAdminInvites(invites, {
       statuses: ['publicado', 'rascunho', 'fechado'],
