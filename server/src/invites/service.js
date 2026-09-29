@@ -887,6 +887,7 @@ function renderPayload(
   } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
+  const registrationOpen = isRegistrationOpen(invite, spotsLeft)
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
   const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket), guestTicket)
   if (guestStatus) {
@@ -924,7 +925,7 @@ function renderPayload(
       eventId: invite.eventId ?? null,
       registrationMode: invite.registrationMode,
       registrationUrl: invite.registrationUrl,
-      rsvpEnabled: invite.rsvpEnabled,
+      rsvpEnabled: registrationOpen,
       // Datas de INSCRIÇÃO (janela).
       rsvpStartDatetime: invite.rsvpStartDatetime,
       rsvpDeadline: invite.rsvpDeadline,
@@ -959,6 +960,10 @@ function renderPayload(
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
     guestStatus,
   }
+}
+
+export function isRegistrationOpen(invite, spotsLeft) {
+  return Boolean(invite?.rsvpEnabled) && (spotsLeft == null || spotsLeft > 0)
 }
 
 // Página pública por slug. Só devolve convites publicados. Se `guestToken`
