@@ -952,6 +952,8 @@ function renderPayload(
         mbEntity: t.mbEntity ?? null,
         mbReference: t.mbReference ?? null,
         mbNumbers: t.mbNumbers ?? [],
+        capacity: t.capacity,
+        spotsLeft: t.capacity == null ? null : Math.max(0, t.capacity - (t.sold ?? 0)),
         soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
@@ -1253,37 +1255,17 @@ export async function submitRsvp(slug, input) {
   const paymentState =
     (ticket ? ticketNeedsPayment(ticket) : invite.costType !== 'gratuito') ? 'pending' : 'not_applicable'
 
-  // Capacidade: do bilhete escolhido (se houver) ou global do convite.
-  let rsvpState = data.attend ? 'confirmed' : 'declined'
-  if (rsvpState === 'confirmed') {
-    let wouldExceed = false
-    if (ticket && ticket.capacity != null) {
-      const sold = await repo.countTicketSold(ticket.id)
-      if (sold + (data.guestsCount ?? 1) > ticket.capacity) wouldExceed = true
-    } else if (invite.capacity) {
-      const taken = await repo.countConfirmedSeats(invite.id)
-      if (taken + (data.guestsCount ?? 1) > invite.capacity) wouldExceed = true
-    }
-    if (wouldExceed) {
-      // Lotação esgotada: com lista de espera ativa → lista de espera; senão, bloqueia.
-      if (!invite.waitlistEnabled) {
-        throw new InviteError(409, 'A lotação está esgotada. As inscrições estão completas.')
-      }
-      rsvpState = 'waitlisted'
-    }
-  }
-
   // Cada inscrição é Única (não idempotente): cria sempre um novo registo, com o seu
   // próprio token pessoal, código de bilhete e senha de auto-gestão.
   const managePassword = genManagePassword()
-  const guest = await repo.insertGuest(invite.id, {
+  const inserted = await repo.insertGuestWithCapacity(invite.id, {
     token: randomBytes(24).toString('hex'),
     code: genGuestCode(),
     name: data.name,
     email: data.email ?? null,
     phone: data.phone ?? null,
     guestsCount: data.guestsCount ?? 1,
-    rsvpState,
+    rsvpState: data.attend ? 'confirmed' : 'declined',
     paymentState,
     ticketId: ticket?.id ?? null,
     extra: data.extra ?? null,
@@ -1291,7 +1273,18 @@ export async function submitRsvp(slug, input) {
     // preserva campos/rótulos usados, mesmo que o formulário mude depois.
     schemaSnapshot: Array.isArray(formFields) && formFields.length ? formFields : null,
     managePasswordHash: hashManagePassword(managePassword),
+  }, {
+    acceptWaitlist: data.acceptWaitlist === true,
   })
+  if (inserted.reason === 'full') {
+    throw new InviteError(409, 'A lotação está esgotada. As inscrições estão completas.')
+  }
+  if (inserted.reason === 'waitlist_consent_required') {
+    throw new InviteError(409, 'Confirma que pretendes entrar na lista de espera.')
+  }
+  if (inserted.reason === 'invalid_ticket') throw new InviteError(400, 'Bilhete inválido.')
+  if (inserted.reason === 'invite_not_found') throw new InviteError(404, 'Convite não encontrado.')
+  const guest = inserted.guest
   const status = guestStatusPayload(guest, resolveGuestMethod(guest, ticket), ticket)
   // Comunidade do JotForm (link "contribuir via MB WAY") — mesma resolução do
   // email/renderPayload, para o link ficar correto já a seguir à inscrição.

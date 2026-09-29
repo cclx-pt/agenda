@@ -28,9 +28,53 @@ test.describe('Casos-limite e regras', () => {
     const first = await pub.submitRsvp(invite.slug, { name: 'Confirmado', attend: true })
     expect(first.body.status.rsvpState).toBe('confirmed')
 
+    const withoutConsent = await pub.submitRsvp(invite.slug, { name: 'Sem consentimento', attend: true })
+    expect(withoutConsent.status).toBe(409)
+    expect(withoutConsent.body.error).toContain('Confirma')
+
     const second = await pub.submitRsvp(invite.slug, { name: 'Espera', attend: true, acceptWaitlist: true })
     expect(second.status).toBe(201)
     expect(second.body.status.rsvpState).toBe('waitlisted')
+  })
+
+  test('capacidade do bilhete esgotada permite lista de espera com consentimento', async ({ admin, pub }) => {
+    const invite = await admin.seedPublishedInvite({
+      title: uniqueTitle('edge-ticket-waitlist'),
+      waitlistEnabled: true,
+      tickets: [{ name: 'Bilhete limitado', kind: 'gratis', capacity: 1 }],
+    })
+    const ticketId = invite.savedTickets[0].id
+
+    const first = await pub.submitRsvp(invite.slug, {
+      name: 'Confirmado',
+      attend: true,
+      ticketId,
+    })
+    expect(first.body.status.rsvpState).toBe('confirmed')
+
+    const second = await pub.submitRsvp(invite.slug, {
+      name: 'Espera',
+      attend: true,
+      ticketId,
+      acceptWaitlist: true,
+    })
+    expect(second.status).toBe(201)
+    expect(second.body.status.rsvpState).toBe('waitlisted')
+  })
+
+  test('inscrições concorrentes não ultrapassam a capacidade', async ({ admin, pub }) => {
+    const invite = await admin.seedPublishedInvite({
+      title: uniqueTitle('edge-concurrent-capacity'),
+      capacity: 1,
+      waitlistEnabled: false,
+    })
+
+    const results = await Promise.all([
+      pub.submitRsvp(invite.slug, { name: 'Concorrente A', attend: true }),
+      pub.submitRsvp(invite.slug, { name: 'Concorrente B', attend: true }),
+    ])
+
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409])
   })
 
   test('prazo de inscrição terminado → 410', async ({ admin, pub }) => {

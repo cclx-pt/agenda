@@ -328,9 +328,9 @@ export async function replaceBlocks(inviteId, blocks) {
 
 // ── Convidados / RSVP ────────────────────────────────────────────
 
-export async function insertGuest(inviteId, data) {
+async function insertGuestWithDb(db, inviteId, data) {
   const id = randomUUID()
-  await pool.query(
+  await db.query(
     `INSERT INTO invite_guests
       (id, invite_id, token, code, name, email, phone, guests_count, rsvp_state, payment_state, extra, ticket_id, manage_password_hash, schema_snapshot, responded_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())`,
@@ -351,7 +351,94 @@ export async function insertGuest(inviteId, data) {
       data.schemaSnapshot ? JSON.stringify(data.schemaSnapshot) : null,
     ]
   )
-  return findGuestById(id)
+  const { rows } = await db.query('SELECT * FROM invite_guests WHERE id = $1', [id])
+  return mapGuest(rows[0])
+}
+
+export async function insertGuest(inviteId, data) {
+  return insertGuestWithDb(pool, inviteId, data)
+}
+
+// Verifica a capacidade e cria a inscrição na mesma transação. O bloqueio da
+// linha do convite serializa inscrições concorrentes sem alterar registos atuais.
+export async function insertGuestWithCapacity(inviteId, data, { acceptWaitlist = false } = {}) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows: inviteRows } = await client.query(
+      'SELECT capacity, waitlist_enabled FROM invites WHERE id = $1 FOR UPDATE',
+      [inviteId]
+    )
+    const invite = inviteRows[0]
+    if (!invite) {
+      await client.query('ROLLBACK')
+      return { reason: 'invite_not_found', guest: null }
+    }
+
+    let capacity = invite.capacity
+    let sold = 0
+    let usesTicketCapacity = false
+    if (data.ticketId) {
+      const { rows: ticketRows } = await client.query(
+        `SELECT capacity
+         FROM invite_tickets
+         WHERE id = $1 AND invite_id = $2 AND active = TRUE
+         FOR UPDATE`,
+        [data.ticketId, inviteId]
+      )
+      if (!ticketRows[0]) {
+        await client.query('ROLLBACK')
+        return { reason: 'invalid_ticket', guest: null }
+      }
+      if (ticketRows[0].capacity != null) {
+        capacity = ticketRows[0].capacity
+        usesTicketCapacity = true
+        const result = await client.query(
+          `SELECT COALESCE(SUM(guests_count), 0)::int AS sold
+           FROM invite_guests
+           WHERE ticket_id = $1 AND rsvp_state = 'confirmed'`,
+          [data.ticketId]
+        )
+        sold = result.rows[0]?.sold ?? 0
+      }
+    }
+
+    if (capacity != null && !usesTicketCapacity) {
+      const result = await client.query(
+        `SELECT COALESCE(SUM(guests_count), 0)::int AS sold
+         FROM invite_guests
+         WHERE invite_id = $1 AND rsvp_state = 'confirmed'`,
+        [inviteId]
+      )
+      sold = result.rows[0]?.sold ?? 0
+    }
+
+    const wouldExceed =
+      data.rsvpState === 'confirmed' &&
+      capacity != null &&
+      sold + (data.guestsCount ?? 1) > capacity
+
+    if (wouldExceed && !invite.waitlist_enabled) {
+      await client.query('ROLLBACK')
+      return { reason: 'full', guest: null }
+    }
+    if (wouldExceed && !acceptWaitlist) {
+      await client.query('ROLLBACK')
+      return { reason: 'waitlist_consent_required', guest: null }
+    }
+
+    const guest = await insertGuestWithDb(client, inviteId, {
+      ...data,
+      rsvpState: wouldExceed ? 'waitlisted' : data.rsvpState,
+    })
+    await client.query('COMMIT')
+    return { reason: null, guest }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function findGuestById(id) {

@@ -16,8 +16,9 @@ import {
   SpeakersCard,
   WorkshopsCard,
 } from '../components/invite/InviteCards'
-import { BannerRegistrationAction, RsvpCard } from '../components/invite/InvitePage'
+import { BannerRegistrationAction, RsvpCard, SpotsCounter } from '../components/invite/InvitePage'
 import { uploadEventImage, uploadMultimediaVideo } from '../services/eventsService'
+import * as invitesService from '../services/invitesService'
 
 vi.mock('../services/eventsService', () => ({
   uploadEventImage: vi.fn(),
@@ -204,6 +205,96 @@ describe('InviteBlockEditors uploads', () => {
       />,
     )
     expect(screen.getByRole('link', { name: /Garantir lugar/i })).toHaveAttribute('href', 'https://forms.example/register')
+  })
+
+  it('allows sold-out tickets only when the waitlist is active', async () => {
+    const ticket = { id: 'ticket-1', name: 'Bilhete geral', kind: 'gratis', active: true, soldOut: true }
+    const { rerender } = render(
+      <BannerRegistrationAction
+        block={{ content: {} }}
+        invite={{ registrationMode: 'internal', waitlistEnabled: false }}
+        tickets={[ticket]}
+        slug="conferencia"
+        accent="#1F3864"
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /Inscrever-me/i }))
+    expect(screen.queryByRole('link', { name: /Bilhete geral/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Esgotado')).toBeInTheDocument()
+
+    rerender(
+      <BannerRegistrationAction
+        block={{ content: {} }}
+        invite={{ registrationMode: 'internal', waitlistEnabled: true }}
+        tickets={[ticket]}
+        slug="conferencia"
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByRole('link', { name: /Bilhete geral/i })).toHaveAttribute(
+      'href',
+      '/invite/conferencia/inscricao?ticket=ticket-1',
+    )
+    expect(screen.getByText(/lista de espera disponível/i)).toBeInTheDocument()
+  })
+
+  it('describes sold-out capacity according to the waitlist setting', () => {
+    const { rerender } = render(
+      <SpotsCounter
+        invite={{ capacity: 10, spotsLeft: 0, waitlistEnabled: false }}
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByText('As inscrições estão esgotadas.')).toBeInTheDocument()
+
+    rerender(
+      <SpotsCounter
+        invite={{ capacity: 10, spotsLeft: 0, waitlistEnabled: true }}
+        accent="#1F3864"
+      />,
+    )
+    expect(screen.getByText('Novas inscrições entram em lista de espera.')).toBeInTheDocument()
+  })
+
+  it('asks for waitlist consent when capacity changes during submission', async () => {
+    const consentError = Object.assign(
+      new Error('Confirma que pretendes entrar na lista de espera.'),
+      { status: 409 },
+    )
+    const submit = vi.spyOn(invitesService, 'submitRsvp')
+      .mockRejectedValueOnce(consentError)
+      .mockResolvedValueOnce({ token: 'guest-token', status: { rsvpState: 'waitlisted' }, spotsLeft: 0 })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const onSubmitted = vi.fn()
+
+    render(
+      <RsvpCard
+        block={{ content: { fields: [{ key: 'name', type: 'text', label: 'Nome', required: true }] } }}
+        page={{
+          slug: 'conferencia',
+          invite: { title: 'Conferência', rsvpEnabled: true, waitlistEnabled: true, capacity: 1, spotsLeft: 1 },
+          tickets: [],
+        }}
+        accent="#1F3864"
+        onSubmitted={onSubmitted}
+        guestStatus={null}
+      />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/^Nome/), 'Pessoa em espera')
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar inscrição' }))
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2))
+    expect(confirm).toHaveBeenCalledWith('Entretanto, as vagas esgotaram. Queres inscrever-te na lista de espera?')
+    expect(submit.mock.calls[0][1].acceptWaitlist).toBe(false)
+    expect(submit.mock.calls[1][1].acceptWaitlist).toBe(true)
+    expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({
+      status: expect.objectContaining({ rsvpState: 'waitlisted' }),
+    }))
+
+    submit.mockRestore()
+    confirm.mockRestore()
   })
 
   it('keeps Enter as a new dropdown option', async () => {

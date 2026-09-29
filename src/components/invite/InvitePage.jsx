@@ -84,7 +84,7 @@ function StatusCard({ status }) {
 }
 
 // Contador de vagas disponíveis (aparece quando o convite tem capacidade definida).
-function SpotsCounter({ invite, accent }) {
+export function SpotsCounter({ invite, accent }) {
   const { capacity, spotsLeft } = invite
   if (spotsLeft == null || !capacity) return null
   const taken = Math.max(0, capacity - spotsLeft)
@@ -108,7 +108,11 @@ function SpotsCounter({ invite, accent }) {
         />
       </div>
       {soldOut ? (
-        <span className="text-xs text-muted-foreground">Novas inscrições entram em lista de espera.</span>
+        <span className="text-xs text-muted-foreground">
+          {invite.waitlistEnabled
+            ? 'Novas inscrições entram em lista de espera.'
+            : 'As inscrições estão esgotadas.'}
+        </span>
       ) : null}
     </div>
   )
@@ -116,9 +120,8 @@ function SpotsCounter({ invite, accent }) {
 
 // Escolha do bilhete — 1º passo da inscrição. O utilizador começa por ESCOLHER o
 // bilhete; só depois se abre o formulário. Usa-se com `onSelect` (botão, na página
-// de inscrição) ou com `hrefFor` (link, na landing). Bilhetes esgotados aparecem
-// desativados.
-function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe o teu bilhete' }) {
+// de inscrição) ou com `hrefFor` (link, na landing).
+function TicketChooser({ tickets, accent, onSelect, hrefFor, waitlistEnabled = false, heading = 'Escolhe o teu bilhete' }) {
   const list = tickets || []
   if (!list.length) return null
   const cardCls =
@@ -141,7 +144,9 @@ function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe 
               <span className="text-xs text-muted-foreground">Grupo{t.groupSize ? ` até ${t.groupSize} pessoas` : ''}</span>
             ) : null}
             {t.soldOut ? (
-              <span className="mt-1 text-xs font-semibold text-destructive">Esgotado</span>
+              <span className="mt-1 text-xs font-semibold text-destructive">
+                {waitlistEnabled ? 'Esgotado · lista de espera disponível' : 'Esgotado'}
+              </span>
             ) : (
               <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: accent }}>
                 Escolher e continuar
@@ -150,7 +155,7 @@ function TicketChooser({ tickets, accent, onSelect, hrefFor, heading = 'Escolhe 
             )}
           </>
         )
-        if (t.soldOut) {
+        if (t.soldOut && !waitlistEnabled) {
           return (
             <div key={t.id} className={cardCls + ' cursor-not-allowed opacity-60'} aria-disabled="true">
               {body}
@@ -222,6 +227,7 @@ export function BannerRegistrationAction({ block, invite, tickets, slug, accent,
         tickets={activeTickets}
         accent={accent}
         hrefFor={(ticket) => inviteRsvpHref(slug, ticket.id)}
+        waitlistEnabled={invite.waitlistEnabled}
         heading={content.ticketHeading || 'Escolhe o teu bilhete'}
       />
     )
@@ -311,14 +317,14 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
   const [notOpenYet] = useState(
     () => !preview && Boolean(inv.rsvpStartDatetime) && Date.now() < Date.parse(inv.rsvpStartDatetime)
   )
-  const tickets = (page.tickets || []).filter((t) => !t.soldOut)
+  const tickets = page.tickets || []
   const hasTickets = tickets.length > 0
   const [values, setValues] = useState(() => initialValues(fields))
   const [errors, setErrors] = useState({})
   const [ticketId, setTicketId] = useState(() => {
     if (typeof window === 'undefined') return preview && tickets.length ? tickets[0].id : ''
     const wanted = new URLSearchParams(window.location.search).get('ticket')
-    if (wanted && tickets.some((t) => t.id === wanted)) return wanted
+    if (wanted && tickets.some((t) => t.id === wanted && (!t.soldOut || inv.waitlistEnabled))) return wanted
     // Na pré-visualização do Admin, seleciona logo o 1.º bilhete para mostrar o formulário.
     return preview && tickets.length ? tickets[0].id : ''
   })
@@ -513,8 +519,10 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       : countPeople(fields, values, ticketId)
     // Lista de espera: se a lotação estiver esgotada, avisa e pede confirmação.
     let acceptWaitlist = false
-    const cap = page.invite?.capacity
-    const left = page.invite?.spotsLeft
+    const selectedTicket = tickets.find((t) => t.id === ticketId)
+    const usesTicketCapacity = selectedTicket?.capacity != null
+    const cap = usesTicketCapacity ? selectedTicket.capacity : page.invite?.capacity
+    const left = usesTicketCapacity ? selectedTicket.spotsLeft : page.invite?.spotsLeft
     if (cap && left != null && peopleCount > left) {
       if (page.invite?.waitlistEnabled) {
         const ok =
@@ -528,17 +536,32 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
       }
     }
     setBusy(true)
+    const payload = {
+      name,
+      email,
+      phone,
+      guestsCount: peopleCount,
+      attend: true,
+      ticketId: ticketId || null,
+      acceptWaitlist,
+      extra: Object.keys(finalExtra).length ? finalExtra : null,
+    }
     try {
-      const res = await invitesService.submitRsvp(page.slug, {
-        name,
-        email,
-        phone,
-        guestsCount: peopleCount,
-        attend: true,
-        ticketId: ticketId || null,
-        acceptWaitlist,
-        extra: Object.keys(finalExtra).length ? finalExtra : null,
-      })
+      let res
+      try {
+        res = await invitesService.submitRsvp(page.slug, payload)
+      } catch (err) {
+        const consentRequired =
+          err.status === 409 &&
+          page.invite?.waitlistEnabled &&
+          err.message === 'Confirma que pretendes entrar na lista de espera.'
+        if (!consentRequired) throw err
+        const confirmed =
+          typeof window !== 'undefined' &&
+          window.confirm('Entretanto, as vagas esgotaram. Queres inscrever-te na lista de espera?')
+        if (!confirmed) return
+        res = await invitesService.submitRsvp(page.slug, { ...payload, acceptWaitlist: true })
+      }
       onSubmitted(res)
       toast.success('Inscrição registada. Obrigado!')
     } catch (err) {
@@ -761,6 +784,7 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
           tickets={tickets}
           accent={accent}
           onSelect={setTicketId}
+          waitlistEnabled={inv.waitlistEnabled}
           heading={c.ticketHeading || 'Escolhe o teu bilhete'}
         />
       ) : (

@@ -88,8 +88,14 @@ rendering of `<meta>` tags without pulling the full block payload (crawlers/bots
 Submits the RSVP form. Delegates to the existing RSVP feature (see main spec §3.3);
 included here only because the landing page is its entry point.
 
+When the requested number of places exceeds the remaining capacity and the
+waitlist is enabled, the request must include `"acceptWaitlist": true`. Capacity
+checking and registration creation are atomic, so concurrent requests cannot
+confirm more places than the configured global or ticket capacity.
+
 ## Error handling
 
 - Unknown/invalid slug → `404` with a generic "invite not found" page.
 - Expired invite (past RSVP deadline and no waitlist) → `410 Gone` with a
   friendly "this invite has closed" message, still showing read-only event info.
+- Full capacity without a waitlist, or without explicit waitlist consent → `409`.
