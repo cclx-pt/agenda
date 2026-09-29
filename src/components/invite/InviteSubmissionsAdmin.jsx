@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug, ChevronDown } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   DropdownMenu,
@@ -629,21 +629,30 @@ export default function InviteSubmissionsAdmin() {
       </div>
 
       {selectedInvite ? (
-        <section className="rounded-xl border border-border bg-card p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <details className="group rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <KeyRound className="h-4 w-4" aria-hidden="true" />
-                API de inscrições — {selectedInvite.title}
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
+                Gestão da API — {selectedInvite.title}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {selectedInvite.registrationsApiKeyConfigured
+                  ? `Chave ativa ••••${selectedInvite.registrationsApiKeyLastFour || ''}`
+                  : 'Sem chave API configurada'}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 flex-none text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="max-w-2xl text-xs text-muted-foreground">
                 Configura estes dados no dashboard externo e envia a chave no cabeçalho <code>X-API-Key</code>.
               </p>
-            </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={primaryBtn} onClick={rotateApiKey} disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <KeyRound className="h-4 w-4" aria-hidden="true" />}
-                {selectedInvite.registrationsApiKeyConfigured ? 'Gerar nova chave' : 'Gerar chave API'}
+                {selectedInvite.registrationsApiKeyConfigured ? 'Criar nova chave API' : 'Criar chave API'}
               </button>
               {selectedInvite.registrationsApiKeyConfigured ? (
                 <button type="button" className={ghostBtn} onClick={revokeApiKey} disabled={busy}>
@@ -653,46 +662,47 @@ export default function InviteSubmissionsAdmin() {
               ) : null}
             </div>
           </div>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <label className={labelCls}>
-              URL da API
-              <span className="flex gap-2">
-                <input className={inputCls} readOnly value={registrationsApiUrl} />
-                <button type="button" className={iconBtn} onClick={() => copyApiValue(registrationsApiUrl, 'URL')}>
-                  <Copy className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Copiar URL</span>
-                </button>
-              </span>
-            </label>
-            <label className={labelCls}>
-              Chave API
-              <span className="flex gap-2">
-                <input
-                  className={inputCls}
-                  readOnly
-                  value={
-                    apiCredential?.inviteId === selectedInvite.id
-                      ? apiCredential.apiKey
-                      : selectedInvite.registrationsApiKeyConfigured
-                        ? `Chave configurada ••••${selectedInvite.registrationsApiKeyLastFour || ''}`
-                        : 'Ainda não configurada'
-                  }
-                />
-                {apiCredential?.inviteId === selectedInvite.id ? (
-                  <button type="button" className={iconBtn} onClick={() => copyApiValue(apiCredential.apiKey, 'Chave API')}>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <label className={labelCls}>
+                URL da API
+                <span className="flex gap-2">
+                  <input className={inputCls} readOnly value={registrationsApiUrl} />
+                  <button type="button" className={iconBtn} onClick={() => copyApiValue(registrationsApiUrl, 'URL')}>
                     <Copy className="h-4 w-4" aria-hidden="true" />
-                    <span className="sr-only">Copiar chave API</span>
+                    <span className="sr-only">Copiar URL</span>
                   </button>
-                ) : null}
-              </span>
-            </label>
+                </span>
+              </label>
+              <label className={labelCls}>
+                Chave API
+                <span className="flex gap-2">
+                  <input
+                    className={inputCls}
+                    readOnly
+                    value={
+                      apiCredential?.inviteId === selectedInvite.id
+                        ? apiCredential.apiKey
+                        : selectedInvite.registrationsApiKeyConfigured
+                          ? `Chave configurada ••••${selectedInvite.registrationsApiKeyLastFour || ''}`
+                          : 'Ainda não configurada'
+                    }
+                  />
+                  {apiCredential?.inviteId === selectedInvite.id ? (
+                    <button type="button" className={iconBtn} onClick={() => copyApiValue(apiCredential.apiKey, 'Chave API')}>
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                      <span className="sr-only">Copiar chave API</span>
+                    </button>
+                  ) : null}
+                </span>
+              </label>
+            </div>
+            {apiCredential?.inviteId === selectedInvite.id ? (
+              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                Guarda esta chave agora. Por segurança, só é apresentada uma vez.
+              </p>
+            ) : null}
           </div>
-          {apiCredential?.inviteId === selectedInvite.id ? (
-            <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-              Guarda esta chave agora. Por segurança, só é apresentada uma vez.
-            </p>
-          ) : null}
-        </section>
+        </details>
       ) : null}
 
       {filterInvite ? (

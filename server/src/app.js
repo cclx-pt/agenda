@@ -25,6 +25,7 @@ import { approverScopesRouter } from './approverScopes/routes.js'
 import { invitesRouter, publicInvitesRouter } from './invites/routes.js'
 import { fundingRouter, publicFundingRouter } from './funding/routes.js'
 import { healthRouter } from './health/routes.js'
+import { corsOptionsForRequest } from './cors.js'
 
 /**
  * app.js — constrói e exporta a aplicação Express já configurada (middleware +
@@ -43,9 +44,8 @@ if (config.isProd) {
 }
 
 app.use(
-  cors({
-    origin: config.corsOrigin,
-    credentials: true,
+  cors((req, callback) => {
+    callback(null, corsOptionsForRequest(req, config.corsOrigin))
   })
 )
 app.use(express.json())
