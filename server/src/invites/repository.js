@@ -692,6 +692,87 @@ export async function updateGuest(id, data) {
   return findGuestById(id)
 }
 
+export async function recordImageConsent({
+  inviteId,
+  guestId,
+  campaignId,
+  fieldKey,
+  expectedValue,
+}) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query(
+      `SELECT extra
+       FROM invite_guests
+       WHERE id = $1 AND invite_id = $2
+       FOR UPDATE`,
+      [guestId, inviteId]
+    )
+    if (!rows[0]) {
+      await client.query('ROLLBACK')
+      return null
+    }
+    const previousValue = rows[0].extra?.[fieldKey]
+    const values = Array.isArray(previousValue)
+      ? previousValue
+      : [previousValue]
+    const expected = expectedValue.trim().toLocaleLowerCase('pt-PT')
+    const hasRefusal = values.some(
+      (value) =>
+        String(value ?? '').trim().toLocaleLowerCase('pt-PT') === expected
+    )
+    if (!hasRefusal) {
+      await client.query('COMMIT')
+      return { changed: false, consentedAt: null }
+    }
+    const campaignResult = campaignId
+      ? await client.query(
+          'SELECT id FROM invite_campaigns WHERE id = $1 AND invite_id = $2',
+          [campaignId, inviteId]
+        )
+      : { rows: [] }
+    if (campaignId && !campaignResult.rows[0]) {
+      await client.query('ROLLBACK')
+      return null
+    }
+    const consentedAt = new Date()
+    await client.query(
+      `UPDATE invite_guests
+       SET extra = jsonb_set(
+         COALESCE(extra, '{}'::jsonb),
+         ARRAY[$3]::text[],
+         '""'::jsonb,
+         true
+       ),
+       updated_at = $4
+       WHERE id = $1 AND invite_id = $2`,
+      [guestId, inviteId, fieldKey, consentedAt]
+    )
+    await client.query(
+      `INSERT INTO invite_image_consent_audit
+         (id, invite_id, guest_id, campaign_id, field_key, previous_value, consented_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      [
+        randomUUID(),
+        inviteId,
+        guestId,
+        campaignId ?? null,
+        fieldKey,
+        JSON.stringify(previousValue ?? null),
+        consentedAt,
+      ]
+    )
+    await client.query('COMMIT')
+    return { changed: true, consentedAt }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 // Atualiza SÓ os campos editáveis pelo organizador (nome/email/telemóvel/estado),
 // sem mexer em responded_at (mantém a data de inscrição original).
 export async function updateGuestDetails(id, data) {

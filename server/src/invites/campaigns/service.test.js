@@ -12,6 +12,10 @@ import {
   richTextToPlainText,
   sanitizeCampaignRichText,
 } from './richText.js'
+import {
+  findImageConsentField,
+  IMAGE_CONSENT_REFUSAL,
+} from '../imageConsent.js'
 
 const guests = [
   {
@@ -137,10 +141,11 @@ test('retryDelayMs applies increasing backoff between delivery attempts', () => 
 })
 
 test('campaign templates provide all reusable stage 6 messages', () => {
-  assert.equal(campaignTemplates.length, 7)
+  assert.equal(campaignTemplates.length, 8)
   assert.deepEqual(
     campaignTemplates.map((template) => template.key),
     [
+      'image_consent_confirmation',
       'access_information',
       'event_reminder',
       'payment_pending',
@@ -151,12 +156,42 @@ test('campaign templates provide all reusable stage 6 messages', () => {
     ]
   )
   const draft = applyTemplate(
-    campaignTemplates[0],
+    campaignTemplates[1],
     { title: 'Conferência' },
     'https://example.test/invite/conferencia'
   )
   assert.equal(draft.subject, 'Informações de acesso')
   assert.equal(draft.blocks[1].url, 'https://example.test/invite/conferencia')
+})
+
+test('image consent template contains the personalized action block', () => {
+  const draft = applyTemplate(
+    campaignTemplates[0],
+    { title: 'Conferência' },
+    'https://example.test/invite/conferencia'
+  )
+  assert.deepEqual(draft.blocks[1], {
+    type: 'image_consent',
+    label: 'AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM',
+  })
+})
+
+test('image consent field is resolved by its configured form label', () => {
+  const field = findImageConsentField([
+    {
+      type: 'rsvp',
+      content: {
+        fields: [
+          {
+            key: 'image_consent',
+            label: 'Confirmação/consentimento de proteção de imagem',
+            options: [IMAGE_CONSENT_REFUSAL],
+          },
+        ],
+      },
+    },
+  ])
+  assert.equal(field.key, 'image_consent')
 })
 
 test('renderInviteCampaignEmail escapes authored content', () => {
@@ -168,6 +203,7 @@ test('renderInviteCampaignEmail escapes authored content', () => {
     blocks: [{ type: 'text', text: '<img src=x onerror=alert(1)>' }],
     eventLink: 'https://example.test/invite/test',
   })
+
   assert.equal(message.subject, 'Evento | Aviso')
   assert.match(message.html, /<title>Evento \| Aviso<\/title>/)
   assert.doesNotMatch(message.html, /<script>|<img src=x/)
@@ -175,6 +211,24 @@ test('renderInviteCampaignEmail escapes authored content', () => {
   assert.match(message.html, /&lt;img src=x onerror=alert\(1\)&gt;/)
   assert.doesNotMatch(message.html, /Ver Evento/)
   assert.doesNotMatch(message.text, /Ver convite|Agenda CCLX/)
+})
+
+test('renderInviteCampaignEmail adds the personal image consent link', () => {
+  const message = renderInviteCampaignEmail({
+    eventTitle: 'Evento',
+    subject: 'Consentimento',
+    blocks: [
+      {
+        type: 'image_consent',
+        label: 'AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM',
+      },
+    ],
+    imageConsentUrl:
+      'https://example.test/invite/evento/image-consent?g=token&c=campaign',
+  })
+  assert.match(message.html, /AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM/)
+  assert.match(message.html, /image-consent\?g=token&amp;c=campaign/)
+  assert.match(message.text, /image-consent\?g=token&c=campaign/)
 })
 
 test('rich campaign text keeps safe formatting and removes active content', () => {

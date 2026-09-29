@@ -17,6 +17,10 @@ import {
   richTextToPlainText,
   sanitizeCampaignRichText,
 } from './richText.js'
+import {
+  findImageConsentField,
+  IMAGE_CONSENT_REFUSAL,
+} from '../imageConsent.js'
 
 const urlSchema = z
   .string()
@@ -56,6 +60,10 @@ const blockSchema = z.union([
     title: z.string().trim().max(200).optional().default(''),
   }),
   z.object({ type: z.literal('button'), url: urlSchema, label: z.string().trim().min(1).max(80) }),
+  z.object({
+    type: z.literal('image_consent'),
+    label: z.string().trim().min(1).max(100),
+  }),
   z.object({ type: z.literal('warning'), text: z.string().trim().min(1).max(3000) }),
   z.object({
     type: z.literal('workshops'),
@@ -159,6 +167,8 @@ const DELIVERY_LEASE_SECONDS = 90
 const DELIVERY_WORKER_BUDGET_MS = 40_000
 const DELIVERY_SEND_DELAY_MS = 1_000
 const DELIVERY_RATE_LIMIT_DELAY_MS = 30 * 60_000
+const IMAGE_CONSENT_TEXT_PLACEHOLDER =
+  'Edite este bloco com o texto da comunicação antes de enviar.'
 
 function canAccessChurch(user, community) {
   if (user?.role === 'admin' || !community) return true
@@ -310,7 +320,7 @@ export async function listTemplates(user, inviteId) {
     ...campaignTemplates.map((template) => ({
       ...template,
       custom: false,
-      automationCompatible: true,
+      automationCompatible: template.automationCompatible !== false,
     })),
     ...(await campaignsRepo.listTemplates(inviteId)),
   ]
@@ -325,10 +335,34 @@ export async function createFromTemplate(user, inviteId, templateKey) {
     ? await campaignsRepo.findTemplate(inviteId, customId)
     : findCampaignTemplate(templateKey)
   if (!template) throw new InviteError(404, 'Template não encontrado.')
+  let resolvedTemplate = template
+  if (template.key === 'image_consent_confirmation') {
+    const blocks = await invitesRepo.listBlocks(inviteId)
+    const field = findImageConsentField(blocks)
+    if (!field?.key) {
+      throw new InviteError(
+        409,
+        'O formulário não contém o campo de confirmação/consentimento de proteção de imagem.'
+      )
+    }
+    resolvedTemplate = {
+      ...template,
+      audience: {
+        formMatch: 'all',
+        formConditions: [
+          {
+            fieldKey: field.key,
+            operator: 'equals',
+            value: IMAGE_CONSENT_REFUSAL,
+          },
+        ],
+      },
+    }
+  }
   const eventLink = `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`
   return campaignsRepo.insert(
     inviteId,
-    campaignSchema.parse(applyTemplate(template, invite, eventLink)),
+    campaignSchema.parse(applyTemplate(resolvedTemplate, invite, eventLink)),
     user.sub
   )
 }
@@ -425,6 +459,12 @@ function unsubscribeLinks(invite, token) {
   }
 }
 
+function buildImageConsentUrl(invite, token, campaignId) {
+  if (!token) return undefined
+  const base = (config.appUrl || '').replace(/\/+$/, '')
+  return `${base}/invite/${encodeURIComponent(invite.slug)}/image-consent?g=${encodeURIComponent(token)}&c=${encodeURIComponent(campaignId)}`
+}
+
 export async function sendTest(user, inviteId, campaignId, input) {
   const { invite, campaign } = await getCampaign(user, inviteId, campaignId)
   if (campaign.status !== 'draft')
@@ -440,6 +480,7 @@ export async function sendTest(user, inviteId, campaignId, input) {
     blocks: campaign.blocks,
     eventLink: `${(config.appUrl || '').replace(/\/+$/, '')}/invite/${encodeURIComponent(invite.slug)}`,
     bannerUrl: await resolveInviteBanner(invite),
+    imageConsentUrl: buildImageConsentUrl(invite, guest?.token, campaign.id),
     ...unsubscribeLinks(invite, guest?.token),
   })
 }
@@ -451,6 +492,15 @@ export async function schedule(user, inviteId, campaignId, input) {
   const { scheduledAt } = scheduleSchema.parse(input)
   if (scheduledAt.getTime() <= Date.now() + 60_000) {
     throw new InviteError(400, 'O envio deve ser agendado com pelo menos um minuto de antecedência.')
+  }
+  if (
+    campaign.blocks.some(
+      (block) =>
+        block.type === 'text' &&
+        block.text === IMAGE_CONSENT_TEXT_PLACEHOLDER
+    )
+  ) {
+    throw new InviteError(400, 'Defina o texto da comunicação antes de agendar.')
   }
   if (campaign.status === 'draft') {
     const audience = await audienceFor(inviteId, campaign.audience)
@@ -479,7 +529,8 @@ export async function listAutomations(user, inviteId) {
 export async function saveAutomation(user, inviteId, input) {
   const invite = await getInvite(user, inviteId)
   const automation = automationSchema.parse(input)
-  if (!findCampaignTemplate(automation.templateKey)) {
+  const automationTemplate = findCampaignTemplate(automation.templateKey)
+  if (!automationTemplate || automationTemplate.automationCompatible === false) {
     throw new InviteError(400, 'Template de automatização inválido.')
   }
   if (!invite.startDatetime) {
@@ -528,6 +579,15 @@ export async function send(user, inviteId, campaignId) {
   const { campaign } = await getCampaign(user, inviteId, campaignId)
   if (campaign.status !== 'draft')
     throw new InviteError(409, 'Esta comunicação já foi ou está a ser enviada.')
+  if (
+    campaign.blocks.some(
+      (block) =>
+        block.type === 'text' &&
+        block.text === IMAGE_CONSENT_TEXT_PLACEHOLDER
+    )
+  ) {
+    throw new InviteError(400, 'Defina o texto da comunicação antes de enviar.')
+  }
   const audience = await audienceFor(inviteId, campaign.audience)
   if (audience.length === 0)
     throw new InviteError(400, 'A audiência não tem destinatários com email.')
@@ -578,6 +638,11 @@ async function deliverRecipient(invite, campaign, recipient, bannerUrl) {
       blocks: campaign.blocks,
       eventLink: guestLink(invite, recipient.guestToken),
       bannerUrl,
+      imageConsentUrl: buildImageConsentUrl(
+        invite,
+        recipient.guestToken,
+        campaign.id
+      ),
       ...unsubscribeLinks(invite, recipient.guestToken),
     })
     if (!delivery.accepted) {

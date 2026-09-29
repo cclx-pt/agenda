@@ -1,5 +1,24 @@
 export const campaignTemplates = [
   {
+    key: 'image_consent_confirmation',
+    label: 'Confirmação/consentimento de proteção de imagem',
+    automationCompatible: false,
+    type: 'update',
+    subject: 'Confirmação de consentimento de imagem',
+    preheader: 'Pode atualizar a sua autorização de utilização de imagem.',
+    blocks: [
+      {
+        type: 'text',
+        text: 'Edite este bloco com o texto da comunicação antes de enviar.',
+      },
+      {
+        type: 'image_consent',
+        label: 'AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM',
+      },
+    ],
+    audience: {},
+  },
+  {
     key: 'access_information',
     label: 'Informações de acesso',
     type: 'update',

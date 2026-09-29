@@ -147,7 +147,7 @@ com o plano Hobby. Existe ainda uma execução administrativa manual do worker.
 
 ### Templates, segmentos e automatizações
 
-O editor inclui sete templates operacionais e templates personalizados criados
+O editor inclui oito templates operacionais e templates personalizados criados
 a partir de comunicações enviadas. No fim do envio definitivo, o utilizador pode
 dar um nome ao conteúdo e audiência atuais e guardá-los como template partilhado
 do convite. Os templates personalizados podem criar novos rascunhos; os sete
@@ -159,6 +159,16 @@ agendada pode ser reagendada ou cancelada. As automatizações suportam lembrete
 antes/depois do evento e pagamentos pendentes, reutilizam templates de sistema e
 audiências, e guardam uma chave de execução para não duplicarem uma campanha
 relativa à mesma data do evento.
+
+O template **Confirmação/consentimento de proteção de imagem** identifica no
+formulário o campo com esse nome e pré-configura a audiência para inscrições com
+a resposta “Não autorizo a utilização da minha imagem em fotografias ou vídeos
+captados”. O texto é definido pelo gestor antes do envio. O bloco
+**AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM** gera uma ligação pessoal por inscrição
+e exige confirmação numa página pública. Ao confirmar, apenas essa resposta é
+colocada em branco; o valor anterior, a inscrição, a campanha e a data da
+alteração ficam guardados em `invite_image_consent_audit`. Cliques repetidos são
+idempotentes e não criam novas alterações.
 
 O browser aberto consulta agendamentos e ativa trabalho vencido. O cron também
 processa agendamentos e automatizações; no plano Vercel Hobby, em que o cron é

@@ -542,6 +542,18 @@ CREATE TABLE IF NOT EXISTS invite_campaigns (
 CREATE INDEX IF NOT EXISTS idx_invite_campaigns_invite
   ON invite_campaigns (invite_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS invite_image_consent_audit (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id      UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  guest_id       UUID NOT NULL REFERENCES invite_guests (id) ON DELETE CASCADE,
+  campaign_id    UUID REFERENCES invite_campaigns (id) ON DELETE SET NULL,
+  field_key      TEXT NOT NULL,
+  previous_value JSONB,
+  consented_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_image_consent_audit_guest
+  ON invite_image_consent_audit (guest_id, consented_at DESC);
+
 -- Audiência materializada no início do envio. Preserva quem recebeu, mesmo que a
 -- inscrição ou o email sejam alterados posteriormente.
 CREATE TABLE IF NOT EXISTS invite_campaign_recipients (

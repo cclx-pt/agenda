@@ -393,6 +393,28 @@ export async function unsubscribeInviteCampaignEmails(slug, guestToken) {
   return result
 }
 
+export async function getInviteImageConsent(slug, guestToken) {
+  const { consent } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/image-consent?g=${encodeURIComponent(guestToken)}`
+  )
+  return consent
+}
+
+export async function confirmInviteImageConsent(
+  slug,
+  guestToken,
+  campaignId
+) {
+  const { consent } = await request(
+    `/data/public/invite/${encodeURIComponent(slug)}/image-consent`,
+    {
+      method: 'POST',
+      body: { token: guestToken, campaignId },
+    }
+  )
+  return consent
+}
+
 export async function submitRsvp(slug, payload) {
   return request(`/data/public/invite/${encodeURIComponent(slug)}/rsvp`, {
     method: 'POST',

@@ -97,7 +97,7 @@ function emailText(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br />')
 }
 
-function campaignBlockHtml(block) {
+function campaignBlockHtml(block, { imageConsentUrl } = {}) {
   if (block.type === 'text') {
     const content = block.html
       ? renderCampaignRichText(block.html)
@@ -112,6 +112,10 @@ function campaignBlockHtml(block) {
   }
   if (block.type === 'button') {
     return `<tr><td align="left" style="padding:2px 0 24px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td bgcolor="#1f3864" style="border-radius:6px"><a href="${escapeHtml(block.url)}" style="display:inline-block;padding:13px 22px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border:1px solid #1f3864;border-radius:6px">${escapeHtml(block.label)}</a></td></tr></table></td></tr>`
+  }
+  if (block.type === 'image_consent') {
+    if (!imageConsentUrl) return ''
+    return `<tr><td align="left" style="padding:2px 0 24px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td bgcolor="#166534" style="border-radius:6px"><a href="${escapeHtml(imageConsentUrl)}" style="display:inline-block;padding:13px 22px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border:1px solid #166534;border-radius:6px">${escapeHtml(block.label)}</a></td></tr></table></td></tr>`
   }
   if (block.type === 'warning') {
     return `<tr><td style="padding:0 0 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td width="4" bgcolor="#d97706" style="width:4px;font-size:0;line-height:0">&nbsp;</td><td bgcolor="#fef3c7" style="padding:14px 16px;font-family:Arial,'Helvetica Neue',sans-serif;font-size:15px;line-height:23px;color:#78350f"><strong style="color:#78350f">Aviso</strong><br />${emailText(block.text)}</td></tr></table></td></tr>`
@@ -133,6 +137,7 @@ export function renderInviteCampaignEmail({
   bannerUrl,
   unsubscribeUrl,
   oneClickUnsubscribeUrl,
+  imageConsentUrl,
 }) {
   const emailSubject = `${String(eventTitle ?? '').trim()} | ${String(subject ?? '').trim()}`
   const content = Array.isArray(blocks) ? blocks : []
@@ -144,6 +149,9 @@ export function renderInviteCampaignEmail({
     if (block.type === 'image') return block.alt ? `${block.alt}: ${block.url}` : block.url
     if (block.type === 'video') return `${block.title || 'Ver vídeo'}: ${block.url}`
     if (block.type === 'button') return `${block.label}: ${block.url}`
+    if (block.type === 'image_consent') {
+      return imageConsentUrl ? `${block.label}: ${imageConsentUrl}` : ''
+    }
     if (block.type === 'workshops') return `Workshops:\n${block.items.map((item) => `- ${item.title}${item.description ? `: ${item.description}` : ''}`).join('\n')}`
     return ''
   }).filter(Boolean)
@@ -195,7 +203,9 @@ export function renderInviteCampaignEmail({
           <tr>
             <td class="email-content" style="padding:32px;font-family:Arial,'Helvetica Neue',sans-serif;color:#111827">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                ${content.map(campaignBlockHtml).join('')}
+                ${content
+                  .map((block) => campaignBlockHtml(block, { imageConsentUrl }))
+                  .join('')}
               </table>
             </td>
           </tr>

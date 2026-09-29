@@ -122,6 +122,16 @@ function validateDraft(campaign) {
   if (!campaign.name.trim()) return 'Indique o nome interno da comunicação.'
   if (!campaign.subject.trim()) return 'Indique o assunto do email.'
   if (!campaign.blocks.length) return 'Adicione pelo menos um bloco de conteúdo.'
+  if (
+    campaign.blocks.some(
+      (block) =>
+        block.type === 'text' &&
+        block.text ===
+          'Edite este bloco com o texto da comunicação antes de enviar.'
+    )
+  ) {
+    return 'Defina o texto da comunicação antes de guardar.'
+  }
   const incompleteCondition = (campaign.audience.formConditions ?? []).some(
     (condition) =>
       !['empty', 'not_empty'].includes(condition.operator) &&
@@ -517,6 +527,11 @@ function BlockEditor({ inviteId, block, onChange, onRemove }) {
                 ? { type, url: '', title: '' }
                 : type === 'button'
                   ? { type, url: '', label: '' }
+                  : type === 'image_consent'
+                    ? {
+                        type,
+                        label: 'AUTORIZO A UTILIZAÇÃO DA MINHA IMAGEM',
+                      }
                   : { type, items: [{ title: '', description: '' }] }
         onChange(initial)
       }}
@@ -526,6 +541,7 @@ function BlockEditor({ inviteId, block, onChange, onRemove }) {
       <option value="image">Imagem</option>
       <option value="video">Vídeo (link)</option>
       <option value="button">Botão</option>
+      <option value="image_consent">Autorização de utilização de imagem</option>
       <option value="workshops">Workshops</option>
     </select>
   )
@@ -599,6 +615,17 @@ function BlockEditor({ inviteId, block, onChange, onRemove }) {
             onChange={(event) => onChange({ ...block, url: event.target.value })}
             placeholder="https://…"
           />
+        </div>
+      ) : null}
+      {block.type === 'image_consent' ? (
+        <div className="rounded-lg border border-emerald-700 bg-emerald-50 p-3">
+          <p className="m-0 text-sm font-semibold text-emerald-900">
+            {block.label}
+          </p>
+          <p className="mb-0 mt-1 text-xs text-emerald-800">
+            No email, este botão recebe automaticamente a ligação pessoal da
+            inscrição. O participante confirma a alteração numa página segura.
+          </p>
         </div>
       ) : null}
       {block.type === 'workshops' ? (
@@ -734,6 +761,15 @@ function CampaignPreview({ campaign, invite }) {
             >
               {block.label || 'Abrir'}
             </a>
+          )
+        if (block.type === 'image_consent')
+          return (
+            <span
+              key={index}
+              className="mb-4 inline-block rounded-lg bg-emerald-700 px-5 py-2.5 font-bold text-white"
+            >
+              {block.label}
+            </span>
           )
         if (block.type === 'workshops')
           return (

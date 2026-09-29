@@ -9,6 +9,10 @@ import { config } from '../config.js'
 import { sendRsvpConfirmationEmail, sendRefundRequestEmail } from '../auth/email.js'
 import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
 import { buildFollowupStats } from './followup.js'
+import {
+  findImageConsentField,
+  IMAGE_CONSENT_REFUSAL,
+} from './imageConsent.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -1166,6 +1170,58 @@ export async function unsubscribeCampaignEmails(slug, token) {
   return {
     unsubscribed: true,
     unsubscribedAt: updated.emailOptedOutAt,
+    eventTitle: invite.title,
+  }
+}
+
+async function imageConsentSubject(slug, token) {
+  if (!token) throw new InviteError(400, 'Ligação de consentimento inválida.')
+  const invite = await repo.findBySlug(slug)
+  if (!invite) throw new InviteError(404, 'Convite não encontrado.')
+  const guest = await repo.findGuestByToken(token)
+  if (!guest || guest.inviteId !== invite.id) {
+    throw new InviteError(404, 'Inscrição não encontrada.')
+  }
+  const field = findImageConsentField(await repo.listBlocks(invite.id))
+  if (!field?.key) {
+    throw new InviteError(
+      409,
+      'O campo de consentimento de imagem já não existe neste formulário.'
+    )
+  }
+  return { invite, guest, field }
+}
+
+export async function getImageConsentContext(slug, token) {
+  const { invite, guest, field } = await imageConsentSubject(slug, token)
+  const answer = guest.extra?.[field.key]
+  const values = Array.isArray(answer) ? answer : [answer]
+  const expected = IMAGE_CONSENT_REFUSAL.toLocaleLowerCase('pt-PT')
+  return {
+    eventTitle: invite.title,
+    bannerUrl: invite.bannerUrl,
+    canConsent: values.some(
+      (value) =>
+        String(value ?? '').trim().toLocaleLowerCase('pt-PT') === expected
+    ),
+  }
+}
+
+export async function confirmImageConsent(slug, token, campaignId) {
+  const { invite, guest, field } = await imageConsentSubject(slug, token)
+  const parsedCampaignId = campaignId
+    ? z.string().uuid('Comunicação inválida.').parse(campaignId)
+    : null
+  const result = await repo.recordImageConsent({
+    inviteId: invite.id,
+    guestId: guest.id,
+    campaignId: parsedCampaignId,
+    fieldKey: field.key,
+    expectedValue: IMAGE_CONSENT_REFUSAL,
+  })
+  if (!result) throw new InviteError(400, 'Ligação de consentimento inválida.')
+  return {
+    ...result,
     eventTitle: invite.title,
   }
 }

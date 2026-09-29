@@ -633,6 +633,34 @@ publicInvitesRouter.post(
   })
 )
 
+publicInvitesRouter.get(
+  '/:slug/image-consent',
+  asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'private, no-store')
+    res.json({
+      consent: await service.getImageConsentContext(
+        req.params.slug,
+        typeof req.query.g === 'string' ? req.query.g : undefined
+      ),
+    })
+  })
+)
+
+publicInvitesRouter.post(
+  '/:slug/image-consent',
+  asyncHandler(async (req, res) => {
+    res.json({
+      consent: await service.confirmImageConsent(
+        req.params.slug,
+        typeof req.body?.token === 'string' ? req.body.token : undefined,
+        typeof req.body?.campaignId === 'string'
+          ? req.body.campaignId
+          : undefined
+      ),
+    })
+  })
+)
+
 // ── Auto-gestão da inscrição (código de reserva + senha) ────────
 // POST /manage — login: devolve o resumo da inscrição.
 publicInvitesRouter.post(

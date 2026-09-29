@@ -13,6 +13,7 @@ import InviteManage from './components/invite/InviteManage'
 import InviteCheckin from './components/invite/InviteCheckin'
 import InviteFollowup from './components/invite/InviteFollowup'
 import InviteUnsubscribe from './components/invite/InviteUnsubscribe'
+import InviteImageConsent from './components/invite/InviteImageConsent'
 import FundingPage from './components/funding/FundingPage'
 import './index.css'
 
@@ -53,6 +54,7 @@ if (isInviteRoute) {
   else if (parts[1] === 'checkin') inviteView = 'checkin'
   else if (parts[1] === 'follow-up') inviteView = 'follow-up'
   else if (parts[1] === 'unsubscribe') inviteView = 'unsubscribe'
+  else if (parts[1] === 'image-consent') inviteView = 'image-consent'
   invitePreviewId = new URLSearchParams(window.location.search).get('preview') || null
   inviteCheckinToken = new URLSearchParams(window.location.search).get('k') || null
 }
@@ -80,6 +82,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <InviteFollowup slug={inviteSlug} token={inviteCheckinToken} />
           ) : inviteView === 'unsubscribe' ? (
             <InviteUnsubscribe slug={inviteSlug} />
+          ) : inviteView === 'image-consent' ? (
+            <InviteImageConsent slug={inviteSlug} />
           ) : (
             <InvitePage slug={inviteSlug} view={inviteView} previewId={invitePreviewId} />
           )}
