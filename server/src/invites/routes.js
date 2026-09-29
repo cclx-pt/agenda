@@ -191,6 +191,25 @@ invitesRouter.get(
   })
 )
 
+invitesRouter.post(
+  '/:id/registrations-api/key',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.status(201).json({
+      credential: await service.rotateRegistrationsApiKey(req.user, req.params.id),
+    })
+  })
+)
+
+invitesRouter.delete(
+  '/:id/registrations-api/key',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    await service.revokeRegistrationsApiKey(req.user, req.params.id)
+    res.json({ ok: true })
+  })
+)
+
 // ── Comunicações operacionais por email ────────────────────────
 invitesRouter.get('/:id/campaigns', manageRoles, asyncHandler(async (req, res) => {
   const list = await campaigns.list(req.user, req.params.id)
@@ -518,6 +537,20 @@ invitesRouter.delete(
 
 // ── Rotas públicas (sem sessão) — /data/public/invite ───────────
 export const publicInvitesRouter = Router()
+
+// Feed JSON por convite para dashboards externos, autenticado por X-API-Key.
+publicInvitesRouter.get(
+  '/:slug/registrations',
+  asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'private, no-store')
+    res.json(
+      await service.getRegistrationsForApi(
+        req.params.slug,
+        typeof req.get('x-api-key') === 'string' ? req.get('x-api-key').trim() : ''
+      )
+    )
+  })
+)
 
 // GET /data/public/invite/:slug?g=<guestToken> — payload da página pública.
 publicInvitesRouter.get(

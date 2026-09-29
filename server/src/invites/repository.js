@@ -42,6 +42,9 @@ function mapInvite(row) {
     jotformCommunity: row.jotform_community ?? null,
     checkinToken: row.checkin_token ?? null,
     followupToken: row.followup_token ?? null,
+    registrationsApiKeyConfigured: !!row.registrations_api_key_hash,
+    registrationsApiKeyLastFour: row.registrations_api_key_last_four ?? null,
+    registrationsApiKeyCreatedAt: row.registrations_api_key_created_at ?? null,
     status: row.status,
     publishedAt: row.published_at ?? null,
     createdBy: row.created_by ?? null,
@@ -165,6 +168,43 @@ export async function setCheckinToken(id, token) {
 export async function setFollowupToken(id, token) {
   await pool.query('UPDATE invites SET followup_token = $2, updated_at = now() WHERE id = $1', [id, token])
   return findById(id)
+}
+
+export async function setRegistrationsApiKey(id, hash, lastFour) {
+  await pool.query(
+    `UPDATE invites
+     SET registrations_api_key_hash = $2,
+         registrations_api_key_last_four = $3,
+         registrations_api_key_created_at = now(),
+         updated_at = now()
+     WHERE id = $1`,
+    [id, hash, lastFour]
+  )
+  return findById(id)
+}
+
+export async function clearRegistrationsApiKey(id) {
+  await pool.query(
+    `UPDATE invites
+     SET registrations_api_key_hash = NULL,
+         registrations_api_key_last_four = NULL,
+         registrations_api_key_created_at = NULL,
+         updated_at = now()
+     WHERE id = $1`,
+    [id]
+  )
+  return findById(id)
+}
+
+export async function getRegistrationsApiCredentialsBySlug(slug) {
+  const { rows } = await pool.query(
+    `SELECT id, slug, title, community, start_datetime, end_datetime,
+            registrations_api_key_hash
+     FROM invites
+     WHERE slug = $1`,
+    [slug]
+  )
+  return rows[0] ?? null
 }
 
 // Convite associado a um evento — garante 1 evento ↔ 1 convite. `exceptId` exclui

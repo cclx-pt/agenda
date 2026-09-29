@@ -441,6 +441,9 @@ CREATE TABLE IF NOT EXISTS invites (
   community        TEXT,
   jotform_community TEXT,
   followup_token   TEXT,
+  registrations_api_key_hash TEXT,
+  registrations_api_key_last_four TEXT,
+  registrations_api_key_created_at TIMESTAMPTZ,
   status           TEXT NOT NULL DEFAULT 'rascunho'
                      CHECK (status IN ('rascunho', 'publicado', 'fechado')),
   published_at     TIMESTAMPTZ,
@@ -676,6 +679,11 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS spots_on_registration BOOLEAN NOT N
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS checkin_token TEXT;
 -- Token secreto do painel público Self Follow-up (KPIs agregados, sem dados pessoais).
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS followup_token TEXT;
+-- Credencial individual para um dashboard externo consultar as inscrições.
+-- A chave em claro nunca é persistida; apenas o hash e os últimos 4 caracteres.
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS registrations_api_key_hash TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS registrations_api_key_last_four TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS registrations_api_key_created_at TIMESTAMPTZ;
 
 -- Bilhetes (tipos) de um convite. Tipos: individual/pago (com valor), grátis
 -- (0€), doação (valor à escolha) ou grupo. Cada tipo tem preço, capacidade
