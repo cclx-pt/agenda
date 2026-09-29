@@ -1666,24 +1666,24 @@ export default function InvitesAdmin() {
                   className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
                   aria-hidden="true"
                 />
-                Estado
-                <span className="font-medium normal-case">({statusFilters.length} selecionados)</span>
+                Filtros
+                <span className="font-medium normal-case">({statusFilters.length} estados selecionados)</span>
               </summary>
-              <fieldset className="m-0 mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0 pl-6">
-                <legend className="sr-only">Filtrar por estado</legend>
-                {STATUS_FILTER_OPTIONS.map((option) => (
-                  <label key={option.value} className="inline-flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={statusFilters.includes(option.value)}
-                      onChange={() => toggleStatusFilter(option.value)}
-                      className="h-4 w-4 rounded border-input accent-primary"
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </fieldset>
-            </details>
+              <div className="mt-4 flex flex-col gap-4 pl-6">
+                <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0">
+                  <legend className="mb-2 text-xs font-bold uppercase text-muted-foreground">Estado</legend>
+                  {STATUS_FILTER_OPTIONS.map((option) => (
+                    <label key={option.value} className="inline-flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={statusFilters.includes(option.value)}
+                        onChange={() => toggleStatusFilter(option.value)}
+                        className="h-4 w-4 rounded border-input accent-primary"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </fieldset>
 
             <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-0 p-0">
               <legend className="mb-2 text-xs font-bold uppercase text-muted-foreground">Inscrições</legend>
@@ -1746,6 +1746,8 @@ export default function InvitesAdmin() {
                 </label>
               ) : null}
             </fieldset>
+              </div>
+            </details>
           </div>
 
           {loading ? (
