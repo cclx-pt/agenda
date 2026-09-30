@@ -14,6 +14,7 @@ import {
 } from './richText.js'
 import {
   findImageConsentField,
+  imageConsentRefusalValue,
   IMAGE_CONSENT_REFUSAL,
 } from '../imageConsent.js'
 
@@ -192,6 +193,26 @@ test('image consent field is resolved by its configured form label', () => {
     },
   ])
   assert.equal(field.key, 'image_consent')
+})
+
+test('image consent checkbox uses its boolean refusal value', () => {
+  const field = findImageConsentField([
+    {
+      type: 'rsvp',
+      content: {
+        fields: [
+          {
+            key: 'consent_media',
+            label:
+              'Não autorizo a utilização da minha imagem em fotografias ou vídeos captados durante a Conferência CCLX.',
+            type: 'checkbox',
+          },
+        ],
+      },
+    },
+  ])
+  assert.equal(field.key, 'consent_media')
+  assert.equal(imageConsentRefusalValue(field), true)
 })
 
 test('renderInviteCampaignEmail escapes authored content', () => {

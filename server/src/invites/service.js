@@ -9,10 +9,6 @@ import { config } from '../config.js'
 import { sendRsvpConfirmationEmail, sendRefundRequestEmail } from '../auth/email.js'
 import { getActivePaymentMethods, getInvitePaymentInfo } from '../settings/service.js'
 import { buildFollowupStats } from './followup.js'
-import {
-  findImageConsentField,
-  IMAGE_CONSENT_REFUSAL,
-} from './imageConsent.js'
 
 // Erro de domínio com código HTTP associado.
 export class InviteError extends Error {
@@ -1026,6 +1022,7 @@ function renderPayload(
     tickets = [],
     spotsLeft = null,
     community = null,
+    privateRegistrationOpen = false,
     paymentMethodLabels = {},
     paymentMethodReceipt = {},
     paymentMethodType = {},
@@ -1033,7 +1030,7 @@ function renderPayload(
   } = {}
 ) {
   const banner = bannerUrl ?? invite.bannerUrl
-  const registrationOpen = isRegistrationOpen(invite, spotsLeft)
+  const registrationOpen = isRegistrationOpen(invite, spotsLeft, privateRegistrationOpen)
   const guestTicket = guest?.ticketId ? (tickets || []).find((t) => t.id === guest.ticketId) : null
   const guestStatus = guestStatusPayload(guest, resolveGuestMethod(guest, guestTicket), guestTicket)
   if (guestStatus) {
@@ -1108,22 +1105,26 @@ function renderPayload(
   }
 }
 
-export function isRegistrationOpen(invite, spotsLeft) {
-  return Boolean(invite?.rsvpEnabled) && (spotsLeft == null || spotsLeft > 0)
+export function isRegistrationOpen(invite, spotsLeft, privateRegistrationOpen = false) {
+  return (Boolean(invite?.rsvpEnabled) || privateRegistrationOpen) && (spotsLeft == null || spotsLeft > 0)
 }
 
 // Página pública por slug. Só devolve convites publicados. Se `guestToken`
 // identificar um convidado deste convite, inclui o cartão de estado.
-export async function getPublicBySlug(slug, { guestToken } = {}) {
+export async function getPublicBySlug(slug, { guestToken, registrationLinkToken } = {}) {
   const invite = await repo.findBySlug(slug)
   if (!invite || invite.status === 'rascunho') {
     throw new InviteError(404, 'Convite não encontrado.')
   }
 
-  const [blocks, tickets, connectedEvent] = await Promise.all([
+  const parsedRegistrationLinkToken = rsvpSchema.shape.registrationLinkToken.safeParse(registrationLinkToken)
+  const [blocks, tickets, connectedEvent, registrationLink] = await Promise.all([
     repo.listBlocks(invite.id),
     repo.listTicketsWithSold(invite.id),
     invite.eventId ? eventsRepo.findById(invite.eventId).catch(() => null) : Promise.resolve(null),
+    parsedRegistrationLinkToken.success
+      ? repo.findRegistrationLinkByToken(invite.id, parsedRegistrationLinkToken.data)
+      : Promise.resolve(null),
   ])
   const bannerUrl =
     invite.useEventBanner && connectedEvent?.bannerUrl ? connectedEvent.bannerUrl : invite.bannerUrl
@@ -1143,6 +1144,9 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
   const paymentMethodReceipt = Object.fromEntries(activeMethods.map((m) => [m.key, m.requireReceipt !== false]))
   const paymentMethodType = Object.fromEntries(activeMethods.map((m) => [m.key, m.type]))
   const paymentMethodNumbers = Object.fromEntries(activeMethods.filter((m) => m.type === 'mbway').map((m) => [m.key, m.numbers || []]))
+  const privateRegistrationOpen = Boolean(
+    registrationLink?.isActive && registrationLink.registrationsCount < registrationLink.maxRegistrations
+  )
   return {
     invite,
     payload: renderPayload(invite, blocks, guest, {
@@ -1150,6 +1154,7 @@ export async function getPublicBySlug(slug, { guestToken } = {}) {
       tickets,
       spotsLeft,
       community,
+      privateRegistrationOpen,
       paymentMethodLabels,
       paymentMethodReceipt,
       paymentMethodType,
@@ -1174,29 +1179,48 @@ export async function unsubscribeCampaignEmails(slug, token) {
   }
 }
 
-async function imageConsentSubject(slug, token) {
+async function imageConsentSubject(slug, token, campaignId) {
   if (!token) throw new InviteError(400, 'Ligação de consentimento inválida.')
+  const parsedCampaignId = z
+    .string()
+    .uuid('Comunicação inválida.')
+    .parse(campaignId)
   const invite = await repo.findBySlug(slug)
   if (!invite) throw new InviteError(404, 'Convite não encontrado.')
   const guest = await repo.findGuestByToken(token)
   if (!guest || guest.inviteId !== invite.id) {
     throw new InviteError(404, 'Inscrição não encontrada.')
   }
-  const field = findImageConsentField(await repo.listBlocks(invite.id))
-  if (!field?.key) {
+  const campaign = await repo.findImageConsentCampaign(
+    invite.id,
+    parsedCampaignId
+  )
+  const condition = campaign?.audience?.formConditions?.find(
+    (item) => item?.fieldKey && item.operator === 'equals'
+  )
+  if (!condition) {
     throw new InviteError(
       409,
-      'O campo de consentimento de imagem já não existe neste formulário.'
+      'A comunicação não contém uma condição válida de consentimento de imagem.'
     )
   }
-  return { invite, guest, field }
+  return {
+    invite,
+    guest,
+    campaignId: parsedCampaignId,
+    fieldKey: condition.fieldKey,
+    expectedValue: condition.value,
+  }
 }
 
-export async function getImageConsentContext(slug, token) {
-  const { invite, guest, field } = await imageConsentSubject(slug, token)
-  const answer = guest.extra?.[field.key]
+export async function getImageConsentContext(slug, token, campaignId) {
+  const { invite, guest, fieldKey, expectedValue } =
+    await imageConsentSubject(slug, token, campaignId)
+  const answer = guest.extra?.[fieldKey]
   const values = Array.isArray(answer) ? answer : [answer]
-  const expected = IMAGE_CONSENT_REFUSAL.toLocaleLowerCase('pt-PT')
+  const expected = String(expectedValue ?? '')
+    .trim()
+    .toLocaleLowerCase('pt-PT')
   return {
     eventTitle: invite.title,
     bannerUrl: invite.bannerUrl,
@@ -1208,16 +1232,19 @@ export async function getImageConsentContext(slug, token) {
 }
 
 export async function confirmImageConsent(slug, token, campaignId) {
-  const { invite, guest, field } = await imageConsentSubject(slug, token)
-  const parsedCampaignId = campaignId
-    ? z.string().uuid('Comunicação inválida.').parse(campaignId)
-    : null
+  const {
+    invite,
+    guest,
+    campaignId: parsedCampaignId,
+    fieldKey,
+    expectedValue,
+  } = await imageConsentSubject(slug, token, campaignId)
   const result = await repo.recordImageConsent({
     inviteId: invite.id,
     guestId: guest.id,
     campaignId: parsedCampaignId,
-    fieldKey: field.key,
-    expectedValue: IMAGE_CONSENT_REFUSAL,
+    fieldKey,
+    expectedValue,
   })
   if (!result) throw new InviteError(400, 'Ligação de consentimento inválida.')
   return {
@@ -1412,7 +1439,8 @@ export async function submitRsvp(slug, input) {
   if (invite.registrationMode && invite.registrationMode !== 'internal') {
     throw new InviteError(409, 'Este convite não tem inscrições internas.')
   }
-  if (!invite.rsvpEnabled) {
+  const data = rsvpSchema.parse(input)
+  if (!invite.rsvpEnabled && !data.registrationLinkToken) {
     throw new InviteError(409, 'As inscrições não estão abertas para este convite.')
   }
   if (invite.rsvpStartDatetime && Date.now() < Date.parse(invite.rsvpStartDatetime)) {
@@ -1421,8 +1449,6 @@ export async function submitRsvp(slug, input) {
   if (invite.rsvpDeadline && Date.now() > Date.parse(invite.rsvpDeadline)) {
     throw new InviteError(410, 'O prazo de inscrição terminou.')
   }
-  const data = rsvpSchema.parse(input)
-
   // Validação server-side contra o formulário configurado (obrigatórios/consentimentos).
   // Só corre quando o bloco rsvp tem campos explícitos; fail-open na leitura dos blocos.
   let formFields

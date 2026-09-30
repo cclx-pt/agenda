@@ -376,8 +376,11 @@ export async function updateInviteSettings(payload) {
 
 // ── Público (sem sessão) ─────────────────────────────────────────
 
-export async function getPublicInvite(slug, guestToken) {
-  const qs = guestToken ? `?g=${encodeURIComponent(guestToken)}` : ''
+export async function getPublicInvite(slug, guestToken, registrationLinkToken) {
+  const params = new URLSearchParams()
+  if (guestToken) params.set('g', guestToken)
+  if (registrationLinkToken) params.set('private', registrationLinkToken)
+  const qs = params.size ? `?${params.toString()}` : ''
   const { page } = await request(`/data/public/invite/${encodeURIComponent(slug)}${qs}`)
   return page
 }
@@ -393,9 +396,9 @@ export async function unsubscribeInviteCampaignEmails(slug, guestToken) {
   return result
 }
 
-export async function getInviteImageConsent(slug, guestToken) {
+export async function getInviteImageConsent(slug, guestToken, campaignId) {
   const { consent } = await request(
-    `/data/public/invite/${encodeURIComponent(slug)}/image-consent?g=${encodeURIComponent(guestToken)}`
+    `/data/public/invite/${encodeURIComponent(slug)}/image-consent?g=${encodeURIComponent(guestToken)}&c=${encodeURIComponent(campaignId)}`
   )
   return consent
 }

@@ -14,7 +14,7 @@ export default function InviteImageConsent({ slug }) {
     if (!token) return
     let alive = true
     invitesService
-      .getInviteImageConsent(slug, token)
+      .getInviteImageConsent(slug, token, campaignId)
       .then((result) => {
         if (!alive) return
         setContext(result)
@@ -28,7 +28,7 @@ export default function InviteImageConsent({ slug }) {
     return () => {
       alive = false
     }
-  }, [slug, token])
+  }, [campaignId, slug, token])
 
   const confirm = async () => {
     setState('submitting')

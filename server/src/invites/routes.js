@@ -588,12 +588,13 @@ publicInvitesRouter.get(
   })
 )
 
-// GET /data/public/invite/:slug?g=<guestToken> — payload da página pública.
+// GET /data/public/invite/:slug?g=<guestToken>&private=<registrationLinkToken>
 publicInvitesRouter.get(
   '/:slug',
   asyncHandler(async (req, res) => {
     const { invite, payload } = await service.getPublicBySlug(req.params.slug, {
       guestToken: typeof req.query.g === 'string' ? req.query.g : undefined,
+      registrationLinkToken: typeof req.query.private === 'string' ? req.query.private : undefined,
     })
     // Regista a visualização (fire-and-forget, não bloqueia a resposta).
     service.recordView(invite.id, { referer: req.get('referer'), userAgent: req.get('user-agent') })
@@ -640,7 +641,8 @@ publicInvitesRouter.get(
     res.json({
       consent: await service.getImageConsentContext(
         req.params.slug,
-        typeof req.query.g === 'string' ? req.query.g : undefined
+        typeof req.query.g === 'string' ? req.query.g : undefined,
+        typeof req.query.c === 'string' ? req.query.c : undefined
       ),
     })
   })

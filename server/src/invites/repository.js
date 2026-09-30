@@ -414,6 +414,19 @@ export async function listRegistrationLinks(inviteId) {
   return rows.map(mapRegistrationLink)
 }
 
+export async function findRegistrationLinkByToken(inviteId, token) {
+  const { rows } = await pool.query(
+    `SELECT link.*,
+            (COUNT(guest.id) FILTER (WHERE guest.rsvp_state IN ('pending', 'confirmed', 'waitlisted')))::int AS registrations_count
+     FROM invite_registration_links link
+     LEFT JOIN invite_guests guest ON guest.registration_link_id = link.id
+     WHERE link.invite_id = $1 AND link.token = $2
+     GROUP BY link.id`,
+    [inviteId, token]
+  )
+  return mapRegistrationLink(rows[0])
+}
+
 export async function insertRegistrationLink(inviteId, data) {
   const id = randomUUID()
   const { rows } = await pool.query(
@@ -717,7 +730,9 @@ export async function recordImageConsent({
     const values = Array.isArray(previousValue)
       ? previousValue
       : [previousValue]
-    const expected = expectedValue.trim().toLocaleLowerCase('pt-PT')
+    const expected = String(expectedValue ?? '')
+      .trim()
+      .toLocaleLowerCase('pt-PT')
     const hasRefusal = values.some(
       (value) =>
         String(value ?? '').trim().toLocaleLowerCase('pt-PT') === expected
@@ -771,6 +786,18 @@ export async function recordImageConsent({
   } finally {
     client.release()
   }
+}
+
+export async function findImageConsentCampaign(inviteId, campaignId) {
+  const { rows } = await pool.query(
+    `SELECT audience
+     FROM invite_campaigns
+     WHERE id = $1
+       AND invite_id = $2
+       AND blocks @> '[{"type":"image_consent"}]'::jsonb`,
+    [campaignId, inviteId]
+  )
+  return rows[0] ?? null
 }
 
 // Atualiza SÓ os campos editáveis pelo organizador (nome/email/telemóvel/estado),

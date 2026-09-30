@@ -37,6 +37,11 @@ describe('InviteImageConsent', () => {
         name: 'Autorizar utilização da imagem',
       })
     ).toBeInTheDocument()
+    expect(invitesService.getInviteImageConsent).toHaveBeenCalledWith(
+      'conferencia',
+      'secret-token',
+      'campaign-id'
+    )
     expect(invitesService.confirmInviteImageConsent).not.toHaveBeenCalled()
 
     await userEvent.click(

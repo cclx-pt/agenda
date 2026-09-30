@@ -11,7 +11,15 @@ export function findImageConsentField(blocks) {
     fields.find(
       (field) =>
         String(field?.label ?? '').trim().toLocaleLowerCase('pt-PT') ===
-        IMAGE_CONSENT_FIELD_LABEL
+          IMAGE_CONSENT_FIELD_LABEL ||
+        String(field?.label ?? '')
+          .trim()
+          .toLocaleLowerCase('pt-PT')
+          .includes(IMAGE_CONSENT_REFUSAL.toLocaleLowerCase('pt-PT'))
     ) ?? null
   )
+}
+
+export function imageConsentRefusalValue(field) {
+  return field?.type === 'checkbox' ? true : IMAGE_CONSENT_REFUSAL
 }

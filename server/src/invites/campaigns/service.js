@@ -19,7 +19,7 @@ import {
 } from './richText.js'
 import {
   findImageConsentField,
-  IMAGE_CONSENT_REFUSAL,
+  imageConsentRefusalValue,
 } from '../imageConsent.js'
 
 const urlSchema = z
@@ -353,7 +353,7 @@ export async function createFromTemplate(user, inviteId, templateKey) {
           {
             fieldKey: field.key,
             operator: 'equals',
-            value: IMAGE_CONSENT_REFUSAL,
+            value: imageConsentRefusalValue(field),
           },
         ],
       },
