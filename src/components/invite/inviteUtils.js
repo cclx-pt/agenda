@@ -24,26 +24,26 @@ export function fmtDateRange(start, end) {
   return `${fmtDate(start)} – ${fmtDate(end)}`
 }
 
-// Token pessoal (?g=) do URL atual, se existir.
-function currentGuestToken() {
-  if (typeof window === 'undefined') return null
-  return new URLSearchParams(window.location.search).get('g')
-}
-// URL da página dedicada de inscrição (/invite/<slug>/inscricao), preservando ?g= e
-// (opcional) pré-selecionando um bilhete via ?ticket=.
-export function inviteRsvpHref(slug, ticketId) {
-  const g = currentGuestToken()
+function currentAccessParams() {
+  if (typeof window === 'undefined') return new URLSearchParams()
+  const current = new URLSearchParams(window.location.search)
   const params = new URLSearchParams()
+  if (current.get('g')) params.set('g', current.get('g'))
+  if (current.get('private')) params.set('private', current.get('private'))
+  return params
+}
+// URL da página dedicada de inscrição, preservando o acesso pessoal/privado.
+export function inviteRsvpHref(slug, ticketId) {
+  const params = currentAccessParams()
   if (ticketId) params.set('ticket', ticketId)
-  if (g) params.set('g', g)
   const qs = params.toString()
   return `/invite/${encodeURIComponent(slug)}/inscricao${qs ? `?${qs}` : ''}`
 }
-// URL da landing do convite (/invite/<slug>), preservando ?g=.
+// URL da landing do convite, preservando o acesso pessoal/privado.
 export function inviteHomeHref(slug) {
-  const g = currentGuestToken()
+  const params = currentAccessParams().toString()
   const base = `/invite/${encodeURIComponent(slug)}`
-  return g ? `${base}?g=${encodeURIComponent(g)}` : base
+  return params ? `${base}?${params}` : base
 }
 
 // Rótulo de preço/tipo de um bilhete (lista "Custo" + seletor).

@@ -48,3 +48,131 @@ test('an exhausted private registration link rejects the insert atomically', asy
     await pool.end()
   }
 })
+
+test('a private registration extends a full invite capacity atomically', async () => {
+  const queries = []
+  const client = {
+    async query(sql, params) {
+      queries.push({ sql, params })
+      if (sql.includes('SELECT capacity, waitlist_enabled')) {
+        return { rows: [{ capacity: 2, waitlist_enabled: false }] }
+      }
+      if (sql.includes('FROM invite_registration_links')) {
+        return { rows: [{ id: 'link-1', max_registrations: 5, is_active: true }] }
+      }
+      if (sql.includes('COUNT(*)::int AS registrations_count')) {
+        return { rows: [{ registrations_count: 0 }] }
+      }
+      if (sql.includes('COALESCE(SUM(guests_count)')) {
+        return { rows: [{ sold: 2 }] }
+      }
+      if (sql.includes('UPDATE invites')) {
+        return { rows: [{ capacity: 4 }] }
+      }
+      if (sql.startsWith('SELECT * FROM invite_guests')) {
+        return {
+          rows: [{
+            id: 'guest-1',
+            invite_id: 'invite-1',
+            registration_link_id: 'link-1',
+            guests_count: 2,
+            rsvp_state: 'confirmed',
+            payment_state: 'not_applicable',
+          }],
+        }
+      }
+      return { rows: [] }
+    },
+    release() {},
+  }
+  const originalConnect = pool.connect
+  pool.connect = async () => client
+
+  try {
+    const result = await insertGuestWithCapacity(
+      'invite-1',
+      { rsvpState: 'confirmed', guestsCount: 2 },
+      { registrationLinkToken: 'private-token-123456' }
+    )
+
+    assert.equal(result.reason, null)
+    assert.equal(result.guest.rsvpState, 'confirmed')
+    assert.equal(result.inviteCapacity, 4)
+    const capacityUpdate = queries.find(({ sql }) => sql.includes('UPDATE invites'))
+    assert.deepEqual(capacityUpdate.params, ['invite-1', 2])
+    assert.equal(queries.at(-1).sql, 'COMMIT')
+  } finally {
+    pool.connect = originalConnect
+  }
+})
+
+test('a private registration extends full invite and ticket capacities atomically', async () => {
+  const queries = []
+  const client = {
+    async query(sql, params) {
+      queries.push({ sql, params })
+      if (sql.includes('SELECT capacity, waitlist_enabled')) {
+        return { rows: [{ capacity: 10, waitlist_enabled: false }] }
+      }
+      if (sql.includes('FROM invite_registration_links')) {
+        return { rows: [{ id: 'link-1', max_registrations: 5, is_active: true }] }
+      }
+      if (sql.includes('COUNT(*)::int AS registrations_count')) {
+        return { rows: [{ registrations_count: 0 }] }
+      }
+      if (sql.includes('FROM invite_tickets')) {
+        return { rows: [{ capacity: 1 }] }
+      }
+      if (sql.includes('COALESCE(SUM(guests_count)')) {
+        return { rows: [{ sold: 1 }] }
+      }
+      if (sql.includes('UPDATE invite_tickets')) {
+        return { rows: [{ capacity: 3 }] }
+      }
+      if (sql.includes('UPDATE invites')) {
+        return { rows: [{ capacity: 12 }] }
+      }
+      if (sql.startsWith('SELECT * FROM invite_guests')) {
+        return {
+          rows: [{
+            id: 'guest-2',
+            invite_id: 'invite-1',
+            ticket_id: 'ticket-1',
+            registration_link_id: 'link-1',
+            guests_count: 2,
+            rsvp_state: 'confirmed',
+            payment_state: 'not_applicable',
+          }],
+        }
+      }
+      return { rows: [] }
+    },
+    release() {},
+  }
+  const originalConnect = pool.connect
+  pool.connect = async () => client
+
+  try {
+    const result = await insertGuestWithCapacity(
+      'invite-1',
+      { rsvpState: 'confirmed', guestsCount: 2, ticketId: 'ticket-1' },
+      { registrationLinkToken: 'private-token-123456' }
+    )
+
+    assert.equal(result.reason, null)
+    assert.equal(result.guest.rsvpState, 'confirmed')
+    assert.equal(result.inviteCapacity, 12)
+    assert.equal(result.ticketCapacity, 3)
+    assert.deepEqual(
+      queries.find(({ sql }) => sql.includes('UPDATE invites')).params,
+      ['invite-1', 2]
+    )
+    assert.deepEqual(
+      queries.find(({ sql }) => sql.includes('UPDATE invite_tickets')).params,
+      ['ticket-1', 2]
+    )
+    assert.equal(queries.at(-1).sql, 'COMMIT')
+  } finally {
+    pool.connect = originalConnect
+  }
+})

@@ -540,6 +540,7 @@ export async function insertGuestWithCapacity(
     }
 
     let capacity = invite.capacity
+    let ticketCapacity = null
     let sold = 0
     let usesTicketCapacity = false
     if (data.ticketId) {
@@ -555,7 +556,8 @@ export async function insertGuestWithCapacity(
         return { reason: 'invalid_ticket', guest: null }
       }
       if (ticketRows[0].capacity != null) {
-        capacity = ticketRows[0].capacity
+        ticketCapacity = ticketRows[0].capacity
+        capacity = ticketCapacity
         usesTicketCapacity = true
         const result = await client.query(
           `SELECT COALESCE(SUM(guests_count), 0)::int AS sold
@@ -577,9 +579,11 @@ export async function insertGuestWithCapacity(
       sold = result.rows[0]?.sold ?? 0
     }
 
+    const privateBypassesCapacity = Boolean(registrationLinkId)
     const wouldExceed =
       data.rsvpState === 'confirmed' &&
       capacity != null &&
+      !privateBypassesCapacity &&
       sold + (data.guestsCount ?? 1) > capacity
 
     if (wouldExceed && !invite.waitlist_enabled) {
@@ -591,13 +595,37 @@ export async function insertGuestWithCapacity(
       return { reason: 'waitlist_consent_required', guest: null }
     }
 
+    const finalRsvpState = wouldExceed ? 'waitlisted' : data.rsvpState
+    let inviteCapacity = invite.capacity
+    if (registrationLinkId && finalRsvpState === 'confirmed' && invite.capacity != null) {
+      const { rows } = await client.query(
+        `UPDATE invites
+         SET capacity = capacity + $2, updated_at = now()
+         WHERE id = $1
+         RETURNING capacity`,
+        [inviteId, data.guestsCount ?? 1]
+      )
+      inviteCapacity = rows[0]?.capacity ?? invite.capacity
+    }
+    let updatedTicketCapacity = ticketCapacity
+    if (registrationLinkId && finalRsvpState === 'confirmed' && data.ticketId && ticketCapacity != null) {
+      const { rows } = await client.query(
+        `UPDATE invite_tickets
+         SET capacity = capacity + $2, updated_at = now()
+         WHERE id = $1
+         RETURNING capacity`,
+        [data.ticketId, data.guestsCount ?? 1]
+      )
+      updatedTicketCapacity = rows[0]?.capacity ?? ticketCapacity
+    }
+
     const guest = await insertGuestWithDb(client, inviteId, {
       ...data,
       registrationLinkId,
-      rsvpState: wouldExceed ? 'waitlisted' : data.rsvpState,
+      rsvpState: finalRsvpState,
     })
     await client.query('COMMIT')
-    return { reason: null, guest }
+    return { reason: null, guest, inviteCapacity, ticketCapacity: updatedTicketCapacity }
   } catch (error) {
     await client.query('ROLLBACK')
     throw error

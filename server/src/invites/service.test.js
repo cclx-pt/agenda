@@ -45,6 +45,11 @@ test('registration stays closed when it is disabled by the organizer', () => {
   assert.equal(isRegistrationOpen({ rsvpEnabled: false }, 10), false)
 })
 
+test('an available private link opens registration regardless of invite capacity', () => {
+  assert.equal(isRegistrationOpen({ rsvpEnabled: false }, 10, true), true)
+  assert.equal(isRegistrationOpen({ rsvpEnabled: false }, 0, true), true)
+})
+
 test('registration API keys are random and verified from their stored hash', () => {
   const apiKey = createRegistrationsApiKey()
   const hash = createHash('sha256').update(apiKey).digest('hex')

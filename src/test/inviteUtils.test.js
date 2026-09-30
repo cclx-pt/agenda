@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { classifyGuestPeople, isConfirmedRegistration, registrationChurch } from '../components/invite/inviteUtils'
+import {
+  classifyGuestPeople,
+  inviteHomeHref,
+  inviteRsvpHref,
+  isConfirmedRegistration,
+  registrationChurch,
+} from '../components/invite/inviteUtils'
 
 describe('invite management helpers', () => {
   it('counts entries from the children field as children, including age 11', () => {
@@ -39,5 +45,14 @@ describe('invite management helpers', () => {
     }
 
     expect(registrationChurch(guest)).toBe('Almada')
+  })
+
+  it('preserves private registration access while navigating the invite', () => {
+    window.history.replaceState({}, '', '/invite/evento/inscricao?private=private-token-123456')
+
+    expect(inviteRsvpHref('evento', 'ticket-1')).toBe(
+      '/invite/evento/inscricao?private=private-token-123456&ticket=ticket-1'
+    )
+    expect(inviteHomeHref('evento')).toBe('/invite/evento?private=private-token-123456')
   })
 })
