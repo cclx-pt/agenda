@@ -520,9 +520,10 @@ export function RsvpCard({ block, page, accent, onSubmitted, guestStatus, previe
     // Lista de espera: se a lotação estiver esgotada, avisa e pede confirmação.
     let acceptWaitlist = false
     const selectedTicket = tickets.find((t) => t.id === ticketId)
-    const usesTicketCapacity = selectedTicket?.capacity != null
-    const cap = usesTicketCapacity ? selectedTicket.capacity : page.invite?.capacity
-    const left = usesTicketCapacity ? selectedTicket.spotsLeft : page.invite?.spotsLeft
+    const usesTicketCapacity = selectedTicket?.capacity != null && !page.invite?.privateRegistrationOpen
+    const usesInviteCapacity = !usesTicketCapacity && !page.invite?.privateRegistrationOpen
+    const cap = usesTicketCapacity ? selectedTicket.capacity : usesInviteCapacity ? page.invite?.capacity : null
+    const left = usesTicketCapacity ? selectedTicket.spotsLeft : usesInviteCapacity ? page.invite?.spotsLeft : null
     if (cap && left != null && peopleCount > left) {
       if (page.invite?.waitlistEnabled) {
         const ok =
@@ -1255,11 +1256,12 @@ export default function InvitePage({ slug, view = 'landing', previewId = null })
     let alive = true
     const params = new URLSearchParams(window.location.search)
     const token = previewId ? undefined : params.get('g') || undefined
+    const registrationLinkToken = previewId ? undefined : params.get('private') || undefined
     // Pré-visualização (organizador autenticado): usa o payload de preview, que
     // funciona mesmo com o convite em rascunho ou com as inscrições fechadas.
     const load = previewId
       ? invitesService.getInvitePreview(previewId)
-      : invitesService.getPublicInvite(slug, token)
+      : invitesService.getPublicInvite(slug, token, registrationLinkToken)
     load
       .then((page) => {
         if (!alive) return

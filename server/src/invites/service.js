@@ -1069,6 +1069,7 @@ function renderPayload(
       registrationMode: invite.registrationMode,
       registrationUrl: invite.registrationUrl,
       rsvpEnabled: registrationOpen,
+      privateRegistrationOpen,
       // Datas de INSCRIÇÃO (janela).
       rsvpStartDatetime: invite.rsvpStartDatetime,
       rsvpDeadline: invite.rsvpDeadline,
@@ -1097,8 +1098,11 @@ function renderPayload(
         mbReference: t.mbReference ?? null,
         mbNumbers: t.mbNumbers ?? [],
         capacity: t.capacity,
-        spotsLeft: t.capacity == null ? null : Math.max(0, t.capacity - (t.sold ?? 0)),
-        soldOut: t.capacity != null && (t.sold ?? 0) >= t.capacity,
+        spotsLeft:
+          privateRegistrationOpen || t.capacity == null
+            ? null
+            : Math.max(0, t.capacity - (t.sold ?? 0)),
+        soldOut: !privateRegistrationOpen && t.capacity != null && (t.sold ?? 0) >= t.capacity,
       })),
     blocks: blocks.filter((b) => b.visible).map((b) => ({ id: b.id, type: b.type, content: b.content })),
     guestStatus,
@@ -1106,7 +1110,7 @@ function renderPayload(
 }
 
 export function isRegistrationOpen(invite, spotsLeft, privateRegistrationOpen = false) {
-  return (Boolean(invite?.rsvpEnabled) || privateRegistrationOpen) && (spotsLeft == null || spotsLeft > 0)
+  return privateRegistrationOpen || (Boolean(invite?.rsvpEnabled) && (spotsLeft == null || spotsLeft > 0))
 }
 
 // Página pública por slug. Só devolve convites publicados. Se `guestToken`
@@ -1537,9 +1541,9 @@ export async function submitRsvp(slug, input) {
   }
   notifyGuestConfirmation(invite, guest, status, methodType)
   let spotsLeft = null
-  if (invite.capacity) {
+  if (inserted.inviteCapacity != null) {
     const taken = await repo.countConfirmedSeats(invite.id)
-    spotsLeft = Math.max(0, invite.capacity - taken)
+    spotsLeft = Math.max(0, inserted.inviteCapacity - taken)
   }
   return { token: guest.token, status, spotsLeft, isPrivateRegistration: guest.isPrivateRegistration }
 }
