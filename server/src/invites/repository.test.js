@@ -6,7 +6,12 @@ process.env.JWT_SECRET ||= 'test-secret'
 process.env.OTP_PEPPER ||= 'test-pepper'
 
 const { pool } = await import('../db/pool.js')
-const { insertGuestWithCapacity } = await import('./repository.js')
+const {
+  deleteUnticketedRegistration,
+  insertGuestWithCapacity,
+  insertUnticketedRegistration,
+  updateUnticketedRegistration,
+} = await import('./repository.js')
 
 test('an exhausted private registration link rejects the insert atomically', async () => {
   const queries = []
@@ -174,5 +179,58 @@ test('a private registration extends full invite and ticket capacities atomicall
     assert.equal(queries.at(-1).sql, 'COMMIT')
   } finally {
     pool.connect = originalConnect
+  }
+})
+
+test('an unticketed registration never reads or updates invite and ticket capacity', async () => {
+  const queries = []
+  const originalQuery = pool.query
+  pool.query = async (sql, params) => {
+    queries.push({ sql, params })
+    if (sql.includes('INSERT INTO invite_unticketed_registrations')) {
+      return {
+        rows: [{
+          id: params[0],
+          invite_id: params[1],
+          spots: params[2],
+          reason: params[3],
+          created_at: '2026-04-01T10:00:00.000Z',
+          updated_at: '2026-04-01T10:00:00.000Z',
+        }],
+      }
+    }
+    if (sql.includes('UPDATE invite_unticketed_registrations')) {
+      return {
+        rows: [{
+          id: params[0],
+          invite_id: params[1],
+          spots: params[2],
+          reason: params[3],
+          created_at: '2026-04-01T10:00:00.000Z',
+          updated_at: '2026-04-01T10:05:00.000Z',
+        }],
+      }
+    }
+    return { rowCount: 1, rows: [] }
+  }
+
+  try {
+    const registration = await insertUnticketedRegistration('invite-1', {
+      spots: 4,
+      reason: 'Equipa técnica',
+    })
+    const updated = await updateUnticketedRegistration('invite-1', registration.id, {
+      spots: 5,
+      reason: 'Equipa técnica e produção',
+    })
+    const removed = await deleteUnticketedRegistration('invite-1', updated.id)
+
+    assert.equal(registration.spots, 4)
+    assert.equal(updated.spots, 5)
+    assert.equal(removed, true)
+    assert.equal(queries.every(({ sql }) => sql.includes('invite_unticketed_registrations')), true)
+    assert.equal(queries.some(({ sql }) => /invite_guests|invite_tickets|UPDATE invites/.test(sql)), false)
+  } finally {
+    pool.query = originalQuery
   }
 })

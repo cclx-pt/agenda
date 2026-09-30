@@ -505,6 +505,19 @@ CREATE TABLE IF NOT EXISTS invite_registration_links (
 CREATE INDEX IF NOT EXISTS idx_invite_registration_links_invite
   ON invite_registration_links (invite_id, created_at DESC);
 
+-- Inscrições administrativas sem bilhete. Contam no total apresentado na gestão,
+-- mas ficam deliberadamente fora de invite_guests e dos cálculos de capacidade.
+CREATE TABLE IF NOT EXISTS invite_unticketed_registrations (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id  UUID NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+  spots      INTEGER NOT NULL CHECK (spots > 0),
+  reason     TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invite_unticketed_registrations_invite
+  ON invite_unticketed_registrations (invite_id, created_at DESC);
+
 ALTER TABLE invite_guests ADD COLUMN IF NOT EXISTS registration_link_id UUID
   REFERENCES invite_registration_links (id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_invite_guests_registration_link

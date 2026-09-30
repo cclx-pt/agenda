@@ -95,6 +95,11 @@ invitesRouter.param('registrationLinkId', (req, res, next, id) => {
   next()
 })
 
+invitesRouter.param('unticketedRegistrationId', (req, res, next, id) => {
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Inscrição sem bilhete não encontrada.' })
+  next()
+})
+
 invitesRouter.param('campaignId', (req, res, next, id) => {
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Comunicação não encontrada.' })
   next()
@@ -224,6 +229,52 @@ invitesRouter.put(
         req.body
       ),
     })
+  })
+)
+
+invitesRouter.get(
+  '/:id/unticketed-registrations',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({ registrations: await service.listUnticketedRegistrations(req.user, req.params.id) })
+  })
+)
+
+invitesRouter.post(
+  '/:id/unticketed-registrations',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.status(201).json({
+      registration: await service.createUnticketedRegistration(req.user, req.params.id, req.body),
+    })
+  })
+)
+
+invitesRouter.put(
+  '/:id/unticketed-registrations/:unticketedRegistrationId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    res.json({
+      registration: await service.updateUnticketedRegistration(
+        req.user,
+        req.params.id,
+        req.params.unticketedRegistrationId,
+        req.body
+      ),
+    })
+  })
+)
+
+invitesRouter.delete(
+  '/:id/unticketed-registrations/:unticketedRegistrationId',
+  manageRoles,
+  asyncHandler(async (req, res) => {
+    await service.removeUnticketedRegistration(
+      req.user,
+      req.params.id,
+      req.params.unticketedRegistrationId
+    )
+    res.json({ ok: true })
   })
 )
 

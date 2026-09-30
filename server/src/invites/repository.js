@@ -112,6 +112,18 @@ function mapRegistrationLink(row) {
   }
 }
 
+function mapUnticketedRegistration(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    inviteId: row.invite_id,
+    spots: Number(row.spots),
+    reason: row.reason,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 // ── Convites ─────────────────────────────────────────────────────
 
 export async function slugExists(slug) {
@@ -453,6 +465,49 @@ export async function updateRegistrationLink(inviteId, linkId, data) {
   if (!rows[0]) return null
   const links = await listRegistrationLinks(inviteId)
   return links.find((link) => link.id === linkId) ?? null
+}
+
+// ── Inscrições administrativas sem bilhete ─────────────────────
+
+export async function listUnticketedRegistrations(inviteId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM invite_unticketed_registrations
+     WHERE invite_id = $1
+     ORDER BY created_at DESC`,
+    [inviteId]
+  )
+  return rows.map(mapUnticketedRegistration)
+}
+
+export async function insertUnticketedRegistration(inviteId, data) {
+  const id = randomUUID()
+  const { rows } = await pool.query(
+    `INSERT INTO invite_unticketed_registrations (id, invite_id, spots, reason)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [id, inviteId, data.spots, data.reason]
+  )
+  return mapUnticketedRegistration(rows[0])
+}
+
+export async function updateUnticketedRegistration(inviteId, registrationId, data) {
+  const { rows } = await pool.query(
+    `UPDATE invite_unticketed_registrations
+     SET spots = $3, reason = $4, updated_at = now()
+     WHERE id = $1 AND invite_id = $2
+     RETURNING *`,
+    [registrationId, inviteId, data.spots, data.reason]
+  )
+  return mapUnticketedRegistration(rows[0])
+}
+
+export async function deleteUnticketedRegistration(inviteId, registrationId) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM invite_unticketed_registrations
+     WHERE id = $1 AND invite_id = $2`,
+    [registrationId, inviteId]
+  )
+  return rowCount > 0
 }
 
 // ── Convidados / RSVP ────────────────────────────────────────────
