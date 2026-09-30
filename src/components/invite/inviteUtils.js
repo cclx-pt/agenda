@@ -167,6 +167,25 @@ export function classifyGuestPeople(guest, ticket = null) {
   return { adultos, jovens, criancas: criancasN, total: adultos + jovens + criancasN }
 }
 
+export function registrationTypeTotals(guests, unticketedRegistrations) {
+  const totals = (guests || []).reduce(
+    (result, guest) => {
+      if (!isConfirmedRegistration(guest) || !guest.ticket) return result
+      const spots = classifyGuestPeople(guest, guest.ticket).total
+      if (guest.isPrivateRegistration) result.privateTicket += spots
+      else result.ticket += spots
+      return result
+    },
+    { ticket: 0, privateTicket: 0 }
+  )
+  totals.unticketed = (unticketedRegistrations || []).reduce(
+    (sum, registration) => sum + Number(registration.spots || 0),
+    0
+  )
+  totals.total = totals.ticket + totals.privateTicket + totals.unticketed
+  return totals
+}
+
 // Converte um link de YouTube/Vimeo num URL de embed, ou devolve null.
 export function toEmbed(url) {
   if (!url) return null

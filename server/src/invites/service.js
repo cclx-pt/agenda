@@ -263,6 +263,11 @@ const registrationLinkUpdateSchema = registrationLinkCreateSchema.partial().exte
   isActive: z.boolean().optional(),
 })
 
+const unticketedRegistrationSchema = z.object({
+  spots: z.number().int().min(1).max(100000),
+  reason: z.string().trim().min(1, 'Indique o motivo.').max(500),
+})
+
 // ── Auxiliares de evento associado e pagamento ───────────────────
 
 // Valida que o evento associado existe (se indicado) e que ainda não está ligado a
@@ -513,6 +518,31 @@ export async function updateRegistrationLink(user, inviteId, linkId, input) {
   const link = await repo.updateRegistrationLink(inviteId, linkId, data)
   if (!link) throw new InviteError(404, 'Link privado não encontrado.')
   return withRegistrationLinkUrl(invite, link)
+}
+
+export async function listUnticketedRegistrations(user, inviteId) {
+  await getManagedInvite(user, inviteId)
+  return repo.listUnticketedRegistrations(inviteId)
+}
+
+export async function createUnticketedRegistration(user, inviteId, input) {
+  await getManagedInvite(user, inviteId)
+  const data = unticketedRegistrationSchema.parse(input)
+  return repo.insertUnticketedRegistration(inviteId, data)
+}
+
+export async function updateUnticketedRegistration(user, inviteId, registrationId, input) {
+  await getManagedInvite(user, inviteId)
+  const data = unticketedRegistrationSchema.parse(input)
+  const registration = await repo.updateUnticketedRegistration(inviteId, registrationId, data)
+  if (!registration) throw new InviteError(404, 'Inscrição sem bilhete não encontrada.')
+  return registration
+}
+
+export async function removeUnticketedRegistration(user, inviteId, registrationId) {
+  await getManagedInvite(user, inviteId)
+  const removed = await repo.deleteUnticketedRegistration(inviteId, registrationId)
+  if (!removed) throw new InviteError(404, 'Inscrição sem bilhete não encontrada.')
 }
 
 function hashRegistrationsApiKey(apiKey) {
