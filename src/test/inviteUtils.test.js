@@ -4,6 +4,7 @@ import {
   inviteHomeHref,
   inviteRsvpHref,
   isConfirmedRegistration,
+  registrationTypeTotals,
   registrationChurch,
 } from '../components/invite/inviteUtils'
 
@@ -54,5 +55,26 @@ describe('invite management helpers', () => {
       '/invite/evento/inscricao?private=private-token-123456&ticket=ticket-1'
     )
     expect(inviteHomeHref('evento')).toBe('/invite/evento?private=private-token-123456')
+  })
+
+  it('adds multiple unticketed rows to the registration total without treating them as tickets', () => {
+    const guests = [
+      { ticket: { id: 'ticket-1' }, rsvpState: 'confirmed', paymentState: 'paid' },
+      {
+        ticket: { id: 'ticket-1' },
+        isPrivateRegistration: true,
+        rsvpState: 'confirmed',
+        paymentState: 'not_applicable',
+        extra: { numCriancas: 1 },
+      },
+      { ticket: { id: 'ticket-1' }, rsvpState: 'declined', paymentState: 'not_applicable' },
+    ]
+
+    expect(registrationTypeTotals(guests, [{ spots: 3 }, { spots: 2 }])).toEqual({
+      ticket: 1,
+      privateTicket: 2,
+      unticketed: 5,
+      total: 8,
+    })
   })
 })

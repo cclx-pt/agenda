@@ -107,6 +107,33 @@ export async function updateRegistrationLink(inviteId, linkId, payload) {
   return link
 }
 
+export async function listUnticketedRegistrations(inviteId) {
+  const { registrations } = await request(`/data/invites/${inviteId}/unticketed-registrations`)
+  return registrations
+}
+
+export async function createUnticketedRegistration(inviteId, payload) {
+  const { registration } = await request(`/data/invites/${inviteId}/unticketed-registrations`, {
+    method: 'POST',
+    body: payload,
+  })
+  return registration
+}
+
+export async function updateUnticketedRegistration(inviteId, registrationId, payload) {
+  const { registration } = await request(
+    `/data/invites/${inviteId}/unticketed-registrations/${registrationId}`,
+    { method: 'PUT', body: payload }
+  )
+  return registration
+}
+
+export async function deleteUnticketedRegistration(inviteId, registrationId) {
+  await request(`/data/invites/${inviteId}/unticketed-registrations/${registrationId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function rotateRegistrationsApiKey(inviteId) {
   const { credential } = await request(`/data/invites/${inviteId}/registrations-api/key`, {
     method: 'POST',

@@ -16,6 +16,7 @@ import {
   SITUACAO_BADGE,
   classifyGuestPeople,
   isConfirmedRegistration,
+  registrationTypeTotals,
   registrationChurch,
 } from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
@@ -153,6 +154,9 @@ export default function InviteSubmissionsAdmin() {
   const [apiCredential, setApiCredential] = useState(null)
   const [registrationLinksState, setRegistrationLinksState] = useState({ inviteId: null, links: [] })
   const [newLink, setNewLink] = useState({ label: '', maxRegistrations: 1 })
+  const [unticketedState, setUnticketedState] = useState({ inviteId: null, registrations: [] })
+  const [newUnticketed, setNewUnticketed] = useState({ spots: 1, reason: '' })
+  const [editingUnticketedId, setEditingUnticketedId] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -228,6 +232,9 @@ export default function InviteSubmissionsAdmin() {
   // Estatísticas do evento selecionado (contam TODAS as inscrições desse convite,
   // por situação, independentemente do filtro de situação).
   const eventRows = filterInvite ? (rows || []).filter((r) => r.inviteId === filterInvite) : []
+  const unticketedRegistrations =
+    unticketedState.inviteId === filterInvite ? unticketedState.registrations : []
+  const registrationTotals = registrationTypeTotals(eventRows, unticketedRegistrations)
   const countSit = (key) => eventRows.filter((r) => inscricaoSituacao(r) === key).length
   const eventStats = {
     total: eventRows.length,
@@ -412,6 +419,7 @@ export default function InviteSubmissionsAdmin() {
   const selectedInviteId = selectedInvite?.id ?? null
   const registrationLinks = registrationLinksState.inviteId === selectedInviteId ? registrationLinksState.links : []
   const registrationLinksLoading = !!selectedInviteId && registrationLinksState.inviteId !== selectedInviteId
+  const unticketedLoading = !!selectedInviteId && unticketedState.inviteId !== selectedInviteId
 
   useEffect(() => {
     if (!selectedInviteId) return undefined
@@ -424,6 +432,17 @@ export default function InviteSubmissionsAdmin() {
       .catch((err) => {
         if (!ignore) {
           setRegistrationLinksState({ inviteId: selectedInviteId, links: [] })
+          toast.error(err.message)
+        }
+      })
+    invitesService
+      .listUnticketedRegistrations(selectedInviteId)
+      .then((registrations) => {
+        if (!ignore) setUnticketedState({ inviteId: selectedInviteId, registrations })
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setUnticketedState({ inviteId: selectedInviteId, registrations: [] })
           toast.error(err.message)
         }
       })
@@ -441,6 +460,8 @@ export default function InviteSubmissionsAdmin() {
     try {
       const links = await invitesService.listRegistrationLinks(selectedInviteId)
       setRegistrationLinksState({ inviteId: selectedInviteId, links })
+      const registrations = await invitesService.listUnticketedRegistrations(selectedInviteId)
+      setUnticketedState({ inviteId: selectedInviteId, registrations })
     } catch (err) {
       toast.error(err.message)
     }
@@ -468,6 +489,61 @@ export default function InviteSubmissionsAdmin() {
       }))
       setNewLink({ label: '', maxRegistrations: 1 })
       toast.success('Link privado criado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const createUnticketed = async (event) => {
+    event.preventDefault()
+    if (!selectedInvite) return
+    setBusy(true)
+    try {
+      const payload = { spots: Number(newUnticketed.spots), reason: newUnticketed.reason }
+      const registration = editingUnticketedId
+        ? await invitesService.updateUnticketedRegistration(
+            selectedInvite.id,
+            editingUnticketedId,
+            payload
+          )
+        : await invitesService.createUnticketedRegistration(selectedInvite.id, payload)
+      setUnticketedState((current) => ({
+        inviteId: selectedInvite.id,
+        registrations: editingUnticketedId
+          ? current.registrations.map((item) => (item.id === registration.id ? registration : item))
+          : current.inviteId === selectedInvite.id
+            ? [registration, ...current.registrations]
+            : [registration],
+      }))
+      setNewUnticketed({ spots: 1, reason: '' })
+      setEditingUnticketedId(null)
+      toast.success(editingUnticketedId ? 'Inscrição sem bilhete atualizada.' : 'Inscrição sem bilhete adicionada.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const editUnticketed = (registration) => {
+    setEditingUnticketedId(registration.id)
+    setNewUnticketed({ spots: registration.spots, reason: registration.reason })
+  }
+  const cancelUnticketedEdit = () => {
+    setEditingUnticketedId(null)
+    setNewUnticketed({ spots: 1, reason: '' })
+  }
+  const deleteUnticketed = async (registration) => {
+    if (!selectedInvite || !window.confirm(`Eliminar “${registration.reason}”?`)) return
+    setBusy(true)
+    try {
+      await invitesService.deleteUnticketedRegistration(selectedInvite.id, registration.id)
+      setUnticketedState((current) => ({
+        ...current,
+        registrations: current.registrations.filter((item) => item.id !== registration.id),
+      }))
+      if (editingUnticketedId === registration.id) cancelUnticketedEdit()
+      toast.success('Inscrição sem bilhete eliminada.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -705,6 +781,97 @@ export default function InviteSubmissionsAdmin() {
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
             <span>
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Convidados sem inscrição — {selectedInvite.title}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {unticketedLoading
+                  ? 'A carregar…'
+                  : `${registrationTotals.unticketed} lugar${registrationTotals.unticketed === 1 ? '' : 'es'} sem bilhete`}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 flex-none text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-border p-4">
+            <form className="grid items-end gap-3 md:grid-cols-[10rem_minmax(0,1fr)_auto]" onSubmit={createUnticketed}>
+              <label className={labelCls}>
+                Nº de vagas
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="1"
+                  max="100000"
+                  value={newUnticketed.spots}
+                  onChange={(event) =>
+                    setNewUnticketed((current) => ({ ...current, spots: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label className={labelCls}>
+                Motivo
+                <input
+                  className={inputCls}
+                  value={newUnticketed.reason}
+                  onChange={(event) =>
+                    setNewUnticketed((current) => ({ ...current, reason: event.target.value }))
+                  }
+                  placeholder="Ex.: convidados da organização"
+                  maxLength={500}
+                  required
+                />
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" className={primaryBtn} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                  {editingUnticketedId ? 'Guardar' : 'Adicionar'}
+                </button>
+                {editingUnticketedId ? (
+                  <button type="button" className={ghostBtn} onClick={cancelUnticketedEdit} disabled={busy}>
+                    Cancelar
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {!unticketedLoading && unticketedRegistrations.length ? (
+              <div className="mt-4 divide-y divide-border border-y border-border">
+                {unticketedRegistrations.map((registration) => (
+                  <div key={registration.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="m-0 font-medium text-foreground">{registration.reason}</p>
+                      <p className="m-0 mt-1 text-xs text-muted-foreground">
+                        {registration.spots} lugar{registration.spots === 1 ? '' : 'es'} · {fmtDateTime(registration.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button type="button" className={iconBtn} onClick={() => editUnticketed(registration)} disabled={busy} title="Editar">
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        <span className="sr-only">Editar inscrição sem bilhete</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={iconBtn}
+                        onClick={() => deleteUnticketed(registration)}
+                        disabled={busy}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        <span className="sr-only">Eliminar inscrição sem bilhete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
+
+      {selectedInvite ? (
+        <details className="group rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Link2 className="h-4 w-4" aria-hidden="true" />
                 Links privados — {selectedInvite.title}
               </span>
@@ -856,6 +1023,22 @@ export default function InviteSubmissionsAdmin() {
             ) : null}
           </div>
         </details>
+      ) : null}
+
+      {filterInvite ? (
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {[
+            { label: 'Total inscritos', value: registrationTotals.total, cls: 'text-primary' },
+            { label: 'Com bilhete', value: registrationTotals.ticket, cls: 'text-foreground' },
+            { label: 'Com bilhete private', value: registrationTotals.privateTicket, cls: 'text-sky-700 dark:text-sky-400' },
+            { label: 'Sem bilhete', value: registrationTotals.unticketed, cls: 'text-amber-700 dark:text-amber-400' },
+          ].map((summary) => (
+            <div key={summary.label} className="rounded-lg border border-border bg-card p-3 text-center">
+              <div className={`text-2xl font-bold ${summary.cls}`}>{summary.value}</div>
+              <div className="text-xs text-muted-foreground">{summary.label}</div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {filterInvite ? (
