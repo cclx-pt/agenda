@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug, ChevronDown, Link2, Plus, Power } from 'lucide-react'
+import { Download, RefreshCw, Eye, Pencil, Ban, Trash2, Loader2, Undo2, StickyNote, Mail, Sparkles, Database, Braces, FileText, FileDown, Copy, KeyRound, Unplug, ChevronDown, Link2, Plus, Power, Check, X } from 'lucide-react'
 import * as invitesService from '../../services/invitesService'
 import {
   DropdownMenu,
@@ -157,6 +157,8 @@ export default function InviteSubmissionsAdmin() {
   const [apiCredential, setApiCredential] = useState(null)
   const [registrationLinksState, setRegistrationLinksState] = useState({ inviteId: null, links: [] })
   const [newLink, setNewLink] = useState({ label: '', maxRegistrations: 1 })
+  const [editingLinkId, setEditingLinkId] = useState(null)
+  const [linkMaxRegistrations, setLinkMaxRegistrations] = useState(1)
   const [unticketedState, setUnticketedState] = useState({ inviteId: null, registrations: [] })
   const [newUnticketed, setNewUnticketed] = useState({ spots: 1, reason: '' })
   const [editingUnticketedId, setEditingUnticketedId] = useState(null)
@@ -576,6 +578,39 @@ export default function InviteSubmissionsAdmin() {
       setBusy(false)
     }
   }
+  const editPrivateLink = (link) => {
+    setEditingLinkId(link.id)
+    setLinkMaxRegistrations(link.maxRegistrations)
+  }
+  const cancelPrivateLinkEdit = () => {
+    setEditingLinkId(null)
+    setLinkMaxRegistrations(1)
+  }
+  const savePrivateLink = async (event, link) => {
+    event.preventDefault()
+    if (!selectedInvite) return
+    const maxRegistrations = Number(linkMaxRegistrations)
+    if (maxRegistrations < link.registrationsCount) {
+      toast.error(`O máximo não pode ser inferior ao número de inscrições já existentes neste link (${link.registrationsCount}).`)
+      return
+    }
+    setBusy(true)
+    try {
+      const updated = await invitesService.updateRegistrationLink(selectedInvite.id, link.id, {
+        maxRegistrations,
+      })
+      setRegistrationLinksState((current) => ({
+        ...current,
+        links: current.links.map((item) => (item.id === updated.id ? updated : item)),
+      }))
+      cancelPrivateLinkEdit()
+      toast.success('Máximo de inscrições atualizado.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
   const rotateApiKey = async () => {
     if (!selectedInvite) return
     if (
@@ -955,6 +990,33 @@ export default function InviteSubmissionsAdmin() {
                       <p className="m-0 mt-1 truncate text-xs text-muted-foreground">{link.url}</p>
                     </div>
                     <div className="flex flex-none items-center gap-2">
+                      {editingLinkId === link.id ? (
+                        <form className="flex items-center gap-1" onSubmit={(event) => savePrivateLink(event, link)}>
+                          <input
+                            className="w-24 rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+                            type="number"
+                            min={Math.max(1, link.registrationsCount)}
+                            max="100000"
+                            value={linkMaxRegistrations}
+                            onChange={(event) => setLinkMaxRegistrations(event.target.value)}
+                            aria-label={`Máximo de inscrições para ${link.label}`}
+                            required
+                          />
+                          <button type="submit" className={iconBtn} disabled={busy} title="Guardar máximo">
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Guardar máximo</span>
+                          </button>
+                          <button type="button" className={iconBtn} onClick={cancelPrivateLinkEdit} disabled={busy} title="Cancelar edição">
+                            <X className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Cancelar edição</span>
+                          </button>
+                        </form>
+                      ) : (
+                        <button type="button" className={iconBtn} onClick={() => editPrivateLink(link)} disabled={busy} title="Editar máximo de inscrições">
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                          <span className="sr-only">Editar máximo de inscrições</span>
+                        </button>
+                      )}
                       <button type="button" className={ghostBtn} onClick={() => copyApiValue(link.url, 'Ligação')}>
                         <Copy className="h-4 w-4" aria-hidden="true" />
                         Copiar

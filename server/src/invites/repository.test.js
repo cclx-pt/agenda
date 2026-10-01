@@ -10,8 +10,42 @@ const {
   deleteUnticketedRegistration,
   insertGuestWithCapacity,
   insertUnticketedRegistration,
+  updateRegistrationLink,
   updateUnticketedRegistration,
 } = await import('./repository.js')
+
+test('a private link maximum cannot be reduced below its active registrations', async () => {
+  const queries = []
+  let released = false
+  const client = {
+    async query(sql) {
+      queries.push(sql)
+      if (sql.includes('SELECT * FROM invite_registration_links')) {
+        return { rows: [{ id: 'link-1', invite_id: 'invite-1', max_registrations: 5 }] }
+      }
+      if (sql.includes('COUNT(*)::int AS registrations_count')) {
+        return { rows: [{ registrations_count: 3 }] }
+      }
+      return { rows: [] }
+    },
+    release() {
+      released = true
+    },
+  }
+  const originalConnect = pool.connect
+  pool.connect = async () => client
+
+  try {
+    const result = await updateRegistrationLink('invite-1', 'link-1', { maxRegistrations: 2 })
+
+    assert.deepEqual(result, { reason: 'limit_below_usage', link: null, registrationsCount: 3 })
+    assert.equal(queries.some((sql) => sql.includes('UPDATE invite_registration_links')), false)
+    assert.equal(queries.at(-1), 'ROLLBACK')
+    assert.equal(released, true)
+  } finally {
+    pool.connect = originalConnect
+  }
+})
 
 test('an exhausted private registration link rejects the insert atomically', async () => {
   const queries = []
