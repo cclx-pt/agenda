@@ -452,19 +452,55 @@ export async function insertRegistrationLink(inviteId, data) {
 }
 
 export async function updateRegistrationLink(inviteId, linkId, data) {
-  const { rows } = await pool.query(
-    `UPDATE invite_registration_links
-     SET label = COALESCE($3, label),
-         max_registrations = COALESCE($4, max_registrations),
-         is_active = COALESCE($5, is_active),
-         updated_at = now()
-     WHERE id = $1 AND invite_id = $2
-     RETURNING *`,
-    [linkId, inviteId, data.label ?? null, data.maxRegistrations ?? null, data.isActive ?? null]
-  )
-  if (!rows[0]) return null
-  const links = await listRegistrationLinks(inviteId)
-  return links.find((link) => link.id === linkId) ?? null
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows: linkRows } = await client.query(
+      `SELECT * FROM invite_registration_links
+       WHERE id = $1 AND invite_id = $2
+       FOR UPDATE`,
+      [linkId, inviteId]
+    )
+    if (!linkRows[0]) {
+      await client.query('ROLLBACK')
+      return { reason: 'not_found', link: null, registrationsCount: 0 }
+    }
+
+    const { rows: countRows } = await client.query(
+      `SELECT COUNT(*)::int AS registrations_count
+       FROM invite_guests
+       WHERE registration_link_id = $1
+         AND rsvp_state IN ('pending', 'confirmed', 'waitlisted')`,
+      [linkId]
+    )
+    const registrationsCount = countRows[0]?.registrations_count ?? 0
+    if (data.maxRegistrations != null && data.maxRegistrations < registrationsCount) {
+      await client.query('ROLLBACK')
+      return { reason: 'limit_below_usage', link: null, registrationsCount }
+    }
+
+    const { rows } = await client.query(
+      `UPDATE invite_registration_links
+       SET label = COALESCE($3, label),
+           max_registrations = COALESCE($4, max_registrations),
+           is_active = COALESCE($5, is_active),
+           updated_at = now()
+       WHERE id = $1 AND invite_id = $2
+       RETURNING *`,
+      [linkId, inviteId, data.label ?? null, data.maxRegistrations ?? null, data.isActive ?? null]
+    )
+    await client.query('COMMIT')
+    return {
+      reason: null,
+      link: mapRegistrationLink({ ...rows[0], registrations_count: registrationsCount }),
+      registrationsCount,
+    }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 // ── Inscrições administrativas sem bilhete ─────────────────────

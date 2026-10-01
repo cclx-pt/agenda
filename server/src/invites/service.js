@@ -515,9 +515,15 @@ export async function updateRegistrationLink(user, inviteId, linkId, input) {
   const invite = await getManagedInvite(user, inviteId)
   const data = registrationLinkUpdateSchema.parse(input)
   if (Object.keys(data).length === 0) throw new InviteError(400, 'Indique uma alteração para o link.')
-  const link = await repo.updateRegistrationLink(inviteId, linkId, data)
-  if (!link) throw new InviteError(404, 'Link privado não encontrado.')
-  return withRegistrationLinkUrl(invite, link)
+  const result = await repo.updateRegistrationLink(inviteId, linkId, data)
+  if (result.reason === 'not_found') throw new InviteError(404, 'Link privado não encontrado.')
+  if (result.reason === 'limit_below_usage') {
+    throw new InviteError(
+      409,
+      `O máximo não pode ser inferior ao número de inscrições já existentes neste link (${result.registrationsCount}).`
+    )
+  }
+  return withRegistrationLinkUrl(invite, result.link)
 }
 
 export async function listUnticketedRegistrations(user, inviteId) {
