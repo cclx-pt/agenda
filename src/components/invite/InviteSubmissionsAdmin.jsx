@@ -21,6 +21,7 @@ import {
 } from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
 import { buildRegistrationKit, buildRegistrationKitArchive } from './registrationExport'
+import { filterInviteSubmissions } from './inviteSubmissionFilters'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -144,6 +145,8 @@ export default function InviteSubmissionsAdmin() {
   const [filterTicket, setFilterTicket] = useState('')
   const [filterSituacao, setFilterSituacao] = useState('')
   const [filterPayment, setFilterPayment] = useState('')
+  const [filterAccess, setFilterAccess] = useState('')
+  const [filterPeople, setFilterPeople] = useState('')
   const [searchName, setSearchName] = useState('')
   const [searchPhone, setSearchPhone] = useState('')
   const [searchEmail, setSearchEmail] = useState('')
@@ -188,16 +191,17 @@ export default function InviteSubmissionsAdmin() {
     load()
   }, [load])
 
-  const filtered = (rows || []).filter((r) => {
-    if (filterInvite && r.inviteId !== filterInvite) return false
-    if (filterChurch && registrationChurch(r) !== filterChurch) return false
-    if (filterTicket && (r.ticket?.name || 'Sem bilhete') !== filterTicket) return false
-    if (filterSituacao && inscricaoSituacao(r) !== filterSituacao) return false
-    if (filterPayment && (r.paymentState || 'not_applicable') !== filterPayment) return false
-    if (searchName && !String(r.name || '').toLocaleLowerCase('pt-PT').includes(searchName.trim().toLocaleLowerCase('pt-PT'))) return false
-    if (searchPhone && !String(r.phone || '').replace(/\D/g, '').includes(searchPhone.replace(/\D/g, ''))) return false
-    if (searchEmail && !String(r.email || '').toLocaleLowerCase('pt-PT').includes(searchEmail.trim().toLocaleLowerCase('pt-PT'))) return false
-    return true
+  const filtered = filterInviteSubmissions(rows, {
+    invite: filterInvite,
+    church: filterChurch,
+    ticket: filterTicket,
+    situacao: filterSituacao,
+    payment: filterPayment,
+    access: filterAccess,
+    people: filterPeople,
+    name: searchName,
+    phone: searchPhone,
+    email: searchEmail,
   })
 
   const hasFilters = !!(
@@ -206,6 +210,8 @@ export default function InviteSubmissionsAdmin() {
     filterTicket ||
     filterSituacao ||
     filterPayment ||
+    filterAccess ||
+    filterPeople ||
     searchName ||
     searchPhone ||
     searchEmail
@@ -216,6 +222,8 @@ export default function InviteSubmissionsAdmin() {
     setFilterTicket('')
     setFilterSituacao('')
     setFilterPayment('')
+    setFilterAccess('')
+    setFilterPeople('')
     setSearchName('')
     setSearchPhone('')
     setSearchEmail('')
@@ -714,12 +722,28 @@ export default function InviteSubmissionsAdmin() {
             </select>
           </label>
           <label className={labelCls}>
+            Inscrição
+            <select className={selectCls} value={filterAccess} onChange={(e) => setFilterAccess(e.target.value)}>
+              <option value="">Públicas e privadas</option>
+              <option value="private">Só privadas</option>
+              <option value="public">Só públicas</option>
+            </select>
+          </label>
+          <label className={labelCls}>
+            Pessoas
+            <select className={selectCls} value={filterPeople} onChange={(e) => setFilterPeople(e.target.value)}>
+              <option value="">Com e sem crianças</option>
+              <option value="with-children">Com crianças</option>
+              <option value="without-children">Sem crianças</option>
+            </select>
+          </label>
+          <label className={labelCls}>
             Nome
             <input className={inputCls} value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Pesquisar nome" />
           </label>
           <label className={labelCls}>
-            Telefone
-            <input className={inputCls} value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} placeholder="Pesquisar telefone" />
+            Telemóvel
+            <input className={inputCls} value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} placeholder="Pesquisar telemóvel" />
           </label>
           <label className={labelCls}>
             Email
@@ -1026,16 +1050,23 @@ export default function InviteSubmissionsAdmin() {
       ) : null}
 
       {filterInvite ? (
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           {[
-            { label: 'Total inscritos', value: registrationTotals.total, cls: 'text-primary' },
-            { label: 'Com bilhete', value: registrationTotals.ticket, cls: 'text-foreground' },
-            { label: 'Com bilhete private', value: registrationTotals.privateTicket, cls: 'text-sky-700 dark:text-sky-400' },
+            { label: 'Total pessoas inscritas', value: registrationTotals.total, cls: 'text-primary' },
+            { label: 'Com bilhete público', value: registrationTotals.ticket, cls: 'text-foreground' },
+            { label: 'Com bilhete privado', value: registrationTotals.privateTicket, cls: 'text-sky-700 dark:text-sky-400' },
+            {
+              label: 'Crianças',
+              value: registrationTotals.children,
+              cls: 'text-emerald-700 dark:text-emerald-400',
+              note: 'Este número soma ao total de inscritos.',
+            },
             { label: 'Sem bilhete', value: registrationTotals.unticketed, cls: 'text-amber-700 dark:text-amber-400' },
           ].map((summary) => (
             <div key={summary.label} className="rounded-lg border border-border bg-card p-3 text-center">
               <div className={`text-2xl font-bold ${summary.cls}`}>{summary.value}</div>
               <div className="text-xs text-muted-foreground">{summary.label}</div>
+              {summary.note ? <div className="mt-1 text-[11px] text-muted-foreground">{summary.note}</div> : null}
             </div>
           ))}
         </div>
