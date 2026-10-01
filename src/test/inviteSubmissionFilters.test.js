@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterInviteSubmissions } from '../components/invite/inviteSubmissionFilters'
+import { filterInviteSubmissions, publishedInvites } from '../components/invite/inviteSubmissionFilters'
 
 const registrations = [
   {
@@ -42,6 +42,16 @@ const emptyFilters = {
 }
 
 describe('registration management filters', () => {
+  it('only exposes published invites to registration management', () => {
+    const invites = [
+      { id: 'published', status: 'publicado' },
+      { id: 'draft', status: 'rascunho' },
+      { id: 'closed', status: 'fechado' },
+    ]
+
+    expect(publishedInvites(invites).map((invite) => invite.id)).toEqual(['published'])
+  })
+
   it('filters private registrations with children', () => {
     const result = filterInviteSubmissions(registrations, {
       ...emptyFilters,
