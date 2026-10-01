@@ -1,0 +1,28 @@
+name: Campaign worker
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: campaign-worker
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Process due communications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake campaign worker
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --retry-all-errors \
+            --max-time 240 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://agenda.cclx.pt/data/integration/campaigns/cron

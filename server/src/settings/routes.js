@@ -10,6 +10,24 @@ export const integrationRouter = Router()
 
 const adminOnly = requireRole('admin')
 
+function authorizeCron(req, res) {
+  const secret = config.cron?.secret
+  if (secret) {
+    const auth = req.get('authorization') || ''
+    const provided = auth.startsWith('Bearer ')
+      ? auth.slice(7)
+      : req.get('x-cron-secret') || ''
+    if (provided !== secret) {
+      res.status(401).json({ error: 'Não autorizado.' })
+      return false
+    }
+  } else if (config.isProd) {
+    res.status(503).json({ error: 'CRON_SECRET não configurado no servidor.' })
+    return false
+  }
+  return true
+}
+
 // Estado público da integração (sem autenticação): o calendário usa-o para
 // decidir se carrega os eventos da inChurch.
 integrationRouter.get('/public', async (_req, res, next) => {
@@ -69,24 +87,23 @@ integrationRouter.post('/purge', adminOnly, async (_req, res, next) => {
 // (não força). O Vercel Cron envia "Authorization: Bearer <CRON_SECRET>".
 integrationRouter.get('/sync/cron', async (req, res, next) => {
   try {
-    const secret = config.cron?.secret
-    if (secret) {
-      const auth = req.get('authorization') || ''
-      const provided = auth.startsWith('Bearer ')
-        ? auth.slice(7)
-        : req.get('x-cron-secret') || ''
-      if (provided !== secret) {
-        return res.status(401).json({ error: 'Não autorizado.' })
-      }
-    } else if (config.isProd) {
-      // Em produção sem CRON_SECRET, recusa por segurança (endpoint sem sessão).
-      return res.status(503).json({ error: 'CRON_SECRET não configurado no servidor.' })
-    }
+    if (!authorizeCron(req, res)) return
     const [result, campaignQueue] = await Promise.all([
       runSync({ force: false }),
       processDueCampaigns(),
     ])
     res.json({ result, campaignQueue })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Worker frequente das comunicações. Separado da sincronização para que um
+// agendamento externo possa acordar apenas as campanhas vencidas.
+integrationRouter.get('/campaigns/cron', async (req, res, next) => {
+  try {
+    if (!authorizeCron(req, res)) return
+    res.json({ campaignQueue: await processDueCampaigns() })
   } catch (err) {
     next(err)
   }

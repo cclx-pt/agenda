@@ -112,6 +112,11 @@ periodicamente para a tabela `external_events` (INSERT/UPDATE/DELETE) por:
   imediata, ignorando o intervalo.
 - **Agendador em processo** — só quando se corre como app Node standalone
   (`npm start`); no Vercel não corre. Desliga-se com `SYNC_SCHEDULER=off`.
+- **Worker das comunicações** — o workflow GitHub Actions
+  `.github/workflows/campaign-worker.yml` chama
+  `/data/integration/campaigns/cron` a cada 5 minutos com o mesmo
+  `CRON_SECRET`. O segredo deve existir tanto na Vercel Production como nos
+  Actions secrets do repositório.
 
 ## 5. Migrar e popular a base de dados
 

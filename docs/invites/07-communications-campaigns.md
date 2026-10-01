@@ -171,10 +171,10 @@ colocada em branco; o valor anterior, a inscrição, a campanha e a data da
 alteração ficam guardados em `invite_image_consent_audit`. Cliques repetidos são
 idempotentes e não criam novas alterações.
 
-O browser aberto consulta agendamentos e ativa trabalho vencido. O cron também
-processa agendamentos e automatizações; no plano Vercel Hobby, em que o cron é
-diário, a precisão sem uma sessão de gestão aberta fica limitada à frequência
-permitida pelo plano.
+O browser aberto consulta agendamentos e ativa trabalho vencido. Em produção, um
+workflow GitHub Actions chama o worker dedicado a cada cinco minutos, pelo que um
+envio pode começar até cerca de cinco minutos depois da hora agendada. O cron
+diário da Vercel permanece como rede de segurança.
 
 ### Fornecedor e métricas
 
