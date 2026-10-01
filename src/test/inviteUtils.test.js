@@ -57,24 +57,30 @@ describe('invite management helpers', () => {
     expect(inviteHomeHref('evento')).toBe('/invite/evento?private=private-token-123456')
   })
 
-  it('adds multiple unticketed rows to the registration total without treating them as tickets', () => {
+  it('counts private registrations as rows and adds children separately to the total', () => {
     const guests = [
-      { ticket: { id: 'ticket-1' }, rsvpState: 'confirmed', paymentState: 'paid' },
+      {
+        ticket: { id: 'ticket-1' },
+        rsvpState: 'confirmed',
+        paymentState: 'paid',
+        extra: { criancas: [{ idade: 8 }] },
+      },
       {
         ticket: { id: 'ticket-1' },
         isPrivateRegistration: true,
         rsvpState: 'confirmed',
         paymentState: 'not_applicable',
-        extra: { numCriancas: 1 },
+        extra: { numCriancas: 2 },
       },
       { ticket: { id: 'ticket-1' }, rsvpState: 'declined', paymentState: 'not_applicable' },
     ]
 
     expect(registrationTypeTotals(guests, [{ spots: 3 }, { spots: 2 }])).toEqual({
       ticket: 1,
-      privateTicket: 2,
+      privateTicket: 1,
+      children: 3,
       unticketed: 5,
-      total: 8,
+      total: 10,
     })
   })
 })

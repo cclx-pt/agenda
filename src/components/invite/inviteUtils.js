@@ -171,18 +171,18 @@ export function registrationTypeTotals(guests, unticketedRegistrations) {
   const totals = (guests || []).reduce(
     (result, guest) => {
       if (!isConfirmedRegistration(guest) || !guest.ticket) return result
-      const spots = classifyGuestPeople(guest, guest.ticket).total
-      if (guest.isPrivateRegistration) result.privateTicket += spots
-      else result.ticket += spots
+      if (guest.isPrivateRegistration) result.privateTicket += 1
+      else result.ticket += 1
+      result.children += classifyGuestPeople(guest, guest.ticket).criancas
       return result
     },
-    { ticket: 0, privateTicket: 0 }
+    { ticket: 0, privateTicket: 0, children: 0 }
   )
   totals.unticketed = (unticketedRegistrations || []).reduce(
     (sum, registration) => sum + Number(registration.spots || 0),
     0
   )
-  totals.total = totals.ticket + totals.privateTicket + totals.unticketed
+  totals.total = totals.ticket + totals.privateTicket + totals.children + totals.unticketed
   return totals
 }
 
