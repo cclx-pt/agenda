@@ -176,10 +176,20 @@ function statusClasses(status) {
 }
 
 function lisbonDateTimeToIso(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/.exec(value.trim())
   if (!match) return null
-  const parts = match.slice(1).map(Number)
-  const desiredUtc = Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4])
+  const [, day, month, year, hour, minute] = match.map(Number)
+  const desiredUtc = Date.UTC(year, month - 1, day, hour, minute)
+  const desiredDate = new Date(desiredUtc)
+  if (
+    desiredDate.getUTCFullYear() !== year ||
+    desiredDate.getUTCMonth() !== month - 1 ||
+    desiredDate.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59
+  ) {
+    return null
+  }
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Lisbon',
     year: 'numeric',
@@ -199,22 +209,26 @@ function lisbonDateTimeToIso(value) {
     Number(shown.hour),
     Number(shown.minute)
   )
-  return new Date(desiredUtc + (desiredUtc - shownUtc)).toISOString()
+  const iso = new Date(desiredUtc + (desiredUtc - shownUtc)).toISOString()
+  return isoToLisbonDateTime(iso) === value.trim() ? iso : null
 }
 
 function isoToLisbonDateTime(value) {
   if (!value) return ''
-  return new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Europe/Lisbon',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-    .format(new Date(value))
-    .replace(' ', 'T')
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Lisbon',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date(value))
+      .map((part) => [part.type, part.value])
+  )
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`
 }
 
 function escapeEditorHtml(value) {
@@ -1215,7 +1229,7 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
   }
   const scheduleCampaign = async () => {
     const iso = lisbonDateTimeToIso(scheduledAt)
-    if (!iso) return toast.error('Indique a data e hora do envio.')
+    if (!iso) return toast.error('Indique uma data e hora válidas no formato DD/MM/AAAA HH:mm.')
     const selectedId =
       campaignStatus === 'scheduled' ? campaignId : (await save())?.id
     if (!selectedId) return
@@ -1928,7 +1942,9 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                   <label className="text-xs font-medium">
                     Nova data (hora de Lisboa)
                     <input
-                      type="datetime-local"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD/MM/AAAA HH:mm"
                       className={inputCls + ' mt-1'}
                       value={scheduledAt}
                       onChange={(event) => setScheduledAt(event.target.value)}
@@ -1978,7 +1994,9 @@ export default function InviteCommunications({ invite, tickets = [], formFields 
                 <span>
                   Agendar (hora de Lisboa)
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="DD/MM/AAAA HH:mm"
                     className={inputCls + ' mt-1'}
                     value={scheduledAt}
                     onChange={(event) => setScheduledAt(event.target.value)}

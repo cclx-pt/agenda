@@ -463,7 +463,10 @@ describe('InviteCommunications', () => {
     await userEvent.type(screen.getByLabelText('Nome interno'), 'Agendado')
     await userEvent.type(screen.getByLabelText('Assunto'), 'Informação')
     await userEvent.type(screen.getByPlaceholderText('Escreva a mensagem…'), 'Mensagem')
-    await userEvent.type(screen.getByLabelText('Agendar (hora de Lisboa)'), '2030-06-01T10:00')
+    await userEvent.type(
+      screen.getByLabelText('Agendar (hora de Lisboa)'),
+      '01/06/2030 10:00'
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Agendar' }))
 
     await waitFor(() =>
