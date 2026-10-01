@@ -21,7 +21,7 @@ import {
 } from './inviteUtils'
 import { fieldLabel } from './inviteFormFields'
 import { buildRegistrationKit, buildRegistrationKitArchive } from './registrationExport'
-import { filterInviteSubmissions } from './inviteSubmissionFilters'
+import { filterInviteSubmissions, publishedInvites } from './inviteSubmissionFilters'
 
 const ghostBtn =
   'inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60'
@@ -164,7 +164,7 @@ export default function InviteSubmissionsAdmin() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const invs = await invitesService.listInvites()
+      const invs = publishedInvites(await invitesService.listInvites())
       setInvites(invs)
       const perInvite = await Promise.all(
         invs.map(async (inv) => {

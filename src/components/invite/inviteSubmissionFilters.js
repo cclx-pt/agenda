@@ -1,5 +1,9 @@
 import { classifyGuestPeople, inscricaoSituacao, registrationChurch } from './inviteUtils'
 
+export function publishedInvites(invites) {
+  return (invites || []).filter((invite) => invite.status === 'publicado')
+}
+
 export function filterInviteSubmissions(rows, filters) {
   const name = filters.name.trim().toLocaleLowerCase('pt-PT')
   const phone = filters.phone.replace(/\D/g, '')
