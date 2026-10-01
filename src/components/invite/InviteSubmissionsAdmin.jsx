@@ -1054,14 +1054,24 @@ export default function InviteSubmissionsAdmin() {
           {[
             { label: 'Total pessoas inscritas', value: registrationTotals.total, cls: 'text-primary' },
             { label: 'Com bilhete público', value: registrationTotals.ticket, cls: 'text-foreground' },
-            { label: 'Com bilhete privado', value: registrationTotals.privateTicket, cls: 'text-sky-700 dark:text-sky-400' },
+            {
+              label: 'Com bilhete privado',
+              value: registrationTotals.privateTicket,
+              cls: 'text-sky-700 dark:text-sky-400',
+              note: 'Este número soma ao total de inscritos.',
+            },
             {
               label: 'Crianças',
               value: registrationTotals.children,
               cls: 'text-emerald-700 dark:text-emerald-400',
               note: 'Este número soma ao total de inscritos.',
             },
-            { label: 'Sem bilhete', value: registrationTotals.unticketed, cls: 'text-amber-700 dark:text-amber-400' },
+            {
+              label: 'Sem bilhete',
+              value: registrationTotals.unticketed,
+              cls: 'text-amber-700 dark:text-amber-400',
+              note: 'Este número soma ao total de inscritos.',
+            },
           ].map((summary) => (
             <div key={summary.label} className="rounded-lg border border-border bg-card p-3 text-center">
               <div className={`text-2xl font-bold ${summary.cls}`}>{summary.value}</div>
